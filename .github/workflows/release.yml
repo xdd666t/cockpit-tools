@@ -59,13 +59,29 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
+      - name: Sync versions
+        run: npm run sync-version
+
+      - name: Read app version
+        id: app_version
+        run: echo "VERSION=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Validate tag matches version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          EXPECTED_TAG="v${{ steps.app_version.outputs.VERSION }}"
+          if [ "${GITHUB_REF_NAME}" != "${EXPECTED_TAG}" ]; then
+            echo "Tag (${GITHUB_REF_NAME}) does not match package.json version (${EXPECTED_TAG})."
+            exit 1
+          fi
+
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Cockpit Tools ${{ github.ref_name }}"
+          tagName: "v${{ steps.app_version.outputs.VERSION }}"
+          releaseName: "Cockpit Tools v${{ steps.app_version.outputs.VERSION }}"
           releaseBody: "See the assets to download this version and install."
           releaseDraft: false
           prerelease: false
