@@ -927,7 +927,7 @@
     },
     "delete": {
       "title": "Smazat instanci",
-      "message": "Smazat instanci {{name}}? Bude odstraněna pouze konfigurace, složka zůstane zachována."
+      "message": "Smazat instanci {{name}}? Tím se odstraní konfigurace a smaže se složka instance."
     },
     "modal": {
       "createTitle": "Nová instance",

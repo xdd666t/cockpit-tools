@@ -136,6 +136,7 @@ pub struct QuotaFetchError {
 #[derive(Debug, Clone)]
 pub struct QuotaFetchResult {
     pub quota: QuotaData,
+    #[allow(dead_code)]
     pub project_id: Option<String>,
     pub error: Option<QuotaFetchError>,
 }

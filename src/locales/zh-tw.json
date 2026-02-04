@@ -927,7 +927,7 @@
     },
     "delete": {
       "title": "刪除實例",
-      "message": "是否刪除實例 {{name}}？僅移除配置，不會刪除本地數據目錄。"
+      "message": "是否刪除實例 {{name}}？這將移除配置並刪除實例目錄。"
     },
     "modal": {
       "createTitle": "新增實例",

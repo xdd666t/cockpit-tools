@@ -927,7 +927,7 @@
     },
     "delete": {
       "title": "Supprimer l'instance",
-      "message": "Supprimer l'instance {{name}} ? Seule la configuration sera supprimée, le dossier sera conservé."
+      "message": "Supprimer l'instance {{name}} ? Cela supprimera la configuration et le dossier de l'instance."
     },
     "modal": {
       "createTitle": "Nouvelle instance",

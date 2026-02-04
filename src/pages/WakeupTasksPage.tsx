@@ -1448,6 +1448,7 @@ export function WakeupTasksPage({ onNavigate }: WakeupPageProps) {
           codexAutoRefreshMinutes: config.codex_auto_refresh_minutes ?? 10,
           closeBehavior: config.close_behavior || 'ask',
           opencodeAppPath: config.opencode_app_path ?? '',
+          antigravityAppPath: config.antigravity_app_path ?? '',
           opencodeSyncOnSwitch: config.opencode_sync_on_switch ?? true,
         });
         

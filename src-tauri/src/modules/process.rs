@@ -3,6 +3,8 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 use sysinfo::System;
+#[cfg(target_os = "windows")]
+use crate::modules::config;
 
 const OPENCODE_APP_NAME: &str = "OpenCode";
 #[cfg(target_os = "macos")]
@@ -156,6 +158,61 @@ fn parse_env_value(raw: &str) -> Option<String> {
     } else {
         Some(value.to_string())
     }
+}
+
+fn split_command_tokens(command_line: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut quote: Option<char> = None;
+
+    for ch in command_line.chars() {
+        match quote {
+            Some(q) => {
+                if ch == q {
+                    quote = None;
+                } else {
+                    current.push(ch);
+                }
+            }
+            None => {
+                if ch == '"' || ch == '\'' {
+                    quote = Some(ch);
+                } else if ch.is_whitespace() {
+                    if !current.is_empty() {
+                        tokens.push(current.clone());
+                        current.clear();
+                    }
+                } else {
+                    current.push(ch);
+                }
+            }
+        }
+    }
+
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+
+    tokens
+}
+
+fn is_env_token(token: &str) -> bool {
+    let (key, _) = match token.split_once('=') {
+        Some(parts) => parts,
+        None => return false,
+    };
+    if key.is_empty() {
+        return false;
+    }
+    let mut chars = key.chars();
+    let first = match chars.next() {
+        Some(value) => value,
+        None => return false,
+    };
+    if !(first.is_ascii_alphabetic() || first == '_') {
+        return false;
+    }
+    chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
 
 fn extract_env_value(command_line: &str, key: &str) -> Option<String> {
@@ -861,37 +918,43 @@ pub fn start_antigravity_with_args(user_data_dir: &str, extra_args: &[String]) -
     {
         use std::os::windows::process::CommandExt;
 
-        // 尝试常见安装路径
-        let possible_paths = [
-            std::env::var("LOCALAPPDATA")
-                .ok()
-                .map(|p| format!("{}/Programs/Antigravity/Antigravity.exe", p)),
-            std::env::var("PROGRAMFILES")
-                .ok()
-                .map(|p| format!("{}/Antigravity/Antigravity.exe", p)),
-        ];
-
-        for path_opt in possible_paths.iter().flatten() {
-            let path = std::path::Path::new(path_opt);
-            if path.exists() {
-                let mut cmd = Command::new(path_opt);
-                cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-                if !user_data_dir.trim().is_empty() {
-                    cmd.arg("--user-data-dir");
-                    cmd.arg(user_data_dir.trim());
-                }
-                for arg in extra_args {
-                    if !arg.trim().is_empty() {
-                        cmd.arg(arg);
-                    }
-                }
-                cmd.spawn()
-                    .map_err(|e| format!("启动 Antigravity 失败: {}", e))?;
-                crate::modules::logger::log_info(&format!("Antigravity 已启动: {}", path_opt));
-                return Ok(());
-            }
+        let mut candidates: Vec<String> = Vec::new();
+        let custom_path = normalize_custom_path(Some(&config::get_user_config().antigravity_app_path));
+        if let Some(custom) = custom_path {
+            candidates.push(custom);
         }
-        return Err("未找到 Antigravity 可执行文件".to_string());
+
+        if let Ok(local_appdata) = std::env::var("LOCALAPPDATA") {
+            candidates.push(format!("{}/Programs/Antigravity/Antigravity.exe", local_appdata));
+        }
+
+        if let Ok(program_files) = std::env::var("PROGRAMFILES") {
+            candidates.push(format!("{}/Antigravity/Antigravity.exe", program_files));
+        }
+
+        for candidate in candidates {
+            if candidate.contains('/') || candidate.contains('\\') {
+                if !std::path::Path::new(&candidate).exists() {
+                    continue;
+                }
+            }
+            let mut cmd = Command::new(&candidate);
+            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            if !user_data_dir.trim().is_empty() {
+                cmd.arg("--user-data-dir");
+                cmd.arg(user_data_dir.trim());
+            }
+            for arg in extra_args {
+                if !arg.trim().is_empty() {
+                    cmd.arg(arg);
+                }
+            }
+            cmd.spawn()
+                .map_err(|e| format!("启动 Antigravity 失败: {}", e))?;
+            crate::modules::logger::log_info(&format!("Antigravity 已启动: {}", candidate));
+            return Ok(());
+        }
+        return Err("未找到 Antigravity 可执行文件，请在设置中配置启动路径".to_string());
     }
 
     #[cfg(target_os = "linux")]
@@ -944,42 +1007,117 @@ pub fn start_antigravity_with_args(user_data_dir: &str, extra_args: &[String]) -
 #[cfg(target_os = "macos")]
 fn collect_codex_process_entries() -> Vec<(u32, Option<String>)> {
     let mut result = Vec::new();
-    let output = Command::new("ps")
-        .args(["-eww", "-axo", "pid,command"])
-        .output();
-    let output = match output {
-        Ok(value) => value,
-        Err(_) => return result,
-    };
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines().skip(1) {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
+    let mut pids: Vec<u32> = Vec::new();
+    if let Ok(output) = Command::new("pgrep")
+        .args(["-f", "Codex.app/Contents/MacOS/Codex"])
+        .output()
+    {
+        if output.status.success() {
+            for line in String::from_utf8_lossy(&output.stdout).lines() {
+                if let Ok(pid) = line.trim().parse::<u32>() {
+                    pids.push(pid);
+                }
+            }
         }
-        let mut parts = line.splitn(2, |ch: char| ch.is_whitespace());
-        let pid_str = parts.next().unwrap_or("").trim();
-        let cmdline = parts.next().unwrap_or("").trim();
-        let pid = match pid_str.parse::<u32>() {
+    }
+
+    if pids.is_empty() {
+        let output = Command::new("ps")
+            .args(["-Eww", "-o", "pid=,command="])
+            .output();
+        let output = match output {
+            Ok(value) => value,
+            Err(_) => return result,
+        };
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let mut parts = line.splitn(2, |ch: char| ch.is_whitespace());
+            let pid_str = parts.next().unwrap_or("").trim();
+            let cmdline = parts.next().unwrap_or("").trim();
+            let pid = match pid_str.parse::<u32>() {
+                Ok(value) => value,
+                Err(_) => continue,
+            };
+            if !cmdline.to_lowercase().contains("codex.app/contents/macos/codex") {
+                continue;
+            }
+            pids.push(pid);
+        }
+    }
+
+    pids.sort();
+    pids.dedup();
+
+    for pid in pids {
+        let output = Command::new("ps")
+            .args(["-Eww", "-p", &pid.to_string(), "-o", "command="])
+            .output();
+        let output = match output {
             Ok(value) => value,
             Err(_) => continue,
         };
+        if !output.status.success() {
+            continue;
+        }
+        let cmdline = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if cmdline.is_empty() {
+            continue;
+        }
         let lower = cmdline.to_lowercase();
         if !lower.contains("codex.app/contents/macos/codex") {
             continue;
         }
-        let is_helper = lower.contains("--type=")
-            || lower.contains("helper")
-            || lower.contains("renderer")
-            || lower.contains("gpu")
-            || lower.contains("crashpad")
-            || lower.contains("utility")
-            || lower.contains("audio")
-            || lower.contains("sandbox");
+        crate::modules::logger::log_info(&format!(
+            "[Codex Instances] ps line pid={} cmdline={}",
+            pid, cmdline
+        ));
+        let tokens = split_command_tokens(&cmdline);
+        let mut args: Vec<String> = Vec::new();
+        let mut env_tokens: Vec<String> = Vec::new();
+        let mut saw_env = false;
+        for (idx, token) in tokens.into_iter().enumerate() {
+            if idx == 0 {
+                args.push(token);
+                continue;
+            }
+            if !saw_env && is_env_token(&token) {
+                saw_env = true;
+                env_tokens.push(token);
+                continue;
+            }
+            if saw_env {
+                env_tokens.push(token);
+            } else {
+                args.push(token);
+            }
+        }
+        let args_lower = args.join(" ").to_lowercase();
+        let is_helper = args_lower.contains("--type=")
+            || args_lower.contains("helper")
+            || args_lower.contains("renderer")
+            || args_lower.contains("gpu")
+            || args_lower.contains("crashpad")
+            || args_lower.contains("utility")
+            || args_lower.contains("audio")
+            || args_lower.contains("sandbox");
         if is_helper {
             continue;
         }
-        let codex_home = extract_env_value(cmdline, "CODEX_HOME");
+        let mut codex_home = env_tokens
+            .iter()
+            .find_map(|token| token.strip_prefix("CODEX_HOME="))
+            .map(|value| value.to_string());
+        if codex_home.is_none() {
+            codex_home = extract_env_value(&cmdline, "CODEX_HOME");
+        }
+        crate::modules::logger::log_info(&format!(
+            "[Codex Instances] pid={} parsed CODEX_HOME={:?}",
+            pid, codex_home
+        ));
         result.push((pid, codex_home));
     }
     result

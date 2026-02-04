@@ -927,7 +927,7 @@
     },
     "delete": {
       "title": "Eliminar instancia",
-      "message": "¿Eliminar la instancia {{name}}? Solo se eliminará la configuración, la carpeta se conservará."
+      "message": "¿Eliminar instancia {{name}}? Esto eliminará la configuración y borrará la carpeta de la instancia."
     },
     "modal": {
       "createTitle": "Nueva instancia",

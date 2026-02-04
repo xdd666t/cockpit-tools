@@ -927,7 +927,7 @@
     },
     "delete": {
       "title": "Usuń instancję",
-      "message": "Czy usunąć instancję {{name}}? Usunięta zostanie tylko konfiguracja, folder zostanie zachowany."
+      "message": "Czy usunąć instancję {{name}}? Spowoduje to usunięcie konfiguracji i folderu instancji."
     },
     "modal": {
       "createTitle": "Nowa instancja",

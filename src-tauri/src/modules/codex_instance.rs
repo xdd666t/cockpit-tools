@@ -83,7 +83,7 @@ pub fn get_default_instances_root_dir() -> Result<PathBuf, String> {
     #[cfg(target_os = "macos")]
     {
         let home = dirs::home_dir().ok_or("无法获取用户主目录")?;
-        return Ok(home.join("Library/Application Support/Codex_Profiles"));
+        return Ok(home.join(".antigravity_cockpit/instances/codex"));
     }
 
     #[allow(unreachable_code)]
@@ -211,15 +211,7 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
 
     if !user_data_dir.trim().is_empty() {
         let dir_path = PathBuf::from(&user_data_dir);
-        if dir_path.exists() {
-            match fs::remove_dir_all(&dir_path) {
-                Ok(()) => {}
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-                Err(err) => {
-                    return Err(format!("删除实例目录失败: {}", err));
-                }
-            }
-        }
+        modules::instance::delete_instance_directory(&dir_path)?;
     }
 
     store.instances.remove(index);

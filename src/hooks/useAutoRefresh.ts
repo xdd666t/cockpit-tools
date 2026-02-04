@@ -10,6 +10,7 @@ interface GeneralConfig {
   codex_auto_refresh_minutes: number;
   close_behavior: string;
   opencode_app_path?: string;
+  antigravity_app_path?: string;
   opencode_sync_on_switch?: boolean;
 }
 
@@ -44,6 +45,7 @@ export function useAutoRefresh() {
                 codexAutoRefreshMinutes: config.codex_auto_refresh_minutes,
                 closeBehavior: config.close_behavior || 'ask',
                 opencodeAppPath: config.opencode_app_path ?? '',
+                antigravityAppPath: config.antigravity_app_path ?? '',
                 opencodeSyncOnSwitch: config.opencode_sync_on_switch ?? true,
               });
               config.auto_refresh_minutes = 2;

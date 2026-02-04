@@ -168,7 +168,7 @@
     },
     "delete": {
       "title": "Delete Instance",
-      "message": "Delete instance {{name}}? This only removes the config and keeps the folder."
+      "message": "Delete instance {{name}}? This will remove the config and delete the instance folder."
     }
   },
   "settings": {

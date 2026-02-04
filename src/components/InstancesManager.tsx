@@ -93,11 +93,11 @@ export function InstancesManager<TAccount extends AccountLike>({
   const [formName, setFormName] = useState('');
   const [formPath, setFormPath] = useState('');
   const [formExtraArgs, setFormExtraArgs] = useState('');
-  const [formBindEnabled, setFormBindEnabled] = useState(false);
   const [formBindAccountId, setFormBindAccountId] = useState<string>('');
-  const [formFollowLocalAccount, setFormFollowLocalAccount] = useState(false);
   const [formCopySourceInstanceId, setFormCopySourceInstanceId] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const formErrorRef = useRef<HTMLDivElement | null>(null);
+  const [formErrorTick, setFormErrorTick] = useState(0);
   const [pathAuto, setPathAuto] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -121,6 +121,11 @@ export function InstancesManager<TAccount extends AccountLike>({
   useEffect(() => {
     localStorage.setItem(restartStrategyStorageKey, restartStrategy);
   }, [restartStrategy, restartStrategyStorageKey]);
+
+  useEffect(() => {
+    if (!formError || !showModal) return;
+    formErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [formError, formErrorTick, showModal]);
 
   const sortedInstances = useMemo(
     () =>
@@ -176,9 +181,7 @@ export function InstancesManager<TAccount extends AccountLike>({
     setFormName('');
     setFormPath(showRoot && defaultRoot ? defaultRoot : '');
     setFormExtraArgs('');
-    setFormBindEnabled(false);
     setFormBindAccountId('');
-    setFormFollowLocalAccount(false);
     setFormCopySourceInstanceId(defaultInstanceId);
     setFormError(null);
     setPathAuto(true);
@@ -198,14 +201,11 @@ export function InstancesManager<TAccount extends AccountLike>({
   }, [defaultInstanceId, editing, formCopySourceInstanceId, showModal]);
 
   const openEditModal = (instance: InstanceProfile) => {
-    const isFollowLocal = Boolean(instance.isDefault && instance.followLocalAccount);
     setEditing(instance);
     setFormName(instance.isDefault ? t('instances.defaultName', '默认实例') : instance.name || '');
     setFormPath(instance.userDataDir || '');
     setFormExtraArgs(instance.extraArgs || '');
-    setFormBindEnabled(!isFollowLocal && Boolean(instance.bindAccountId));
     setFormBindAccountId(instance.bindAccountId || '');
-    setFormFollowLocalAccount(isFollowLocal);
     setFormError(null);
     setPathAuto(false);
     setShowModal(true);
@@ -250,21 +250,25 @@ export function InstancesManager<TAccount extends AccountLike>({
     if (!isEditingDefault) {
       if (!formName.trim()) {
         setFormError(t('instances.form.nameRequired', '请输入实例名称'));
+        setFormErrorTick((prev) => prev + 1);
         return;
       }
       if (!formPath.trim()) {
         setFormError(t('instances.form.pathRequired', '请选择实例目录'));
+        setFormErrorTick((prev) => prev + 1);
         return;
       }
     }
 
     if (!editing && !formCopySourceInstanceId) {
       setFormError(t('instances.form.copySourceRequired', '请选择复制来源实例'));
+      setFormErrorTick((prev) => prev + 1);
       return;
     }
 
-    if (formBindEnabled && !formBindAccountId) {
+    if (!formBindAccountId) {
       setFormError(t('instances.form.bindRequired', '请选择要绑定的账号'));
+      setFormErrorTick((prev) => prev + 1);
       return;
     }
 
@@ -284,15 +288,10 @@ export function InstancesManager<TAccount extends AccountLike>({
         if (!isEditingDefault) {
           updatePayload.name = formName.trim();
         }
-
-        const nextBindId = formBindEnabled ? formBindAccountId : null;
-        if (isEditingDefault && formFollowLocalAccount) {
-          updatePayload.followLocalAccount = true;
-        } else if (editing.bindAccountId !== nextBindId) {
-          updatePayload.bindAccountId = nextBindId;
-          if (isEditingDefault) {
-            updatePayload.followLocalAccount = false;
-          }
+        const nextBindId = formBindAccountId;
+        updatePayload.bindAccountId = nextBindId;
+        if (isEditingDefault) {
+          updatePayload.followLocalAccount = false;
         }
 
         await updateInstance(updatePayload);
@@ -303,7 +302,7 @@ export function InstancesManager<TAccount extends AccountLike>({
           name: formName.trim(),
           userDataDir: formPath.trim(),
           extraArgs: formExtraArgs,
-          bindAccountId: formBindEnabled ? formBindAccountId : null,
+          bindAccountId: formBindAccountId,
           copySourceInstanceId: formCopySourceInstanceId,
         });
         setMessage({ text: t('instances.messages.created', '实例已创建') });
@@ -319,7 +318,7 @@ export function InstancesManager<TAccount extends AccountLike>({
   const handleDelete = async (instance: InstanceProfile) => {
     try {
       const confirmed = await confirmDialog(
-        t('instances.delete.message', '确认删除实例 {{name}}？仅移除配置，不会删除目录。', {
+        t('instances.delete.message', '确认删除实例 {{name}}？将移除配置并删除实例目录。', {
           name: instance.name,
         }),
         {
@@ -768,45 +767,19 @@ export function InstancesManager<TAccount extends AccountLike>({
   };
 
   const handleFormAccountChange = (nextId: string | null) => {
-    setFormFollowLocalAccount(false);
-    if (nextId) {
-      setFormBindEnabled(true);
-      setFormBindAccountId(nextId);
-      return;
-    }
-    setFormBindEnabled(false);
-    setFormBindAccountId('');
-  };
-
-  const handleFormFollowCurrent = () => {
-    setFormFollowLocalAccount(true);
-    setFormBindEnabled(false);
+    setFormBindAccountId(nextId ?? '');
   };
 
   const handleInlineBindChange = async (instance: InstanceProfile, nextId: string | null) => {
+    if (!nextId) return;
     const sameSelection = (instance.bindAccountId || null) === nextId;
-    if (sameSelection && !(instance.isDefault && instance.followLocalAccount)) return;
+    if (sameSelection && !instance.followLocalAccount) return;
     setActionLoading(instance.id);
     try {
       await updateInstance({
         instanceId: instance.id,
         bindAccountId: nextId,
-      });
-    } catch (e) {
-      setMessage({ text: String(e), tone: 'error' });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleInlineFollowCurrent = async (instance: InstanceProfile) => {
-    if (!instance.isDefault) return;
-    if (instance.followLocalAccount) return;
-    setActionLoading(instance.id);
-    try {
-      await updateInstance({
-        instanceId: instance.id,
-        followLocalAccount: true,
+        followLocalAccount: instance.isDefault ? false : undefined,
       });
     } catch (e) {
       setMessage({ text: String(e), tone: 'error' });
@@ -946,10 +919,6 @@ export function InstancesManager<TAccount extends AccountLike>({
                   <AccountSelect
                     value={instance.bindAccountId || null}
                     onChange={(nextId) => handleInlineBindChange(instance, nextId)}
-                    allowUnbound
-                    allowFollowCurrent={Boolean(instance.isDefault)}
-                    isFollowingCurrent={Boolean(instance.isDefault && instance.followLocalAccount)}
-                    onFollowCurrent={() => handleInlineFollowCurrent(instance)}
                     disabled={actionLoading === instance.id}
                     missing={accountMissing}
                     placeholder={t('instances.labels.unbound', '未绑定')}
@@ -1277,25 +1246,8 @@ export function InstancesManager<TAccount extends AccountLike>({
 
               {!editing ? (
                 <div className="form-group">
-                  <label className="toggle-row">
-                    <input
-                      type="checkbox"
-                      checked={formBindEnabled}
-                      onChange={(e) => {
-                        setFormBindEnabled(e.target.checked);
-                        if (!e.target.checked) {
-                          setFormBindAccountId('');
-                        }
-                      }}
-                    />
-                    <span>{t('instances.form.bindInject', '绑定账号')}</span>
-                  </label>
-                  {formBindEnabled && (
-                    <AccountSelect
-                      value={formBindAccountId || null}
-                      onChange={handleFormAccountChange}
-                    />
-                  )}
+                  <label>{t('instances.form.bindInject', '绑定账号')}</label>
+                  <AccountSelect value={formBindAccountId || null} onChange={handleFormAccountChange} />
                 </div>
               ) : (
                 <div className="form-group">
@@ -1303,10 +1255,6 @@ export function InstancesManager<TAccount extends AccountLike>({
                   <AccountSelect
                     value={formBindAccountId || null}
                     onChange={handleFormAccountChange}
-                    allowUnbound
-                    allowFollowCurrent={Boolean(editing?.isDefault)}
-                    isFollowingCurrent={Boolean(editing?.isDefault && formFollowLocalAccount)}
-                    onFollowCurrent={handleFormFollowCurrent}
                     missing={Boolean(
                       formBindAccountId && !accounts.find((item) => item.id === formBindAccountId),
                     )}
@@ -1324,8 +1272,11 @@ export function InstancesManager<TAccount extends AccountLike>({
                 />
                 <p className="form-hint">{t('instances.form.extraArgsDesc', '按空格分隔参数，支持引号包裹')}</p>
               </div>
-
-              {formError && <div className="form-error">{formError}</div>}
+              {formError && (
+                <div className="form-error" ref={formErrorRef}>
+                  {formError}
+                </div>
+              )}
             </div>
 
             <div className="modal-footer">

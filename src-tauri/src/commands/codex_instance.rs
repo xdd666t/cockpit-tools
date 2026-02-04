@@ -49,6 +49,10 @@ pub async fn codex_list_instances() -> Result<Vec<InstanceProfileView>, String> 
     let default_dir = modules::codex_instance::get_default_codex_home()?;
     let default_dir_str = default_dir.to_string_lossy().to_string();
     let running_dirs = modules::process::list_codex_home_dirs(&default_dir_str);
+    crate::modules::logger::log_info(&format!(
+        "[Codex Instances] running CODEX_HOME: {:?}",
+        running_dirs
+    ));
     let running_set: HashSet<String> = running_dirs.into_iter().collect();
 
     let default_settings = store.default_settings.clone();

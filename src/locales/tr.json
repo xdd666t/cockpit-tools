@@ -927,7 +927,7 @@
     },
     "delete": {
       "title": "Oturumu sil",
-      "message": "{{name}} oturumu silinsin mi? Sadece yapılandırma kaldırılacak, klasör korunacaktır."
+      "message": "{{name}} oturumu silinsin mi? Bu işlem yapılandırmayı kaldıracak ve oturum klasörünü silecektir."
     },
     "modal": {
       "createTitle": "Yeni örnek",

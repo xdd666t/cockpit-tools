@@ -927,7 +927,7 @@
     },
     "delete": {
       "title": "Instanz löschen",
-      "message": "Instanz {{name}} löschen? Nur die Konfiguration wird entfernt, der Ordner bleibt erhalten."
+      "message": "Instanz {{name}} löschen? Dies wird die Konfiguration entfernen und den Instanzordner löschen."
     },
     "modal": {
       "createTitle": "Neue Instanz",

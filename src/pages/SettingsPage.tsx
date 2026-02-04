@@ -29,6 +29,7 @@ interface GeneralConfig {
   codex_auto_refresh_minutes: number;
   close_behavior: 'ask' | 'minimize' | 'quit';
   opencode_app_path: string;
+  antigravity_app_path: string;
   opencode_sync_on_switch: boolean;
 }
 
@@ -62,6 +63,7 @@ export function SettingsPage() {
   const [codexAutoRefresh, setCodexAutoRefresh] = useState('10');
   const [closeBehavior, setCloseBehavior] = useState<'ask' | 'minimize' | 'quit'>('ask');
   const [opencodeAppPath, setOpencodeAppPath] = useState('');
+  const [antigravityAppPath, setAntigravityAppPath] = useState('');
   const [opencodeSyncOnSwitch, setOpencodeSyncOnSwitch] = useState(true);
   const [generalLoaded, setGeneralLoaded] = useState(false);
   const generalSaveTimerRef = useRef<number | null>(null);
@@ -128,6 +130,7 @@ export function SettingsPage() {
           codexAutoRefreshMinutes: codexAutoRefreshNum,
           closeBehavior,
           opencodeAppPath,
+          antigravityAppPath,
           opencodeSyncOnSwitch,
         });
         window.dispatchEvent(new Event('config-updated'));
@@ -150,6 +153,7 @@ export function SettingsPage() {
     language,
     theme,
     opencodeAppPath,
+    antigravityAppPath,
     opencodeSyncOnSwitch,
     t,
   ]);
@@ -265,6 +269,7 @@ export function SettingsPage() {
       setCodexAutoRefresh(String(config.codex_auto_refresh_minutes ?? 10));
       setCloseBehavior(config.close_behavior || 'ask');
       setOpencodeAppPath(config.opencode_app_path || '');
+      setAntigravityAppPath(config.antigravity_app_path || '');
       setOpencodeSyncOnSwitch(config.opencode_sync_on_switch ?? true);
       // 同步语言
       changeLanguage(config.language);
@@ -549,6 +554,31 @@ export function SettingsPage() {
                   <button className="btn btn-secondary" onClick={() => accountService.openDeviceFolder()}>
                     <FolderOpen size={16} />{t('common.open')}
                   </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="group-title">{t('settings.general.antigravityTitle', 'Antigravity 启动')}</div>
+            <div className="settings-group">
+              <div className="settings-row">
+                <div className="row-label">
+                  <div className="row-title">{t('settings.general.antigravityAppPath', 'Antigravity 启动路径')}</div>
+                  <div className="row-desc">{t('settings.general.antigravityAppPathDesc', '留空则使用默认路径')}</div>
+                </div>
+                <div className="row-control">
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      className="settings-input"
+                      value={antigravityAppPath}
+                      placeholder={t('settings.general.antigravityAppPathPlaceholder', '默认路径')}
+                      onChange={(e) => setAntigravityAppPath(e.target.value)}
+                    />
+                    <button className="btn btn-secondary" onClick={() => setAntigravityAppPath('')}>
+                      <RefreshCw size={16} />
+                      {t('settings.general.antigravityPathReset', '恢复默认')}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -105,20 +105,20 @@ pub fn get_default_instances_root_dir() -> Result<PathBuf, String> {
     #[cfg(target_os = "macos")]
     {
         let home = dirs::home_dir().ok_or("无法获取用户主目录")?;
-        return Ok(home.join("Library/Application Support/Antigravity_Profiles"));
+        return Ok(home.join(".antigravity_cockpit/instances/antigravity"));
     }
 
     #[cfg(target_os = "windows")]
     {
         let appdata = std::env::var("APPDATA")
             .map_err(|_| "无法获取 APPDATA 环境变量".to_string())?;
-        return Ok(PathBuf::from(appdata).join("Antigravity_Profiles"));
+        return Ok(PathBuf::from(appdata).join(".antigravity_cockpit\\instances\\antigravity"));
     }
 
     #[cfg(target_os = "linux")]
     {
         let home = dirs::home_dir().ok_or("无法获取用户主目录")?;
-        return Ok(home.join(".config/Antigravity_Profiles"));
+        return Ok(home.join(".antigravity_cockpit/instances/antigravity"));
     }
 
     #[allow(unreachable_code)]
@@ -291,20 +291,49 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
 
     if !user_data_dir.trim().is_empty() {
         let dir_path = PathBuf::from(&user_data_dir);
-        if dir_path.exists() {
-            match fs::remove_dir_all(&dir_path) {
-                Ok(()) => {}
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-                Err(err) => {
-                    return Err(format!("删除实例目录失败: {}", err));
-                }
-            }
-        }
+        delete_instance_directory(&dir_path)?;
     }
 
     store.instances.remove(index);
     save_instance_store(&store)?;
     Ok(())
+}
+
+pub fn delete_instance_directory(dir_path: &Path) -> Result<(), String> {
+    if !dir_path.exists() {
+        return Ok(());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let home = dirs::home_dir().ok_or("无法获取用户主目录")?;
+        let trash_dir = home.join(".Trash");
+        fs::create_dir_all(&trash_dir).map_err(|err| format!("创建废纸篓目录失败: {}", err))?;
+        let base_name = dir_path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .filter(|name| !name.is_empty())
+            .ok_or("实例目录无效")?;
+        let mut target = trash_dir.join(&base_name);
+        if target.exists() {
+            let suffix = Utc::now().timestamp_millis();
+            target = trash_dir.join(format!("{}-{}", base_name, suffix));
+        }
+        match fs::rename(dir_path, &target) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(format!("移动实例目录到废纸篓失败: {}", err)),
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        match fs::remove_dir_all(dir_path) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(format!("删除实例目录失败: {}", err)),
+        }
+    }
 }
 
 pub fn update_instance_last_launched(instance_id: &str) -> Result<InstanceProfile, String> {

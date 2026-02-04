@@ -927,7 +927,7 @@
     },
     "delete": {
       "title": "Excluir instância",
-      "message": "Excluir a instância {{name}}? Apenas a configuração será removida, a pasta será mantida."
+      "message": "Excluir instância {{name}}? Isso removerá a configuração e excluirá a pasta da instância."
     },
     "modal": {
       "createTitle": "Nova instância",

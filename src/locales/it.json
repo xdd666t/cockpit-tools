@@ -927,7 +927,7 @@
     },
     "delete": {
       "title": "Elimina istanza",
-      "message": "Eliminare l'istanza {{name}}? Solo la configurazione verrà rimossa, la cartella verrà mantenuta."
+      "message": "Eliminare l'istanza {{name}}? Questo rimuoverà la configurazione e cancellerà la cartella dell'istanza."
     },
     "modal": {
       "createTitle": "Nuova istanza",

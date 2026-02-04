@@ -927,7 +927,7 @@
     },
     "delete": {
       "title": "Xóa phiên bản",
-      "message": "Xóa phiên bản {{name}}? Chỉ cấu hình bị gỡ bỏ, thư mục sẽ được giữ lại."
+      "message": "Xóa phiên bản {{name}}? Hành động này sẽ gỡ bỏ cấu hình và xóa thư mục phiên bản."
     },
     "modal": {
       "createTitle": "Tạo phiên bản mới",
