@@ -1239,44 +1239,95 @@ fn pick_preferred_pid(mut pids: Vec<u32>) -> Option<u32> {
     pids.first().copied()
 }
 
+fn normalize_non_empty_path_for_compare(value: &str) -> Option<String> {
+    let normalized = normalize_path_for_compare(value);
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized)
+    }
+}
+
+fn build_user_data_dir_match_target(
+    requested_user_data_dir: Option<&str>,
+    default_user_data_dir: Option<String>,
+    fallback_to_default_when_missing: bool,
+) -> Option<(String, bool)> {
+    let requested_target =
+        requested_user_data_dir.and_then(|value| normalize_non_empty_path_for_compare(value));
+    let default_target =
+        default_user_data_dir.and_then(|value| normalize_non_empty_path_for_compare(&value));
+    let target = requested_target.or_else(|| {
+        if fallback_to_default_when_missing {
+            default_target.clone()
+        } else {
+            None
+        }
+    })?;
+    let allow_none_for_target = default_target
+        .as_ref()
+        .map(|value| value == &target)
+        .unwrap_or(false);
+    Some((target, allow_none_for_target))
+}
+
+fn collect_matching_pids_by_user_data_dir(
+    entries: &[(u32, Option<String>)],
+    target_dir: &str,
+    allow_none_for_target: bool,
+) -> Vec<u32> {
+    let mut matches = Vec::new();
+    for (pid, dir) in entries {
+        match dir.as_ref() {
+            Some(value) => {
+                let normalized = normalize_path_for_compare(value);
+                if !normalized.is_empty() && normalized == target_dir {
+                    matches.push(*pid);
+                }
+            }
+            None => {
+                if allow_none_for_target {
+                    matches.push(*pid);
+                }
+            }
+        }
+    }
+    matches
+}
+
 fn resolve_pid_from_entries_by_user_data_dir(
     last_pid: Option<u32>,
-    user_data_dir: Option<&str>,
+    target_dir: &str,
+    allow_none_for_target: bool,
     entries: &[(u32, Option<String>)],
 ) -> Option<u32> {
+    if target_dir.is_empty() {
+        return None;
+    }
+
     if let Some(pid) = last_pid {
         if is_pid_running(pid) {
             return Some(pid);
         }
     }
 
-    let target = user_data_dir
-        .map(|value| normalize_path_for_compare(value))
-        .filter(|value| !value.is_empty());
-
-    let mut matches = Vec::new();
-    for (pid, dir) in entries {
-        match (&target, dir.as_ref()) {
-            (Some(target_dir), Some(dir)) => {
-                let normalized = normalize_path_for_compare(dir);
-                if !normalized.is_empty() && &normalized == target_dir {
-                    matches.push(*pid);
-                }
-            }
-            (None, None) => {
-                matches.push(*pid);
-            }
-            (None, Some(dir)) => {
-                let normalized = normalize_path_for_compare(dir);
-                if normalized.is_empty() {
-                    matches.push(*pid);
-                }
-            }
-            _ => {}
-        }
-    }
-
+    let matches = collect_matching_pids_by_user_data_dir(entries, target_dir, allow_none_for_target);
     pick_preferred_pid(matches)
+}
+
+fn get_default_antigravity_user_data_dir() -> Option<String> {
+    crate::modules::instance::get_default_user_data_dir()
+        .ok()
+        .map(|value| normalize_path_for_compare(&value.to_string_lossy()))
+        .filter(|value| !value.is_empty())
+}
+
+fn resolve_antigravity_target_and_fallback(user_data_dir: Option<&str>) -> Option<(String, bool)> {
+    build_user_data_dir_match_target(user_data_dir, get_default_antigravity_user_data_dir(), true)
+}
+
+fn resolve_vscode_target_and_fallback(user_data_dir: Option<&str>) -> Option<(String, bool)> {
+    build_user_data_dir_match_target(user_data_dir, get_default_vscode_user_data_dir_for_os(), true)
 }
 
 pub fn resolve_antigravity_pid_from_entries(
@@ -1284,7 +1335,8 @@ pub fn resolve_antigravity_pid_from_entries(
     user_data_dir: Option<&str>,
     entries: &[(u32, Option<String>)],
 ) -> Option<u32> {
-    resolve_pid_from_entries_by_user_data_dir(last_pid, user_data_dir, entries)
+    let (target, allow_none_for_target) = resolve_antigravity_target_and_fallback(user_data_dir)?;
+    resolve_pid_from_entries_by_user_data_dir(last_pid, &target, allow_none_for_target, entries)
 }
 
 pub fn resolve_antigravity_pid(last_pid: Option<u32>, user_data_dir: Option<&str>) -> Option<u32> {
@@ -1697,13 +1749,14 @@ pub fn collect_vscode_process_entries() -> Vec<(u32, Option<String>)> {
 
 pub fn resolve_vscode_pid_from_entries(
     last_pid: Option<u32>,
-    user_data_dir: &str,
+    user_data_dir: Option<&str>,
     entries: &[(u32, Option<String>)],
 ) -> Option<u32> {
-    resolve_pid_from_entries_by_user_data_dir(last_pid, Some(user_data_dir), entries)
+    let (target, allow_none_for_target) = resolve_vscode_target_and_fallback(user_data_dir)?;
+    resolve_pid_from_entries_by_user_data_dir(last_pid, &target, allow_none_for_target, entries)
 }
 
-pub fn resolve_vscode_pid(last_pid: Option<u32>, user_data_dir: &str) -> Option<u32> {
+pub fn resolve_vscode_pid(last_pid: Option<u32>, user_data_dir: Option<&str>) -> Option<u32> {
     let entries = collect_vscode_process_entries();
     resolve_vscode_pid_from_entries(last_pid, user_data_dir, &entries)
 }
@@ -1737,7 +1790,7 @@ fn get_default_vscode_user_data_dir_for_os() -> Option<String> {
     None
 }
 
-pub fn focus_vscode_instance(last_pid: Option<u32>, user_data_dir: &str) -> Result<u32, String> {
+pub fn focus_vscode_instance(last_pid: Option<u32>, user_data_dir: Option<&str>) -> Result<u32, String> {
     let resolve_start = Instant::now();
     let pid =
         resolve_vscode_pid(last_pid, user_data_dir).ok_or_else(|| "实例未运行，无法定位窗口".to_string())?;
@@ -2407,6 +2460,48 @@ fn collect_remaining_pids(entries: &[(u32, Option<String>)]) -> Vec<u32> {
     pids
 }
 
+fn resolve_entry_user_data_dir_for_matching(
+    dir: Option<&String>,
+    default_dir: Option<&str>,
+) -> Option<String> {
+    dir.and_then(|value| normalize_non_empty_path_for_compare(value))
+        .or_else(|| default_dir.and_then(normalize_non_empty_path_for_compare))
+}
+
+fn entry_matches_target_dirs(
+    dir: Option<&String>,
+    target_dirs: &HashSet<String>,
+    default_dir: Option<&str>,
+) -> bool {
+    resolve_entry_user_data_dir_for_matching(dir, default_dir)
+        .map(|value| target_dirs.contains(&value))
+        .unwrap_or(false)
+}
+
+fn select_main_pids_by_target_dirs(
+    entries: &[(u32, Option<String>)],
+    target_dirs: &HashSet<String>,
+    default_dir: Option<&str>,
+) -> Vec<u32> {
+    entries
+        .iter()
+        .filter_map(|(pid, dir)| {
+            entry_matches_target_dirs(dir.as_ref(), target_dirs, default_dir).then_some(*pid)
+        })
+        .collect()
+}
+
+fn filter_entries_by_target_dirs(
+    entries: Vec<(u32, Option<String>)>,
+    target_dirs: &HashSet<String>,
+    default_dir: Option<&str>,
+) -> Vec<(u32, Option<String>)> {
+    entries
+        .into_iter()
+        .filter(|(_, dir)| entry_matches_target_dirs(dir.as_ref(), target_dirs, default_dir))
+        .collect()
+}
+
 fn close_managed_instances_common<CollectEntries, SelectMainPids, CollectRemainingEntries>(
     log_prefix: &str,
     start_message: &str,
@@ -2553,38 +2648,13 @@ pub fn close_antigravity_instances(user_data_dirs: &[String], timeout_secs: u64)
         user_data_dirs,
         timeout_secs,
         collect_antigravity_process_entries,
-        |entries, target_dirs| {
-            entries
-                .iter()
-                .filter_map(|(pid, dir)| {
-                    let resolved_dir = dir
-                        .as_ref()
-                        .map(|value| normalize_path_for_compare(value))
-                        .filter(|value| !value.is_empty())
-                        .or_else(|| default_dir.clone());
-                    resolved_dir
-                        .as_ref()
-                        .map(|value| target_dirs.contains(value))
-                        .unwrap_or(false)
-                        .then_some(*pid)
-                })
-                .collect()
-        },
+        |entries, target_dirs| select_main_pids_by_target_dirs(entries, target_dirs, default_dir.as_deref()),
         |target_dirs| {
-            collect_antigravity_process_entries()
-                .into_iter()
-                .filter(|(_, dir)| {
-                    let resolved_dir = dir
-                        .as_ref()
-                        .map(|value| normalize_path_for_compare(value))
-                        .filter(|value| !value.is_empty())
-                        .or_else(|| default_dir.clone());
-                    resolved_dir
-                        .as_ref()
-                        .map(|value| target_dirs.contains(value))
-                        .unwrap_or(false)
-                })
-                .collect()
+            filter_entries_by_target_dirs(
+                collect_antigravity_process_entries(),
+                target_dirs,
+                default_dir.as_deref(),
+            )
         },
         None,
         None,
@@ -4118,38 +4188,13 @@ pub fn close_vscode(user_data_dirs: &[String], timeout_secs: u64) -> Result<(), 
         user_data_dirs,
         timeout_secs,
         collect_vscode_process_entries,
-        |entries, target_dirs| {
-            entries
-                .iter()
-                .filter_map(|(pid, dir)| {
-                    let resolved_dir = dir
-                        .as_ref()
-                        .map(|value| normalize_path_for_compare(value))
-                        .filter(|value| !value.is_empty())
-                        .or_else(|| default_dir.clone());
-                    resolved_dir
-                        .as_ref()
-                        .map(|value| target_dirs.contains(value))
-                        .unwrap_or(false)
-                        .then_some(*pid)
-                })
-                .collect()
-        },
+        |entries, target_dirs| select_main_pids_by_target_dirs(entries, target_dirs, default_dir.as_deref()),
         |target_dirs| {
-            collect_vscode_process_entries()
-                .into_iter()
-                .filter(|(_, dir)| {
-                    let resolved_dir = dir
-                        .as_ref()
-                        .map(|value| normalize_path_for_compare(value))
-                        .filter(|value| !value.is_empty())
-                        .or_else(|| default_dir.clone());
-                    resolved_dir
-                        .as_ref()
-                        .map(|value| target_dirs.contains(value))
-                        .unwrap_or(false)
-                })
-                .collect()
+            filter_entries_by_target_dirs(
+                collect_vscode_process_entries(),
+                target_dirs,
+                default_dir.as_deref(),
+            )
         },
         Some(request_vscode_graceful_close as fn(u32)),
         Some(2),

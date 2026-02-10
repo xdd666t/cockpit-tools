@@ -77,7 +77,7 @@ pub async fn github_copilot_list_instances() -> Result<Vec<InstanceProfileView>,
         .map(|instance| {
             let resolved_pid = modules::process::resolve_vscode_pid_from_entries(
                 instance.last_pid,
-                &instance.user_data_dir,
+                Some(&instance.user_data_dir),
                 &process_entries,
             );
             let running = resolved_pid.is_some();
@@ -90,7 +90,7 @@ pub async fn github_copilot_list_instances() -> Result<Vec<InstanceProfileView>,
 
     let default_pid = modules::process::resolve_vscode_pid_from_entries(
         default_settings.last_pid,
-        &default_dir_str,
+        None,
         &process_entries,
     );
     let default_running = default_pid.is_some();
@@ -219,9 +219,7 @@ pub async fn github_copilot_start_instance(instance_id: String) -> Result<Instan
         let default_dir = modules::github_copilot_instance::get_default_vscode_user_data_dir()?;
         let default_dir_str = default_dir.to_string_lossy().to_string();
         let default_settings = modules::github_copilot_instance::load_default_settings()?;
-        if let Some(pid) =
-            modules::process::resolve_vscode_pid(default_settings.last_pid, &default_dir_str)
-        {
+        if let Some(pid) = modules::process::resolve_vscode_pid(default_settings.last_pid, None) {
             modules::process::close_pid(pid, 20)?;
             let _ = modules::github_copilot_instance::update_default_pid(None)?;
         }
@@ -261,9 +259,7 @@ pub async fn github_copilot_start_instance(instance_id: String) -> Result<Instan
         .find(|item| item.id == instance_id)
         .ok_or("实例不存在")?;
 
-    if let Some(pid) =
-        modules::process::resolve_vscode_pid(instance.last_pid, &instance.user_data_dir)
-    {
+    if let Some(pid) = modules::process::resolve_vscode_pid(instance.last_pid, Some(&instance.user_data_dir)) {
         modules::process::close_pid(pid, 20)?;
         let _ = modules::github_copilot_instance::update_instance_pid(&instance.id, None)?;
     }
@@ -295,15 +291,13 @@ pub async fn github_copilot_stop_instance(instance_id: String) -> Result<Instanc
         let default_dir = modules::github_copilot_instance::get_default_vscode_user_data_dir()?;
         let default_dir_str = default_dir.to_string_lossy().to_string();
         let default_settings = modules::github_copilot_instance::load_default_settings()?;
-        if let Some(pid) =
-            modules::process::resolve_vscode_pid(default_settings.last_pid, &default_dir_str)
-        {
+        if let Some(pid) = modules::process::resolve_vscode_pid(default_settings.last_pid, None) {
             modules::process::close_pid(pid, 20)?;
         }
         let updated_settings = modules::github_copilot_instance::update_default_pid(None)?;
         let running = updated_settings
             .last_pid
-            .and_then(|pid| modules::process::resolve_vscode_pid(Some(pid), &default_dir_str))
+            .and_then(|pid| modules::process::resolve_vscode_pid(Some(pid), None))
             .is_some();
         return Ok(InstanceProfileView {
             id: DEFAULT_INSTANCE_ID.to_string(),
@@ -328,9 +322,7 @@ pub async fn github_copilot_stop_instance(instance_id: String) -> Result<Instanc
         .find(|item| item.id == instance_id)
         .ok_or("实例不存在")?;
 
-    if let Some(pid) =
-        modules::process::resolve_vscode_pid(instance.last_pid, &instance.user_data_dir)
-    {
+    if let Some(pid) = modules::process::resolve_vscode_pid(instance.last_pid, Some(&instance.user_data_dir)) {
         modules::process::close_pid(pid, 20)?;
     }
     let updated = modules::github_copilot_instance::update_instance_pid(&instance.id, None)?;
@@ -341,13 +333,9 @@ pub async fn github_copilot_stop_instance(instance_id: String) -> Result<Instanc
 #[tauri::command]
 pub async fn github_copilot_open_instance_window(instance_id: String) -> Result<(), String> {
     if instance_id == DEFAULT_INSTANCE_ID {
-        let default_dir = modules::github_copilot_instance::get_default_vscode_user_data_dir()?;
         let default_settings: DefaultInstanceSettings =
             modules::github_copilot_instance::load_default_settings()?;
-        let default_dir_str = default_dir.to_string_lossy().to_string();
-        if let Err(err) =
-            modules::process::focus_vscode_instance(default_settings.last_pid, &default_dir_str)
-        {
+        if let Err(err) = modules::process::focus_vscode_instance(default_settings.last_pid, None) {
             modules::logger::log_warn(&format!(
                 "定位 VS Code 默认实例窗口失败，回退为启动实例: {}",
                 err
@@ -367,7 +355,9 @@ pub async fn github_copilot_open_instance_window(instance_id: String) -> Result<
         .find(|item| item.id == instance_id)
         .ok_or("实例不存在")?;
 
-    if let Err(err) = modules::process::focus_vscode_instance(instance.last_pid, &instance.user_data_dir) {
+    if let Err(err) =
+        modules::process::focus_vscode_instance(instance.last_pid, Some(&instance.user_data_dir))
+    {
         modules::logger::log_warn(&format!(
             "定位 VS Code 实例窗口失败，回退为启动实例: instance_id={}, err={}",
             instance.id, err
