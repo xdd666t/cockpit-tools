@@ -22,6 +22,8 @@ import {
   Tag,
   ChevronDown,
   Play,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useGitHubCopilotAccountStore } from '../stores/useGitHubCopilotAccountStore';
@@ -39,6 +41,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { GitHubCopilotOverviewTabsHeader, GitHubCopilotTab } from '../components/GitHubCopilotOverviewTabsHeader';
 import { GitHubCopilotInstancesContent } from './GitHubCopilotInstancesPage';
 import { QuickSettingsPopover } from '../components/QuickSettingsPopover';
+import {
+  isPrivacyModeEnabledByDefault,
+  maskSensitiveValue,
+  persistPrivacyModeEnabled,
+} from '../utils/privacy';
 
 const GHCP_FLOW_NOTICE_COLLAPSED_KEY = 'agtools.github_copilot.flow_notice_collapsed';
 const GHCP_CURRENT_ACCOUNT_ID_KEY = 'agtools.github_copilot.current_account_id';
@@ -66,6 +73,9 @@ export function GitHubCopilotAccountsPage() {
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [injecting, setInjecting] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [privacyModeEnabled, setPrivacyModeEnabled] = useState<boolean>(() =>
+    isPrivacyModeEnabledByDefault()
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'FREE' | 'INDIVIDUAL' | 'PRO' | 'BUSINESS' | 'ENTERPRISE'>('all');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
@@ -120,6 +130,17 @@ export function GitHubCopilotAccountsPage() {
   const oauthLog = useCallback((...args: unknown[]) => {
     console.info('[GitHubCopilotOAuth]', ...args);
   }, []);
+  const togglePrivacyMode = useCallback(() => {
+    setPrivacyModeEnabled((prev) => {
+      const next = !prev;
+      persistPrivacyModeEnabled(next);
+      return next;
+    });
+  }, []);
+  const maskAccountText = useCallback(
+    (value?: string | null) => maskSensitiveValue(value, privacyModeEnabled),
+    [privacyModeEnabled]
+  );
 
   useEffect(() => {
     showAddModalRef.current = showAddModal;
@@ -321,7 +342,7 @@ export function GitHubCopilotAccountsPage() {
     try {
       await githubCopilotService.injectGitHubCopilotToVSCode(accountId);
       setCurrentAccountId(accountId);
-      setMessage({ text: t('messages.switched', { email: displayEmail }) });
+      setMessage({ text: t('messages.switched', { email: maskAccountText(displayEmail) }) });
     } catch (e: any) {
       setMessage({
         text: t('messages.switchFailed', { error: e?.toString() || t('common.failed', 'Failed') }),
@@ -773,6 +794,7 @@ export function GitHubCopilotAccountsPage() {
   const renderGridCards = (items: typeof filteredAccounts, groupKey?: string) =>
     items.map((account) => {
       const displayEmail = account.email ?? account.github_email ?? account.github_login;
+      const maskedDisplayEmail = maskAccountText(displayEmail);
       const planKey = getGitHubCopilotPlanDisplayName(account.plan_type);
       const planLabel = t(`githubCopilot.plan.${planKey.toLowerCase()}`, planKey);
       const isSelected = selected.has(account.id);
@@ -791,8 +813,8 @@ export function GitHubCopilotAccountsPage() {
                 onChange={() => toggleSelect(account.id)}
               />
             </div>
-            <span className="account-email" title={displayEmail}>
-              {displayEmail}
+            <span className="account-email" title={maskedDisplayEmail}>
+              {maskedDisplayEmail}
             </span>
             {isCurrent && (
               <span className="current-tag">
@@ -899,6 +921,7 @@ export function GitHubCopilotAccountsPage() {
   const renderTableRows = (items: typeof filteredAccounts, groupKey?: string) =>
     items.map((account) => {
       const displayEmail = account.email ?? account.github_email ?? account.github_login;
+      const maskedDisplayEmail = maskAccountText(displayEmail);
       const planKey = getGitHubCopilotPlanDisplayName(account.plan_type);
       const planLabel = t(`githubCopilot.plan.${planKey.toLowerCase()}`, planKey);
       const isCurrent = currentAccountId === account.id;
@@ -914,7 +937,9 @@ export function GitHubCopilotAccountsPage() {
           <td>
             <div className="account-cell">
               <div className="account-main-line">
-                <span className="account-email-text" title={displayEmail}>{displayEmail}</span>
+                <span className="account-email-text" title={maskedDisplayEmail}>
+                  {maskedDisplayEmail}
+                </span>
                 {isCurrent && <span className="mini-tag current">{t('accounts.status.current')}</span>}
               </div>
             </div>
@@ -1231,6 +1256,22 @@ export function GitHubCopilotAccountsPage() {
             aria-label={t('githubCopilot.refreshAll', '刷新全部')}
           >
             <RefreshCw size={14} className={refreshingAll ? 'loading-spinner' : ''} />
+          </button>
+          <button
+            className="btn btn-secondary icon-only"
+            onClick={togglePrivacyMode}
+            title={
+              privacyModeEnabled
+                ? t('privacy.showSensitive', '显示邮箱')
+                : t('privacy.hideSensitive', '隐藏邮箱')
+            }
+            aria-label={
+              privacyModeEnabled
+                ? t('privacy.showSensitive', '显示邮箱')
+                : t('privacy.hideSensitive', '隐藏邮箱')
+            }
+          >
+            {privacyModeEnabled ? <EyeOff size={14} /> : <Eye size={14} />}
           </button>
           <button
             className="btn btn-secondary icon-only"

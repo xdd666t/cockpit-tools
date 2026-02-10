@@ -33,6 +33,10 @@
     "githubCopilot": "GitHub Copilot",
     "instances": "多开实例"
   },
+  "privacy": {
+    "hideSensitive": "隐藏邮箱",
+    "showSensitive": "显示邮箱"
+  },
   "instances": {
     "title": "多开实例",
     "subtitle": "多实例独立配置，多账号并行运行。",

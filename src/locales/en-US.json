@@ -33,6 +33,10 @@
     "dashboard": "Dashboard",
     "instances": "Multi-Instance"
   },
+  "privacy": {
+    "hideSensitive": "Hide emails",
+    "showSensitive": "Show emails"
+  },
   "instances": {
     "title": "Multi-Instance",
     "subtitle": "Isolated profiles for multi-account parallel runs.",

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -14,12 +14,19 @@ import {
   Search,
   ArrowDownWideNarrow,
   ExternalLink,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { confirm as confirmDialog, open } from '@tauri-apps/plugin-dialog';
 import md5 from 'blueimp-md5';
 import { InstanceInitMode, InstanceProfile } from '../types/instance';
 import { FileCorruptedModal, parseFileCorruptedError, type FileCorruptedError } from './FileCorruptedModal';
 import type { InstanceStoreState } from '../stores/createInstanceStore';
+import {
+  isPrivacyModeEnabledByDefault,
+  maskSensitiveValue,
+  persistPrivacyModeEnabled,
+} from '../utils/privacy';
 
 type MessageState = { text: string; tone?: 'error' };
 type AccountLike = { id: string; email: string };
@@ -102,6 +109,20 @@ export function InstancesManager<TAccount extends AccountLike>({
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<InstanceSortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [privacyModeEnabled, setPrivacyModeEnabled] = useState<boolean>(() => isPrivacyModeEnabledByDefault());
+
+  const togglePrivacyMode = useCallback(() => {
+    setPrivacyModeEnabled((prev) => {
+      const next = !prev;
+      persistPrivacyModeEnabled(next);
+      return next;
+    });
+  }, []);
+
+  const maskAccountText = useCallback(
+    (value?: string | null) => maskSensitiveValue(value, privacyModeEnabled),
+    [privacyModeEnabled],
+  );
 
   useEffect(() => {
     fetchDefaults();
@@ -637,8 +658,8 @@ export function InstancesManager<TAccount extends AccountLike>({
             onClose();
           }}
         >
-          <span className="account-select-email" title={account.email}>
-            {account.email}
+          <span className="account-select-email" title={maskAccountText(account.email)}>
+            {maskAccountText(account.email)}
           </span>
           {renderAccountQuotaPreview(account)}
         </button>
@@ -719,8 +740,8 @@ export function InstancesManager<TAccount extends AccountLike>({
     const selectedLabel = missing
       ? t('instances.quota.accountMissing', '账号不存在')
       : isFollowingCurrent
-        ? selectedAccount?.email || t('instances.form.followCurrent', '跟随当前账号')
-        : selectedAccount?.email || basePlaceholder;
+        ? maskAccountText(selectedAccount?.email) || t('instances.form.followCurrent', '跟随当前账号')
+        : maskAccountText(selectedAccount?.email) || basePlaceholder;
     const selectedQuota = selectedAccount ? renderAccountQuotaPreview(selectedAccount) : null;
 
     return (
@@ -825,8 +846,8 @@ export function InstancesManager<TAccount extends AccountLike>({
     const selectedLabel = missing
       ? t('instances.quota.accountMissing', '账号不存在')
       : isFollowingCurrent
-        ? selectedAccount?.email || t('instances.form.followCurrent', '跟随当前账号')
-        : selectedAccount?.email || basePlaceholder;
+        ? maskAccountText(selectedAccount?.email) || t('instances.form.followCurrent', '跟随当前账号')
+        : maskAccountText(selectedAccount?.email) || basePlaceholder;
     const selectedQuota = selectedAccount ? renderAccountQuotaPreview(selectedAccount) : null;
 
     return (
@@ -1050,6 +1071,22 @@ export function InstancesManager<TAccount extends AccountLike>({
             aria-label={t('instances.sort.toggleDirection', '切换排序方向')}
           >
             {sortDirection === 'asc' ? '⬆' : '⬇'}
+          </button>
+          <button
+            className="sort-direction-btn"
+            onClick={togglePrivacyMode}
+            title={
+              privacyModeEnabled
+                ? t('privacy.showSensitive', '显示邮箱')
+                : t('privacy.hideSensitive', '隐藏邮箱')
+            }
+            aria-label={
+              privacyModeEnabled
+                ? t('privacy.showSensitive', '显示邮箱')
+                : t('privacy.hideSensitive', '隐藏邮箱')
+            }
+          >
+            {privacyModeEnabled ? <EyeOff size={14} /> : <Eye size={14} />}
           </button>
         </div>
         <div className="toolbar-right">

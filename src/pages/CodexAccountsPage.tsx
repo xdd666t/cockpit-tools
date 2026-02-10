@@ -21,6 +21,8 @@ import {
   Clock,
   Calendar,
   Tag,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCodexAccountStore } from '../stores/useCodexAccountStore';
@@ -41,6 +43,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { CodexOverviewTabsHeader, CodexTab } from '../components/CodexOverviewTabsHeader';
 import { CodexInstancesContent } from './CodexInstancesPage';
 import { QuickSettingsPopover } from '../components/QuickSettingsPopover';
+import {
+  isPrivacyModeEnabledByDefault,
+  maskSensitiveValue,
+  persistPrivacyModeEnabled,
+} from '../utils/privacy';
 
 export function CodexAccountsPage() {
   const { t, i18n } = useTranslation();
@@ -67,6 +74,9 @@ export function CodexAccountsPage() {
   const [refreshing, setRefreshing] = useState<string | null>(null);
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [privacyModeEnabled, setPrivacyModeEnabled] = useState<boolean>(() =>
+    isPrivacyModeEnabledByDefault()
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'FREE' | 'PLUS' | 'PRO' | 'TEAM' | 'ENTERPRISE'>('all');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
@@ -104,6 +114,17 @@ export function CodexAccountsPage() {
   const oauthLog = useCallback((...args: unknown[]) => {
     console.info('[CodexOAuth]', ...args);
   }, []);
+  const togglePrivacyMode = useCallback(() => {
+    setPrivacyModeEnabled((prev) => {
+      const next = !prev;
+      persistPrivacyModeEnabled(next);
+      return next;
+    });
+  }, []);
+  const maskAccountText = useCallback(
+    (value?: string | null) => maskSensitiveValue(value, privacyModeEnabled),
+    [privacyModeEnabled]
+  );
 
   useEffect(() => {
     showAddModalRef.current = showAddModal;
@@ -480,7 +501,7 @@ export function CodexAccountsPage() {
     setSwitching(accountId);
     try {
       const account = await switchAccount(accountId);
-      setMessage({ text: t('codex.switched', { email: account.email }) });
+      setMessage({ text: t('codex.switched', { email: maskAccountText(account.email) }) });
     } catch (e) {
       setMessage({ text: t('codex.switchFailed', { error: String(e) }), tone: 'error' });
     }
@@ -503,7 +524,12 @@ export function CodexAccountsPage() {
       }
       
       setAddStatus('success');
-      setAddMessage(t('codex.import.successMsg', '导入成功: {{email}}').replace('{{email}}', account.email));
+      setAddMessage(
+        t('codex.import.successMsg', '导入成功: {{email}}').replace(
+          '{{email}}',
+          maskAccountText(account.email)
+        )
+      );
       setTimeout(() => {
         setShowAddModal(false);
         resetAddModalState();
@@ -879,8 +905,8 @@ export function CodexAccountsPage() {
                 onChange={() => toggleSelect(account.id)}
               />
             </div>
-            <span className="account-email" title={account.email}>
-              {account.email}
+            <span className="account-email" title={maskAccountText(account.email)}>
+              {maskAccountText(account.email)}
             </span>
             {isCurrent && <span className="current-tag">{t('codex.current', '当前')}</span>}
             {hasQuotaError && (
@@ -1011,7 +1037,9 @@ export function CodexAccountsPage() {
           <td>
             <div className="account-cell">
               <div className="account-main-line">
-                <span className="account-email-text" title={account.email}>{account.email}</span>
+                <span className="account-email-text" title={maskAccountText(account.email)}>
+                  {maskAccountText(account.email)}
+                </span>
                 {isCurrent && <span className="mini-tag current">{t('codex.current', '当前')}</span>}
               </div>
               {hasQuotaError && (
@@ -1283,6 +1311,22 @@ export function CodexAccountsPage() {
             aria-label={t('codex.refreshAll', '刷新全部')}
           >
             <RefreshCw size={14} className={refreshingAll ? 'loading-spinner' : ''} />
+          </button>
+          <button
+            className="btn btn-secondary icon-only"
+            onClick={togglePrivacyMode}
+            title={
+              privacyModeEnabled
+                ? t('privacy.showSensitive', '显示邮箱')
+                : t('privacy.hideSensitive', '隐藏邮箱')
+            }
+            aria-label={
+              privacyModeEnabled
+                ? t('privacy.showSensitive', '显示邮箱')
+                : t('privacy.hideSensitive', '隐藏邮箱')
+            }
+          >
+            {privacyModeEnabled ? <EyeOff size={14} /> : <Eye size={14} />}
           </button>
           <button
             className="btn btn-secondary icon-only"
