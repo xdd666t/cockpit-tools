@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 - **Startup app-path detection strategy**: On startup, the app now loads local config first, probes only platforms without configured paths, and staggers detection calls with a small delay to reduce bursts of system path-detection commands.
 - **Release-process docs expanded for Homebrew flow**: Updated `docs/release-process.md` with recommended `universal` build flow, checksum generation examples, GitHub CLI/Rust target prerequisites, and cask update ordering notes.
+- **Release workflow restores automatic Homebrew Cask updates**: `release.yml` now restores the `update-homebrew-cask` job to compute `sha256` from the published `*_universal.dmg`, update `Casks/cockpit-tools.rb`, and open a cask PR after release assets are available.
+- **Auto-merge is limited to generated cask PRs only**: The release workflow now enables auto-merge only for Homebrew cask PRs created on `automation/update-cask-v*` branches (squash + delete branch), without affecting normal PRs.
 
 ### Fixed
 - **Windows black console flashes during startup**: Fixed unhidden `cmd /c reg query` calls in the VS Code registry fallback path detection flow. Background commands now run hidden, reducing startup black-window flashes for some Windows users.

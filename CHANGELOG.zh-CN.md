@@ -15,6 +15,8 @@
 ### 变更
 - **启动路径探测策略优化**：应用启动时改为先读取本地配置，仅探测未配置路径的平台，并使用延迟 + 错峰执行，降低启动阶段集中调用系统探测命令的概率。
 - **发布流程文档补充 Homebrew 场景**：更新 `docs/release-process.md`，补充 `universal` 构建推荐方式、`SHA256SUMS` 生成示例、GitHub CLI/Rust target 前置条件及 cask 更新顺序说明。
+- **Release 工作流恢复 Homebrew Cask 自动更新**：`release.yml` 恢复 `update-homebrew-cask` 任务，基于已发布的 `*_universal.dmg` 自动计算 `sha256`、更新 `Casks/cockpit-tools.rb` 并创建 cask PR。
+- **仅自动合并 cask 自动生成 PR**：Release 工作流现仅对 `automation/update-cask-v*` 分支创建的 Homebrew cask PR 启用自动合并（squash + 删除分支），不影响其他普通 PR。
 
 ### 修复
 - **Windows 启动黑色命令行窗口闪烁**：修复 VS Code 路径注册表回退探测中 `cmd /c reg query` 未隐藏窗口的问题，后台命令改为隐藏执行，减少部分 Windows 用户启动时出现多个黑色窗口闪现。
