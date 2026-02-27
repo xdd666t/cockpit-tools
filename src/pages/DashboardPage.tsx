@@ -21,6 +21,7 @@ import {
   GitHubCopilotAccount,
   getGitHubCopilotPlanDisplayName,
   getGitHubCopilotQuotaClass,
+  getGitHubCopilotUsage,
   formatGitHubCopilotResetTime,
 } from '../types/githubCopilot';
 import {
@@ -41,6 +42,7 @@ import {
   formatKiroResetTime,
 } from '../types/kiro';
 import './DashboardPage.css';
+import { AnnouncementCenter } from '../components/AnnouncementCenter';
 import { RobotIcon } from '../components/icons/RobotIcon';
 import { CodexIcon } from '../components/icons/CodexIcon';
 import { WindsurfIcon } from '../components/icons/WindsurfIcon';
@@ -786,9 +788,36 @@ export function DashboardPage({ onNavigate, onOpenPlatformLayout, onEasterEggTri
 
     const planName = getGitHubCopilotPlanDisplayName(account.plan_type);
     const planLabel = planName;
-    const hourly = account.quota?.hourly_percentage ?? null;
-    const weekly = account.quota?.weekly_percentage ?? null;
-    const hasQuota = hourly != null || weekly != null;
+    const usage = getGitHubCopilotUsage(account);
+    const toMetricView = (percent: number | null | undefined, included: boolean) => {
+      if (included) {
+        return {
+          hasData: true,
+          label: t('githubCopilot.usage.included', 'Included'),
+          barPercent: 100,
+          quotaClass: getGitHubCopilotQuotaClass(0),
+        };
+      }
+      if (typeof percent !== 'number' || !Number.isFinite(percent)) {
+        return {
+          hasData: false,
+          label: '-',
+          barPercent: 0,
+          quotaClass: getGitHubCopilotQuotaClass(0),
+        };
+      }
+      const normalized = Math.max(0, Math.min(100, Math.round(percent)));
+      return {
+        hasData: true,
+        label: `${normalized}%`,
+        barPercent: normalized,
+        quotaClass: getGitHubCopilotQuotaClass(normalized),
+      };
+    };
+
+    const inlineMetric = toMetricView(usage.inlineSuggestionsUsedPercent, usage.inlineIncluded === true);
+    const chatMetric = toMetricView(usage.chatMessagesUsedPercent, usage.chatIncluded === true);
+    const premiumMetric = toMetricView(usage.premiumRequestsUsedPercent, usage.premiumIncluded === true);
     const isRefreshing = refreshing.has(account.id);
     const isSwitching = switching.has(account.id);
     const displayEmail = account.email ?? account.github_email ?? account.github_login;
@@ -805,50 +834,60 @@ export function DashboardPage({ onNavigate, onOpenPlatformLayout, onEasterEggTri
         </div>
 
         <div className="account-mini-quotas">
-          {!hasQuota && <span className="no-data-text">{t('dashboard.noData', '暂无数据')}</span>}
-          {hasQuota && (
-            <>
-              <div className="mini-quota-row-stacked">
-                <div className="mini-quota-header">
-                  <span className="model-name">{t('common.shared.quota.hourly', 'Inline Suggestions')}</span>
-                  <span className={`model-pct ${getGitHubCopilotQuotaClass(hourly ?? 0)}`}>
-                    {hourly ?? 0}%
-                  </span>
-                </div>
-                <div className="mini-progress-track">
-                  <div
-                    className={`mini-progress-bar ${getGitHubCopilotQuotaClass(hourly ?? 0)}`}
-                    style={{ width: `${hourly ?? 0}%` }}
-                  />
-                </div>
-                {account.quota?.hourly_reset_time && (
-                  <div className="mini-reset-time">
-                    {formatGitHubCopilotResetTime(account.quota.hourly_reset_time, t)}
-                  </div>
-                )}
+          <div className="mini-quota-row-stacked">
+            <div className="mini-quota-header">
+              <span className="model-name">{t('common.shared.quota.hourly', 'Inline Suggestions')}</span>
+              <span className={`model-pct ${inlineMetric.quotaClass}`}>
+                {inlineMetric.label}
+              </span>
+            </div>
+            <div className="mini-progress-track">
+              <div
+                className={`mini-progress-bar ${inlineMetric.quotaClass}`}
+                style={{ width: `${inlineMetric.barPercent}%` }}
+              />
+            </div>
+            {account.quota?.hourly_reset_time && (
+              <div className="mini-reset-time">
+                {formatGitHubCopilotResetTime(account.quota.hourly_reset_time, t)}
               </div>
+            )}
+          </div>
 
-              <div className="mini-quota-row-stacked">
-                <div className="mini-quota-header">
-                  <span className="model-name">{t('common.shared.quota.weekly', 'Chat messages')}</span>
-                  <span className={`model-pct ${getGitHubCopilotQuotaClass(weekly ?? 0)}`}>
-                    {weekly ?? 0}%
-                  </span>
-                </div>
-                <div className="mini-progress-track">
-                  <div
-                    className={`mini-progress-bar ${getGitHubCopilotQuotaClass(weekly ?? 0)}`}
-                    style={{ width: `${weekly ?? 0}%` }}
-                  />
-                </div>
-                {account.quota?.weekly_reset_time && (
-                  <div className="mini-reset-time">
-                    {formatGitHubCopilotResetTime(account.quota.weekly_reset_time, t)}
-                  </div>
-                )}
+          <div className="mini-quota-row-stacked">
+            <div className="mini-quota-header">
+              <span className="model-name">{t('common.shared.quota.weekly', 'Chat messages')}</span>
+              <span className={`model-pct ${chatMetric.quotaClass}`}>
+                {chatMetric.label}
+              </span>
+            </div>
+            <div className="mini-progress-track">
+              <div
+                className={`mini-progress-bar ${chatMetric.quotaClass}`}
+                style={{ width: `${chatMetric.barPercent}%` }}
+              />
+            </div>
+            {account.quota?.weekly_reset_time && (
+              <div className="mini-reset-time">
+                {formatGitHubCopilotResetTime(account.quota.weekly_reset_time, t)}
               </div>
-            </>
-          )}
+            )}
+          </div>
+
+          <div className="mini-quota-row-stacked">
+            <div className="mini-quota-header">
+              <span className="model-name">{t('githubCopilot.columns.premium', 'Premium requests')}</span>
+              <span className={`model-pct ${premiumMetric.quotaClass}`}>
+                {premiumMetric.label}
+              </span>
+            </div>
+            <div className="mini-progress-track">
+              <div
+                className={`mini-progress-bar ${premiumMetric.quotaClass}`}
+                style={{ width: `${premiumMetric.barPercent}%` }}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="account-mini-actions icon-only-row">
@@ -1378,7 +1417,7 @@ export function DashboardPage({ onNavigate, onOpenPlatformLayout, onEasterEggTri
            <button className="header-action-btn" onClick={onOpenPlatformLayout}>
              <span>{t('platformLayout.title', '平台布局')}</span>
            </button>
-           <span className="date-display">{new Date().toLocaleDateString()}</span>
+           <AnnouncementCenter onNavigate={onNavigate} variant="inline" trigger="button" />
          </div>
       </div>
 

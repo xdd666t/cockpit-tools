@@ -7,6 +7,21 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
 ---
+## [0.9.1] - 2026-02-27
+
+### 新增
+- **桌面端公告系统**：新增完整公告能力链路，包含 Tauri 公告命令、前端 store/service/type 与公告中心 UI（列表/详情弹窗、未读角标、已读标记、刷新、弹窗公告、图片预览、tab/url/command 动作处理）。
+- **开发调试公告源控制**：新增本地覆盖文件支持（`~/.antigravity_cockpit/announcements.local.json`）与 Debug 工作区公告源（`announcements.json`），用于 `npm run tauri dev` 调试，同时持久化已读记录与缓存文件。
+- **仓库级公告种子文件**：新增仓库根目录 `announcements.json`，内置欢迎公告与反馈动作，便于本地调试并与远端公告源结构保持一致。
+
+### 变更
+- **普通用户公告策略改为远端优先**：非开发/运行时构建默认不再读取本地覆盖公告文件，统一走远端公告（含缓存与失败回退）。
+- **仪表盘页头操作区调整**：将仪表盘右上角日期展示替换为内嵌“公告”按钮；公告入口改为仪表盘上下文显示，不再全局全页悬浮。
+- **v0.9.0 公告内容已补齐全语言**：新增/补齐 `announcements.json` 中该公告的 17 种语言标题、摘要、正文与动作文案，确保各语言环境都能看到对应本地化内容。
+- **GitHub Copilot 用量展示对齐（仪表盘 + 托盘）**：用量解析切换为结构化快照口径（`completions` / `chat` / `premium_interactions`），补充 `Included` 语义处理，并在仪表盘卡片与托盘摘要中新增 `Premium` 维度展示。
+- **公告/托盘文案覆盖补齐**：为全部语言文件新增 `announcement.*` 文案键，并在托盘文案映射中补充 `Included` 与 GitHub Copilot 指标标签（`Inline` / `Chat` / `Premium`）。
+
+---
 ## [0.9.0] - 2026-02-27
 
 ### 新增

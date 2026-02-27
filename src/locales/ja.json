@@ -1435,5 +1435,29 @@
       "localClient": "地元キロから輸入"
     },
     "injectToVSCode": "キロに切り替えます"
+  },
+  "announcement": {
+    "title": "通知",
+    "empty": "通知はありません",
+    "markAllRead": "すべて既読にする",
+    "gotIt": "了解",
+    "later": "後で",
+    "clickToClose": "クリックして閉じる",
+    "new": "新着",
+    "timeAgo": {
+      "justNow": "たった今",
+      "minutesAgo": "{count}分前",
+      "hoursAgo": "{count}時間前",
+      "daysAgo": "{count}日前"
+    },
+    "type": {
+      "feature": "✨ 新機能",
+      "warning": "⚠️ 警告",
+      "info": "ℹ️ 情報",
+      "urgent": "🚨 緊急"
+    },
+    "refreshed": "公告を更新しました（{count}件）",
+    "clickToEnlarge": "クリックして拡大",
+    "imageLoadFailed": "画像の読み込みに失敗しました"
   }
 }

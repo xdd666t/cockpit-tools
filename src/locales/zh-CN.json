@@ -1435,5 +1435,29 @@
       "localClient": "从本机 Kiro 导入"
     },
     "injectToVSCode": "切换到 Kiro"
+  },
+  "announcement": {
+    "title": "消息通知",
+    "empty": "暂无消息",
+    "markAllRead": "全部已读",
+    "gotIt": "知道了",
+    "later": "稍后再说",
+    "new": "新",
+    "timeAgo": {
+      "justNow": "刚刚",
+      "minutesAgo": "{count}分钟前",
+      "hoursAgo": "{count}小时前",
+      "daysAgo": "{count}天前"
+    },
+    "type": {
+      "feature": "✨ 新功能",
+      "warning": "⚠️ 警告",
+      "info": "ℹ️ 信息",
+      "urgent": "🚨 紧急"
+    },
+    "refreshed": "公告已刷新（共 {count} 条）",
+    "clickToClose": "点击关闭",
+    "clickToEnlarge": "点击放大",
+    "imageLoadFailed": "图片加载失败"
   }
 }

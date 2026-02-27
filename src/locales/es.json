@@ -1435,5 +1435,29 @@
       "localClient": "Importar desde Kiro local"
     },
     "injectToVSCode": "Cambiar a Kiro"
+  },
+  "announcement": {
+    "title": "Notificaciones",
+    "empty": "No hay notificaciones",
+    "markAllRead": "Marcar todo como leído",
+    "gotIt": "Entendido",
+    "later": "Más tarde",
+    "clickToClose": "Haz clic para cerrar",
+    "new": "Nuevo",
+    "timeAgo": {
+      "justNow": "Ahora mismo",
+      "minutesAgo": "Hace {count}m",
+      "hoursAgo": "Hace {count}h",
+      "daysAgo": "Hace {count}d"
+    },
+    "type": {
+      "feature": "✨ Nueva función",
+      "warning": "⚠️ Advertencia",
+      "info": "ℹ️ Información",
+      "urgent": "🚨 Urgente"
+    },
+    "refreshed": "Notificaciones actualizadas ({count} en total)",
+    "clickToEnlarge": "Haz clic para ampliar",
+    "imageLoadFailed": "Error al cargar la imagen"
   }
 }

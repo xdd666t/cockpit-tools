@@ -1,0 +1,271 @@
+{
+  "version": "1.0",
+  "announcements": [
+    {
+      "id": "ann-2026-02-welcome-cockpit-tools",
+      "type": "info",
+      "priority": 300,
+      "title": "👋 欢迎使用 Cockpit Tools",
+      "summary": "账号管理、配额监控与多开能力已就绪。",
+      "content": "感谢你选择 Cockpit Tools。\n\n这个桌面端目前可以帮助你：\n• 统一管理 Antigravity、Codex、GitHub Copilot、Windsurf、Kiro 账号\n• 实时查看模型配额与重置时间\n• 快速切换当前账号并支持批量刷新\n• 管理设备指纹与多开实例\n• 使用唤醒任务与账号验证能力\n\n如果你有建议或问题，欢迎随时反馈。",
+      "action": {
+        "type": "url",
+        "target": "https://github.com/jlcodes99/cockpit-tools/issues",
+        "label": "反馈建议"
+      },
+      "targetVersions": "*",
+      "targetLanguages": [
+        "*"
+      ],
+      "showOnce": true,
+      "popup": true,
+      "createdAt": "2026-02-27T09:52:12Z",
+      "expiresAt": null,
+      "locales": {
+        "zh-CN": {
+          "title": "👋 欢迎使用 Cockpit Tools",
+          "summary": "账号管理、配额监控与多开能力已就绪。",
+          "content": "感谢你选择 Cockpit Tools。\n\n这个桌面端目前可以帮助你：\n• 统一管理 Antigravity、Codex、GitHub Copilot、Windsurf、Kiro 账号\n• 实时查看模型配额与重置时间\n• 快速切换当前账号并支持批量刷新\n• 管理设备指纹与多开实例\n• 使用唤醒任务与账号验证能力\n\n如果你有建议或问题，欢迎随时反馈。",
+          "actionLabel": "反馈建议"
+        },
+        "zh-tw": {
+          "title": "👋 歡迎使用 Cockpit Tools",
+          "summary": "帳號管理、配額監控與多開能力已就緒。",
+          "content": "感謝你選擇 Cockpit Tools。\n\n這個桌面端目前可以幫助你：\n• 統一管理 Antigravity、Codex、GitHub Copilot、Windsurf、Kiro 帳號\n• 即時查看模型配額與重置時間\n• 快速切換當前帳號並支援批量刷新\n• 管理裝置指紋與多開實例\n• 使用喚醒任務與帳號驗證能力\n\n如果你有建議或問題，歡迎隨時回饋。",
+          "actionLabel": "回饋建議"
+        },
+        "en": {
+          "title": "👋 Welcome to Cockpit Tools",
+          "summary": "Account management, quota monitoring, and multi-instance tools are ready.",
+          "content": "Thanks for choosing Cockpit Tools.\n\nThis desktop app can help you with:\n• Unified account management for Antigravity, Codex, GitHub Copilot, Windsurf, and Kiro\n• Real-time quota and reset-time visibility\n• Fast current-account switching and batch refresh\n• Device fingerprint and multi-instance management\n• Wakeup tasks and account verification workflows\n\nIf you have suggestions or run into issues, we would love your feedback.",
+          "actionLabel": "Send Feedback"
+        },
+        "en-US": {
+          "title": "👋 Welcome to Cockpit Tools",
+          "summary": "Account management, quota monitoring, and multi-instance tools are ready.",
+          "content": "Thanks for choosing Cockpit Tools.\n\nThis desktop app can help you with:\n• Unified account management for Antigravity, Codex, GitHub Copilot, Windsurf, and Kiro\n• Real-time quota and reset-time visibility\n• Fast current-account switching and batch refresh\n• Device fingerprint and multi-instance management\n• Wakeup tasks and account verification workflows\n\nIf you have suggestions or run into issues, we would love your feedback.",
+          "actionLabel": "Send Feedback"
+        },
+        "ja": {
+          "title": "👋 Cockpit Tools へようこそ",
+          "summary": "アカウント管理、クォータ監視、マルチインスタンス機能が利用できます。",
+          "content": "Cockpit Tools を選んでいただきありがとうございます。\n\nこのデスクトップアプリでできること：\n• Antigravity / Codex / GitHub Copilot / Windsurf / Kiro のアカウントを一元管理\n• モデルクォータとリセット時刻をリアルタイムで確認\n• 現在アカウントの高速切替と一括更新\n• デバイスフィンガープリントとマルチインスタンス管理\n• ウェイクアップタスクとアカウント検証機能\n\nご意見や問題があれば、ぜひお知らせください。",
+          "actionLabel": "フィードバックを送る"
+        },
+        "ko": {
+          "title": "👋 Cockpit Tools에 오신 것을 환영합니다",
+          "summary": "계정 관리, 할당량 모니터링, 멀티 인스턴스 기능을 사용할 수 있습니다.",
+          "content": "Cockpit Tools를 선택해 주셔서 감사합니다.\n\n이 데스크톱 앱으로 할 수 있는 일:\n• Antigravity, Codex, GitHub Copilot, Windsurf, Kiro 계정을 통합 관리\n• 모델 할당량과 리셋 시간을 실시간으로 확인\n• 현재 계정 빠른 전환 및 일괄 새로고침\n• 디바이스 지문 및 멀티 인스턴스 관리\n• 웨이크업 작업 및 계정 검증 기능\n\n문의나 제안이 있다면 언제든지 알려주세요.",
+          "actionLabel": "피드백 보내기"
+        },
+        "de": {
+          "title": "👋 Willkommen bei Cockpit Tools",
+          "summary": "Kontoverwaltung, Quotenüberwachung und Multi-Instanz-Funktionen sind bereit.",
+          "content": "Danke, dass du Cockpit Tools gewählt hast.\n\nDiese Desktop-App hilft dir bei:\n• Zentraler Verwaltung von Antigravity-, Codex-, GitHub Copilot-, Windsurf- und Kiro-Konten\n• Echtzeit-Anzeige von Modellquoten und Reset-Zeiten\n• Schnellem Kontowechsel und Massenaktualisierung\n• Verwaltung von Geräte-Fingerprints und Multi-Instanzen\n• Wakeup-Tasks und Kontoverifikation\n\nWenn du Feedback oder Fragen hast, freuen wir uns auf deine Rückmeldung.",
+          "actionLabel": "Feedback senden"
+        },
+        "fr": {
+          "title": "👋 Bienvenue dans Cockpit Tools",
+          "summary": "La gestion des comptes, le suivi des quotas et le multi-instance sont prêts.",
+          "content": "Merci d'avoir choisi Cockpit Tools.\n\nCette application desktop vous permet de :\n• Gérer de façon unifiée les comptes Antigravity, Codex, GitHub Copilot, Windsurf et Kiro\n• Suivre en temps réel les quotas de modèles et les heures de réinitialisation\n• Changer rapidement de compte actif et lancer des rafraîchissements en lot\n• Gérer les empreintes d'appareil et les instances multiples\n• Utiliser les tâches de réveil et la vérification de compte\n\nSi vous avez des suggestions ou des problèmes, n'hésitez pas à nous le dire.",
+          "actionLabel": "Envoyer un retour"
+        },
+        "es": {
+          "title": "👋 Bienvenido a Cockpit Tools",
+          "summary": "La gestión de cuentas, el monitoreo de cuotas y las funciones multiinstancia están listas.",
+          "content": "Gracias por elegir Cockpit Tools.\n\nEsta aplicación de escritorio te ayuda a:\n• Gestionar de forma unificada cuentas de Antigravity, Codex, GitHub Copilot, Windsurf y Kiro\n• Ver en tiempo real las cuotas de modelos y horarios de reinicio\n• Cambiar rápidamente la cuenta actual y refrescar en lote\n• Gestionar huellas del dispositivo e instancias múltiples\n• Usar tareas de activación y verificación de cuentas\n\nSi tienes sugerencias o problemas, estaremos encantados de recibir tus comentarios.",
+          "actionLabel": "Enviar comentarios"
+        },
+        "it": {
+          "title": "👋 Benvenuto in Cockpit Tools",
+          "summary": "Gestione account, monitoraggio quote e funzioni multi-istanza sono pronti.",
+          "content": "Grazie per aver scelto Cockpit Tools.\n\nQuesta app desktop ti aiuta a:\n• Gestire in modo unificato gli account Antigravity, Codex, GitHub Copilot, Windsurf e Kiro\n• Monitorare in tempo reale quote modello e orari di reset\n• Cambiare rapidamente account corrente e aggiornare in batch\n• Gestire impronte dispositivo e istanze multiple\n• Usare attività di wakeup e verifica account\n\nSe hai suggerimenti o problemi, inviaci pure un feedback.",
+          "actionLabel": "Invia feedback"
+        },
+        "ru": {
+          "title": "👋 Добро пожаловать в Cockpit Tools",
+          "summary": "Управление аккаунтами, мониторинг квот и мультиинстанс уже готовы.",
+          "content": "Спасибо, что выбрали Cockpit Tools.\n\nЭто настольное приложение помогает:\n• Единообразно управлять аккаунтами Antigravity, Codex, GitHub Copilot, Windsurf и Kiro\n• В реальном времени отслеживать квоты моделей и время сброса\n• Быстро переключать текущий аккаунт и обновлять данные пакетно\n• Управлять отпечатками устройства и несколькими инстансами\n• Использовать задачи пробуждения и проверку аккаунтов\n\nЕсли у вас есть предложения или проблемы, будем рады обратной связи.",
+          "actionLabel": "Отправить отзыв"
+        },
+        "pt-br": {
+          "title": "👋 Bem-vindo ao Cockpit Tools",
+          "summary": "Gerenciamento de contas, monitoramento de cotas e recursos de múltiplas instâncias estão prontos.",
+          "content": "Obrigado por escolher o Cockpit Tools.\n\nEste app desktop ajuda você a:\n• Gerenciar de forma unificada contas Antigravity, Codex, GitHub Copilot, Windsurf e Kiro\n• Acompanhar em tempo real cotas de modelos e horários de reset\n• Trocar rapidamente a conta atual e fazer atualização em lote\n• Gerenciar impressões digitais do dispositivo e múltiplas instâncias\n• Usar tarefas de wakeup e verificação de contas\n\nSe tiver sugestões ou problemas, envie seu feedback.",
+          "actionLabel": "Enviar feedback"
+        },
+        "tr": {
+          "title": "👋 Cockpit Tools'a hoş geldiniz",
+          "summary": "Hesap yönetimi, kota izleme ve çoklu örnek özellikleri hazır.",
+          "content": "Cockpit Tools'u seçtiğiniz için teşekkürler.\n\nBu masaüstü uygulaması size şunlarda yardımcı olur:\n• Antigravity, Codex, GitHub Copilot, Windsurf ve Kiro hesaplarını tek yerden yönetme\n• Model kotalarını ve sıfırlanma zamanlarını gerçek zamanlı izleme\n• Mevcut hesabı hızlı değiştirme ve toplu yenileme\n• Cihaz parmak izi ve çoklu örnek yönetimi\n• Wakeup görevleri ve hesap doğrulama\n\nÖneriniz veya sorununuz varsa geri bildiriminizi bekliyoruz.",
+          "actionLabel": "Geri bildirim gönder"
+        },
+        "vi": {
+          "title": "👋 Chào mừng bạn đến với Cockpit Tools",
+          "summary": "Quản lý tài khoản, theo dõi hạn mức và tính năng đa phiên bản đã sẵn sàng.",
+          "content": "Cảm ơn bạn đã chọn Cockpit Tools.\n\nỨng dụng desktop này có thể giúp bạn:\n• Quản lý tập trung tài khoản Antigravity, Codex, GitHub Copilot, Windsurf và Kiro\n• Theo dõi thời gian thực hạn mức mô hình và thời điểm đặt lại\n• Chuyển nhanh tài khoản hiện tại và làm mới hàng loạt\n• Quản lý dấu vân tay thiết bị và đa phiên bản\n• Sử dụng tác vụ wakeup và xác minh tài khoản\n\nNếu bạn có góp ý hoặc gặp vấn đề, hãy phản hồi cho chúng tôi.",
+          "actionLabel": "Gửi phản hồi"
+        },
+        "pl": {
+          "title": "👋 Witamy w Cockpit Tools",
+          "summary": "Zarządzanie kontami, monitorowanie limitów i obsługa wielu instancji są gotowe.",
+          "content": "Dziękujemy za wybór Cockpit Tools.\n\nTa aplikacja desktopowa pomaga w:\n• Zunifikowanym zarządzaniu kontami Antigravity, Codex, GitHub Copilot, Windsurf i Kiro\n• Monitorowaniu limitów modeli i czasu resetu w czasie rzeczywistym\n• Szybkim przełączaniu aktywnego konta i odświeżaniu wsadowym\n• Zarządzaniu fingerprintami urządzenia i wieloma instancjami\n• Korzystaniu z zadań wakeup i weryfikacji kont\n\nJeśli masz sugestie lub problemy, chętnie poznamy Twoją opinię.",
+          "actionLabel": "Wyślij opinię"
+        },
+        "cs": {
+          "title": "👋 Vítejte v Cockpit Tools",
+          "summary": "Správa účtů, sledování kvót a podpora více instancí jsou připravené.",
+          "content": "Děkujeme, že používáte Cockpit Tools.\n\nTato desktopová aplikace vám pomůže s:\n• Jednotnou správou účtů Antigravity, Codex, GitHub Copilot, Windsurf a Kiro\n• Sledováním kvót modelů a časů resetu v reálném čase\n• Rychlým přepínáním aktuálního účtu a hromadným obnovením\n• Správou fingerprintů zařízení a více instancí\n• Používáním wakeup úloh a ověřením účtu\n\nPokud máte návrhy nebo narazíte na problém, pošlete nám zpětnou vazbu.",
+          "actionLabel": "Odeslat zpětnou vazbu"
+        },
+        "ar": {
+          "title": "👋 مرحبًا بك في Cockpit Tools",
+          "summary": "إدارة الحسابات ومراقبة الحصص وميزات تعدد المثيلات جاهزة.",
+          "content": "شكرًا لاختيارك Cockpit Tools.\n\nيمكن لهذا التطبيق المكتبي مساعدتك في:\n• إدارة حسابات Antigravity وCodex وGitHub Copilot وWindsurf وKiro بشكل موحّد\n• متابعة حصص النماذج وأوقات إعادة التعيين في الوقت الفعلي\n• التبديل السريع للحساب الحالي مع التحديث الدفعي\n• إدارة بصمة الجهاز وتعدد المثيلات\n• استخدام مهام الإيقاظ وميزة التحقق من الحساب\n\nإذا كان لديك اقتراح أو واجهت مشكلة، يسعدنا تلقي ملاحظاتك.",
+          "actionLabel": "إرسال ملاحظات"
+        }
+      }
+    },
+    {
+      "id": "ann-2026-02-antigravity-v090-update",
+      "type": "feature",
+      "priority": 280,
+      "title": "🚀 Cockpit Tools v0.9.0 重要更新",
+      "summary": "支持一键验证账号有效性，唤醒/验证链路已对齐官方 APP 实现。",
+      "content": "Cockpit Tools 最近已升级至 v0.9.0，核心变化如下：\n• Antigravity账号支持一键发起账号有效性验证（可按模型批量验证，进度实时可见，结果可回查）\n• Antigravity唤醒/验证链路已对齐Antigravity官方APP实现：本地网关 + 官方 Language Server 协议\n• 403 场景新增快捷处理：立即验证、复制验证地址、复制调试信息\n建议升级到 v0.9.0 及以上版本，以获得更稳定的使用体验。",
+      "action": {
+        "type": "url",
+        "target": "https://github.com/jlcodes99/cockpit-tools/releases/latest",
+        "label": "下载最新版"
+      },
+      "targetVersions": "*",
+      "targetLanguages": [
+        "ar",
+        "cs",
+        "de",
+        "en-US",
+        "en",
+        "es",
+        "fr",
+        "it",
+        "ja",
+        "ko",
+        "pl",
+        "pt-br",
+        "ru",
+        "tr",
+        "vi",
+        "zh-CN",
+        "zh-tw"
+      ],
+      "showOnce": true,
+      "popup": true,
+      "createdAt": "2026-02-27T10:30:15.244Z",
+      "expiresAt": null,
+      "locales": {
+        "ar": {
+          "title": "🚀 تحديث مهم لـ Cockpit Tools v0.9.0",
+          "summary": "تم دعم التحقق من صلاحية الحساب بنقرة واحدة، وتمت مواءمة مسار التنبيه/التحقق مع التطبيق الرسمي.",
+          "content": "تمت ترقية Cockpit Tools مؤخرًا إلى الإصدار v0.9.0. أبرز التغييرات:\n• تدعم حسابات Antigravity الآن التحقق من صلاحية الحساب بنقرة واحدة (تحقق دفعي حسب النموذج، عرض التقدم لحظيًا، وإمكانية مراجعة النتائج)\n• تمت مواءمة مسار التنبيه/التحقق في Antigravity مع تطبيق Antigravity الرسمي: بوابة محلية + بروتوكول Language Server الرسمي\n• إضافة معالجة سريعة لحالات 403: التحقق الآن، نسخ عنوان التحقق، نسخ معلومات التصحيح\nننصح بالترقية إلى v0.9.0 أو أعلى للحصول على تجربة أكثر استقرارًا.",
+          "actionLabel": "تنزيل أحدث إصدار"
+        },
+        "cs": {
+          "title": "🚀 Důležitá aktualizace Cockpit Tools v0.9.0",
+          "summary": "Podporujeme ověření platnosti účtu jedním kliknutím a řetězec probuzení/ověření je sladěn s oficiální aplikací.",
+          "content": "Cockpit Tools byl nedávno aktualizován na verzi v0.9.0. Hlavní změny:\n• Účty Antigravity nyní podporují ověření platnosti jedním kliknutím (hromadné ověření podle modelu, průběh v reálném čase, výsledky lze zpětně dohledat)\n• Řetězec probuzení/ověření Antigravity je nyní sladěn s oficiální aplikací Antigravity: lokální brána + oficiální protokol Language Server\n• Nové rychlé akce pro scénáře 403: Ověřit nyní, kopírovat ověřovací adresu, kopírovat ladicí informace\nPro stabilnější používání doporučujeme aktualizovat na v0.9.0 nebo vyšší.",
+          "actionLabel": "Stáhnout nejnovější verzi"
+        },
+        "de": {
+          "title": "🚀 Wichtiges Update zu Cockpit Tools v0.9.0",
+          "summary": "Die Ein-Klick-Prüfung der Konto-Gültigkeit wird unterstützt, und die Wake/Verifizierungs-Kette ist an die offizielle App angepasst.",
+          "content": "Cockpit Tools wurde kürzlich auf v0.9.0 aktualisiert. Die wichtigsten Änderungen:\n• Antigravity-Konten unterstützen jetzt eine Ein-Klick-Gültigkeitsprüfung (modellweise Stapelprüfung, Fortschritt in Echtzeit sichtbar, Ergebnisse nachverfolgbar)\n• Die Antigravity-Wake/Verifizierungs-Kette ist nun an die offizielle Antigravity-App angepasst: lokales Gateway + offizielles Language-Server-Protokoll\n• Neue Schnellaktionen für 403-Szenarien: Sofort verifizieren, Verifizierungsadresse kopieren, Debug-Informationen kopieren\nFür ein stabileres Nutzungserlebnis empfehlen wir ein Upgrade auf v0.9.0 oder höher.",
+          "actionLabel": "Neueste Version herunterladen"
+        },
+        "en-US": {
+          "title": "🚀 Cockpit Tools v0.9.0 Major Update",
+          "summary": "One-click account validity verification is now supported, and the wake/verification pipeline is aligned with the official app.",
+          "content": "Cockpit Tools has recently been upgraded to v0.9.0. Key changes:\n• Antigravity accounts now support one-click validity verification (batch verification by model, real-time progress visibility, and traceable results)\n• The Antigravity wake/verification pipeline is now aligned with the official Antigravity app: local gateway + official Language Server protocol\n• New quick actions for 403 scenarios: Verify now, copy verification URL, and copy debug info\nWe recommend upgrading to v0.9.0 or later for a more stable experience.",
+          "actionLabel": "Download Latest"
+        },
+        "en": {
+          "title": "🚀 Cockpit Tools v0.9.0 Major Update",
+          "summary": "One-click account validity verification is now supported, and the wake/verification pipeline is aligned with the official app.",
+          "content": "Cockpit Tools has recently been upgraded to v0.9.0. Key changes:\n• Antigravity accounts now support one-click validity verification (batch verification by model, real-time progress visibility, and traceable results)\n• The Antigravity wake/verification pipeline is now aligned with the official Antigravity app: local gateway + official Language Server protocol\n• New quick actions for 403 scenarios: Verify now, copy verification URL, and copy debug info\nWe recommend upgrading to v0.9.0 or later for a more stable experience.",
+          "actionLabel": "Download Latest"
+        },
+        "es": {
+          "title": "🚀 Actualización importante de Cockpit Tools v0.9.0",
+          "summary": "Ya se admite la validación de cuenta con un clic y el flujo de activación/validación está alineado con la app oficial.",
+          "content": "Cockpit Tools se ha actualizado recientemente a la v0.9.0. Cambios clave:\n• Las cuentas de Antigravity ahora admiten validación de cuenta con un clic (validación por lotes por modelo, progreso en tiempo real y resultados consultables)\n• El flujo de activación/validación de Antigravity ya está alineado con la app oficial de Antigravity: puerta de enlace local + protocolo oficial Language Server\n• Nuevas acciones rápidas para casos 403: Validar ahora, copiar URL de validación y copiar información de depuración\nRecomendamos actualizar a la v0.9.0 o superior para obtener una experiencia más estable.",
+          "actionLabel": "Descargar la última versión"
+        },
+        "fr": {
+          "title": "🚀 Mise à jour majeure de Cockpit Tools v0.9.0",
+          "summary": "La vérification de validité du compte en un clic est prise en charge, et le flux réveil/vérification est aligné sur l’app officielle.",
+          "content": "Cockpit Tools a récemment été mis à niveau vers la v0.9.0. Changements clés :\n• Les comptes Antigravity prennent désormais en charge la vérification de validité en un clic (vérification par lot par modèle, progression en temps réel et résultats consultables)\n• Le flux réveil/vérification d’Antigravity est désormais aligné sur l’app officielle Antigravity : passerelle locale + protocole officiel Language Server\n• Nouvelles actions rapides pour les cas 403 : Vérifier maintenant, copier l’URL de vérification, copier les informations de débogage\nNous recommandons de passer à la v0.9.0 ou supérieure pour une expérience plus stable.",
+          "actionLabel": "Télécharger la dernière version"
+        },
+        "it": {
+          "title": "🚀 Aggiornamento importante di Cockpit Tools v0.9.0",
+          "summary": "È supportata la verifica della validità dell’account con un clic e il flusso risveglio/verifica è allineato all’app ufficiale.",
+          "content": "Cockpit Tools è stato recentemente aggiornato alla v0.9.0. Modifiche principali:\n• Gli account Antigravity ora supportano la verifica della validità con un clic (verifica batch per modello, avanzamento in tempo reale e risultati consultabili)\n• Il flusso di risveglio/verifica di Antigravity è ora allineato all’app ufficiale Antigravity: gateway locale + protocollo ufficiale Language Server\n• Nuove azioni rapide per gli scenari 403: Verifica ora, copia indirizzo di verifica, copia informazioni di debug\nConsigliamo di aggiornare alla v0.9.0 o successiva per un’esperienza più stabile.",
+          "actionLabel": "Scarica l'ultima versione"
+        },
+        "ja": {
+          "title": "🚀 Cockpit Tools v0.9.0 重要アップデート",
+          "summary": "アカウント有効性のワンクリック検証に対応し、起動/検証経路は公式 APP 実装に整合しました。",
+          "content": "Cockpit Tools は最近 v0.9.0 にアップグレードされました。主な変更点は以下のとおりです。\n• Antigravity アカウントでワンクリック有効性検証に対応（モデル単位の一括検証、進捗のリアルタイム表示、結果の追跡が可能）\n• Antigravity の起動/検証経路が Antigravity 公式 APP 実装に整合：ローカルゲートウェイ + 公式 Language Server プロトコル\n• 403 シナリオにクイック対応を追加：今すぐ検証、検証 URL をコピー、デバッグ情報をコピー\nより安定した利用体験のため、v0.9.0 以上へのアップグレードを推奨します。",
+          "actionLabel": "最新版をダウンロード"
+        },
+        "ko": {
+          "title": "🚀 Cockpit Tools v0.9.0 주요 업데이트",
+          "summary": "계정 유효성 원클릭 검증을 지원하며, 깨우기/검증 체인이 공식 APP 구현과 정렬되었습니다.",
+          "content": "Cockpit Tools가 최근 v0.9.0으로 업그레이드되었습니다. 핵심 변경 사항은 다음과 같습니다.\n• Antigravity 계정에서 계정 유효성 원클릭 검증 지원 (모델별 일괄 검증, 실시간 진행 상황 확인, 결과 추적 가능)\n• Antigravity 깨우기/검증 체인이 Antigravity 공식 APP 구현과 정렬됨: 로컬 게이트웨이 + 공식 Language Server 프로토콜\n• 403 시나리오에 빠른 처리 추가: 즉시 검증, 검증 주소 복사, 디버그 정보 복사\n더 안정적인 사용 경험을 위해 v0.9.0 이상으로 업그레이드할 것을 권장합니다.",
+          "actionLabel": "최신 버전 다운로드"
+        },
+        "pl": {
+          "title": "🚀 Ważna aktualizacja Cockpit Tools v0.9.0",
+          "summary": "Obsługiwane jest jednoklikowe sprawdzanie ważności konta, a łańcuch wybudzania/weryfikacji został dopasowany do oficjalnej aplikacji.",
+          "content": "Cockpit Tools został niedawno zaktualizowany do wersji v0.9.0. Najważniejsze zmiany:\n• Konta Antigravity obsługują teraz jednoklikową weryfikację ważności (weryfikacja wsadowa według modelu, postęp widoczny w czasie rzeczywistym, możliwość ponownego sprawdzenia wyników)\n• Łańcuch wybudzania/weryfikacji Antigravity został dopasowany do oficjalnej aplikacji Antigravity: lokalna brama + oficjalny protokół Language Server\n• Nowe szybkie działania dla scenariuszy 403: Zweryfikuj teraz, skopiuj adres weryfikacji, skopiuj informacje debugowania\nZalecamy aktualizację do v0.9.0 lub nowszej, aby uzyskać bardziej stabilne działanie.",
+          "actionLabel": "Pobierz najnowszą wersję"
+        },
+        "pt-br": {
+          "title": "🚀 Atualização importante do Cockpit Tools v0.9.0",
+          "summary": "A validação de conta com um clique agora é suportada, e o fluxo de despertar/validação foi alinhado ao app oficial.",
+          "content": "O Cockpit Tools foi atualizado recentemente para a v0.9.0. Principais mudanças:\n• As contas Antigravity agora suportam validação de conta com um clique (validação em lote por modelo, progresso em tempo real e resultados consultáveis)\n• O fluxo de despertar/validação do Antigravity agora está alinhado ao app oficial Antigravity: gateway local + protocolo oficial Language Server\n• Novas ações rápidas para cenários 403: Validar agora, copiar endereço de validação e copiar informações de depuração\nRecomendamos atualizar para a v0.9.0 ou superior para uma experiência mais estável.",
+          "actionLabel": "Baixar versão mais recente"
+        },
+        "ru": {
+          "title": "🚀 Важное обновление Cockpit Tools v0.9.0",
+          "summary": "Поддерживается проверка валидности аккаунта в один клик, а цепочка пробуждения/проверки выровнена с официальным приложением.",
+          "content": "Cockpit Tools недавно обновился до v0.9.0. Ключевые изменения:\n• Для аккаунтов Antigravity теперь доступна проверка валидности в один клик (пакетная проверка по моделям, прогресс в реальном времени, результаты доступны для повторной проверки)\n• Цепочка пробуждения/проверки Antigravity теперь выровнена с официальным приложением Antigravity: локальный шлюз + официальный протокол Language Server\n• Добавлены быстрые действия для сценариев 403: Проверить сейчас, скопировать адрес проверки, скопировать отладочную информацию\nРекомендуем обновиться до v0.9.0 или выше для более стабильной работы.",
+          "actionLabel": "Скачать последнюю версию"
+        },
+        "tr": {
+          "title": "🚀 Cockpit Tools v0.9.0 için önemli güncelleme",
+          "summary": "Tek tıkla hesap geçerlilik doğrulaması destekleniyor ve uyandırma/doğrulama hattı resmi uygulama ile hizalandı.",
+          "content": "Cockpit Tools yakın zamanda v0.9.0 sürümüne yükseltildi. Temel değişiklikler:\n• Antigravity hesapları artık tek tıkla hesap geçerlilik doğrulamasını destekliyor (model bazında toplu doğrulama, gerçek zamanlı ilerleme ve geriye dönük sonuç inceleme)\n• Antigravity uyandırma/doğrulama hattı artık resmi Antigravity APP uygulamasıyla hizalı: yerel ağ geçidi + resmi Language Server protokolü\n• 403 senaryoları için yeni hızlı işlemler: Hemen doğrula, doğrulama adresini kopyala, hata ayıklama bilgisini kopyala\nDaha kararlı bir kullanım deneyimi için v0.9.0 ve üzeri sürümlere yükseltmenizi öneririz.",
+          "actionLabel": "En son sürümü indir"
+        },
+        "vi": {
+          "title": "🚀 Cập nhật quan trọng Cockpit Tools v0.9.0",
+          "summary": "Đã hỗ trợ xác minh hiệu lực tài khoản bằng một lần bấm, và luồng đánh thức/xác minh đã được đồng bộ với ứng dụng chính thức.",
+          "content": "Cockpit Tools gần đây đã được nâng cấp lên v0.9.0. Các thay đổi cốt lõi gồm:\n• Tài khoản Antigravity nay hỗ trợ xác minh hiệu lực chỉ với một lần bấm (xác minh hàng loạt theo mô hình, theo dõi tiến độ thời gian thực, và tra cứu lại kết quả)\n• Luồng đánh thức/xác minh của Antigravity đã đồng bộ với ứng dụng APP chính thức của Antigravity: cổng nội bộ + giao thức Language Server chính thức\n• Bổ sung xử lý nhanh cho tình huống 403: Xác minh ngay, sao chép địa chỉ xác minh, sao chép thông tin gỡ lỗi\nKhuyến nghị nâng cấp lên v0.9.0 trở lên để có trải nghiệm ổn định hơn.",
+          "actionLabel": "Tải phiên bản mới nhất"
+        },
+        "zh-CN": {
+          "title": "🚀 Cockpit Tools v0.9.0 重要更新",
+          "summary": "支持一键验证账号有效性，唤醒/验证链路已对齐官方 APP 实现。",
+          "content": "Cockpit Tools 最近已升级至 v0.9.0，核心变化如下：\n• Antigravity账号支持一键发起账号有效性验证（可按模型批量验证，进度实时可见，结果可回查）\n• Antigravity唤醒/验证链路已对齐Antigravity官方APP实现：本地网关 + 官方 Language Server 协议\n• 403 场景新增快捷处理：立即验证、复制验证地址、复制调试信息\n建议升级到 v0.9.0 及以上版本，以获得更稳定的使用体验。",
+          "actionLabel": "下载最新版"
+        },
+        "zh-tw": {
+          "title": "🚀 Cockpit Tools v0.9.0 重要更新",
+          "summary": "支援一鍵驗證帳號有效性，喚醒/驗證鏈路已對齊官方 APP 實作。",
+          "content": "Cockpit Tools 最近已升級至 v0.9.0，核心變更如下：\n• Antigravity 帳號支援一鍵發起帳號有效性驗證（可按模型批次驗證，進度即時可見，結果可回查）\n• Antigravity 喚醒/驗證鏈路已對齊 Antigravity 官方 APP 實作：本地網關 + 官方 Language Server 協議\n• 403 場景新增快捷處理：立即驗證、複製驗證地址、複製除錯資訊\n建議升級到 v0.9.0 及以上版本，以獲得更穩定的使用體驗。",
+          "actionLabel": "下載最新版本"
+        }
+      }
+    }
+  ]
+}

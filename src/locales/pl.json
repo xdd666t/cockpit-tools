@@ -1435,5 +1435,29 @@
       "localClient": "Importuj z lokalnego Kiro"
     },
     "injectToVSCode": "Przełącz się na Kiro"
+  },
+  "announcement": {
+    "title": "Powiadomienia",
+    "empty": "Brak powiadomień",
+    "markAllRead": "Oznacz wszystko jako przeczytane",
+    "gotIt": "Rozumiem",
+    "later": "Później",
+    "clickToClose": "Kliknij, aby zamknąć",
+    "new": "Nowe",
+    "timeAgo": {
+      "justNow": "Przed chwilą",
+      "minutesAgo": "{count}m temu",
+      "hoursAgo": "{count}h temu",
+      "daysAgo": "{count}d temu"
+    },
+    "type": {
+      "feature": "✨ Nowa funkcja",
+      "warning": "⚠️ Ostrzeżenie",
+      "info": "ℹ️ Informacja",
+      "urgent": "🚨 Pilne"
+    },
+    "refreshed": "Powiadomienia odświeżone (łącznie {count})",
+    "clickToEnlarge": "Kliknij, aby powiększyć",
+    "imageLoadFailed": "Nie udało się załadować obrazu"
   }
 }

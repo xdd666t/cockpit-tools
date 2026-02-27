@@ -1435,5 +1435,29 @@
       "localClient": "Dovoz z místní Kiro"
     },
     "injectToVSCode": "Přepněte na Kiro"
+  },
+  "announcement": {
+    "title": "Oznámení",
+    "empty": "Žádná oznámení",
+    "markAllRead": "Označit vše jako přečtené",
+    "gotIt": "Rozumím",
+    "later": "Později",
+    "clickToClose": "Kliknutím zavřete",
+    "new": "Nové",
+    "timeAgo": {
+      "justNow": "Právě teď",
+      "minutesAgo": "Před {count}m",
+      "hoursAgo": "Před {count}h",
+      "daysAgo": "Před {count}d"
+    },
+    "type": {
+      "feature": "✨ Nová funkce",
+      "warning": "⚠️ Varování",
+      "info": "ℹ️ Informace",
+      "urgent": "🚨 Urgentní"
+    },
+    "refreshed": "Oznámení aktualizována (celkem {count})",
+    "clickToEnlarge": "Klikněte pro zvětšení",
+    "imageLoadFailed": "Obrázek se nepodařilo načíst"
   }
 }

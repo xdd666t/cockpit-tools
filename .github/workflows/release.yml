@@ -80,6 +80,71 @@ jobs:
             exit 1
           fi
 
+      - name: Build bilingual release notes from changelog
+        id: release_notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="${{ steps.app_version.outputs.VERSION }}"
+
+          extract_section() {
+            local file="$1"
+            local version="$2"
+
+            awk -v version="$version" '
+              BEGIN {
+                capture = 0
+                found = 0
+              }
+
+              /^## / {
+                if (capture) {
+                  exit
+                }
+                if ($0 ~ ("^## \\[" version "\\][[:space:]]*-.*$") || $0 ~ ("^## \\[v" version "\\][[:space:]]*-.*$")) {
+                  capture = 1
+                  found = 1
+                }
+              }
+
+              capture {
+                if ($0 ~ /^---[[:space:]]*$/) {
+                  exit
+                }
+                print
+              }
+
+              END {
+                if (!found) {
+                  exit 2
+                }
+              }
+            ' "$file"
+          }
+
+          if ! zh_section="$(extract_section CHANGELOG.zh-CN.md "$VERSION")"; then
+            echo "Missing changelog section for version $VERSION in CHANGELOG.zh-CN.md"
+            exit 1
+          fi
+
+          if ! en_section="$(extract_section CHANGELOG.md "$VERSION")"; then
+            echo "Missing changelog section for version $VERSION in CHANGELOG.md"
+            exit 1
+          fi
+
+          {
+            echo "body<<'EOF'"
+            echo "## 更新日志（中文）"
+            echo
+            printf '%s\n' "$zh_section"
+            echo
+            echo "## Changelog (English)"
+            echo
+            printf '%s\n' "$en_section"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -87,7 +152,7 @@ jobs:
         with:
           tagName: "v${{ steps.app_version.outputs.VERSION }}"
           releaseName: "Cockpit Tools v${{ steps.app_version.outputs.VERSION }}"
-          releaseBody: "See the assets to download this version and install."
+          releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

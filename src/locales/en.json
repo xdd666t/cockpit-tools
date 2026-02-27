@@ -1435,5 +1435,29 @@
       "localClient": "Import from local Kiro"
     },
     "injectToVSCode": "Switch to Kiro"
+  },
+  "announcement": {
+    "title": "Notifications",
+    "empty": "No notifications",
+    "markAllRead": "Mark all read",
+    "gotIt": "Got it",
+    "later": "Later",
+    "new": "New",
+    "timeAgo": {
+      "justNow": "Just now",
+      "minutesAgo": "{count}m ago",
+      "hoursAgo": "{count}h ago",
+      "daysAgo": "{count}d ago"
+    },
+    "type": {
+      "feature": "✨ New Feature",
+      "warning": "⚠️ Warning",
+      "info": "ℹ️ Info",
+      "urgent": "🚨 Urgent"
+    },
+    "refreshed": "Announcements refreshed ({count} total)",
+    "clickToClose": "Click to close",
+    "clickToEnlarge": "Click to enlarge",
+    "imageLoadFailed": "Image failed to load"
   }
 }

@@ -1435,5 +1435,29 @@
       "localClient": "Yerel Kiro'dan ithalat"
     },
     "injectToVSCode": "Kiro'ya geç"
+  },
+  "announcement": {
+    "title": "Bildirimler",
+    "empty": "Bildirim yok",
+    "markAllRead": "Tümünü okundu işaretle",
+    "gotIt": "Anlaşıldı",
+    "later": "Daha sonra",
+    "clickToClose": "Kapatmak için tıklayın",
+    "new": "Yeni",
+    "timeAgo": {
+      "justNow": "Az önce",
+      "minutesAgo": "{count}dk önce",
+      "hoursAgo": "{count}sa önce",
+      "daysAgo": "{count}gün önce"
+    },
+    "type": {
+      "feature": "✨ Yeni Özellik",
+      "warning": "⚠️ Uyarı",
+      "info": "ℹ️ Bilgi",
+      "urgent": "🚨 Acil"
+    },
+    "refreshed": "Bildirimler güncellendi (toplam {count})",
+    "clickToEnlarge": "Büyütmek için tıkla",
+    "imageLoadFailed": "Resim yüklenemedi"
   }
 }

@@ -1435,5 +1435,29 @@
       "localClient": "從當地Kiro進口"
     },
     "injectToVSCode": "切換到基羅"
+  },
+  "announcement": {
+    "title": "消息通知",
+    "empty": "暫無消息",
+    "markAllRead": "全部已讀",
+    "gotIt": "知道了",
+    "later": "稍後再說",
+    "new": "新",
+    "timeAgo": {
+      "justNow": "剛剛",
+      "minutesAgo": "{count}分鐘前",
+      "hoursAgo": "{count}小時前",
+      "daysAgo": "{count}天前"
+    },
+    "type": {
+      "feature": "✨ 新功能",
+      "warning": "⚠️ 警告",
+      "info": "ℹ️ 信息",
+      "urgent": "🚨 緊急"
+    },
+    "refreshed": "公告已重新整理 (共 {count} 條)",
+    "clickToClose": "點擊關閉",
+    "clickToEnlarge": "點擊放大",
+    "imageLoadFailed": "圖片載入失敗"
   }
 }

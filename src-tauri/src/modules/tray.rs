@@ -105,9 +105,16 @@ struct AccountDisplayInfo {
 }
 
 #[derive(Debug, Clone, Copy)]
+struct CopilotMetric {
+    used_percent: Option<i32>,
+    included: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
 struct CopilotUsage {
-    inline_used_percent: Option<i32>,
-    chat_used_percent: Option<i32>,
+    inline: CopilotMetric,
+    chat: CopilotMetric,
+    premium: CopilotMetric,
     reset_ts: Option<i64>,
 }
 
@@ -503,7 +510,7 @@ fn build_github_copilot_display_info(lang: &str) -> AccountDisplayInfo {
             "📧 {}",
             display_login_email(account.github_email.as_deref(), &account.github_login)
         ),
-        quota_lines: build_copilot_quota_lines(lang, usage, "Inline", "Chat"),
+        quota_lines: build_copilot_quota_lines(lang, usage),
     }
 }
 
@@ -679,33 +686,43 @@ fn display_login_email(email: Option<&str>, login: &str) -> String {
         .to_string()
 }
 
-fn build_copilot_quota_lines(
-    lang: &str,
-    usage: CopilotUsage,
-    inline_label: &str,
-    chat_label: &str,
-) -> Vec<String> {
+fn format_copilot_metric_value(lang: &str, metric: CopilotMetric) -> Option<String> {
+    if metric.included {
+        return Some(get_text("included", lang));
+    }
+    metric
+        .used_percent
+        .map(|percentage| format!("{}%", percentage))
+}
+
+fn build_copilot_quota_lines(lang: &str, usage: CopilotUsage) -> Vec<String> {
     let mut lines = Vec::new();
     let reset_text = format_reset_time_from_ts(lang, usage.reset_ts);
 
-    if let Some(percentage) = usage.inline_used_percent {
+    if let Some(value_text) = format_copilot_metric_value(lang, usage.inline) {
         lines.push(format!(
-            "{}: {}% · {} {}",
-            inline_label,
-            percentage,
+            "{}: {} · {} {}",
+            get_text("ghcp_inline", lang),
+            value_text,
             get_text("reset", lang),
             reset_text
         ));
     }
-    if let Some(percentage) = usage.chat_used_percent {
+    if let Some(value_text) = format_copilot_metric_value(lang, usage.chat) {
         lines.push(format!(
-            "{}: {}% · {} {}",
-            chat_label,
-            percentage,
+            "{}: {} · {} {}",
+            get_text("ghcp_chat", lang),
+            value_text,
             get_text("reset", lang),
             reset_text
         ));
     }
+    let premium_value = format_copilot_metric_value(lang, usage.premium).unwrap_or_else(|| "-".to_string());
+    lines.push(format!(
+        "{}: {}",
+        get_text("ghcp_premium", lang),
+        premium_value,
+    ));
 
     if lines.is_empty() {
         lines.push(get_text("loading", lang));
@@ -718,7 +735,7 @@ fn build_windsurf_quota_lines(lang: &str, usage: CopilotUsage) -> Vec<String> {
     let mut lines = Vec::new();
     let reset_text = format_reset_time_from_ts(lang, usage.reset_ts);
 
-    if let Some(percentage) = usage.inline_used_percent {
+    if let Some(percentage) = usage.inline.used_percent {
         lines.push(format!(
             "Prompt: {}% · {} {}",
             percentage,
@@ -726,7 +743,7 @@ fn build_windsurf_quota_lines(lang: &str, usage: CopilotUsage) -> Vec<String> {
             reset_text
         ));
     }
-    if let Some(percentage) = usage.chat_used_percent {
+    if let Some(percentage) = usage.chat.used_percent {
         lines.push(format!(
             "Flow: {}% · {} {}",
             percentage,
@@ -768,38 +785,145 @@ fn compute_copilot_usage(
             .map(|value| value.to_lowercase().contains("free_limited"))
             .unwrap_or(false);
 
-    if !is_free_limited {
-        if let Some(premium_used) = premium_used_percent(quota_snapshots) {
-            return CopilotUsage {
-                inline_used_percent: Some(premium_used),
-                chat_used_percent: Some(premium_used),
-                reset_ts,
-            };
-        }
-    }
+    let completions_snapshot = get_quota_snapshot(quota_snapshots, "completions");
+    let chat_snapshot = get_quota_snapshot(quota_snapshots, "chat");
+    let premium_snapshot = get_quota_snapshot(quota_snapshots, "premium_interactions");
 
     let limited = limited_quotas.and_then(|value| value.as_object());
-    let remaining_inline = limited
-        .and_then(|obj| obj.get("completions"))
-        .and_then(parse_json_number);
-    let remaining_chat = limited
-        .and_then(|obj| obj.get("chat"))
-        .and_then(parse_json_number);
-
-    let total_inline = parse_token_number(&token_map, "cq").or(remaining_inline);
-    let total_chat = parse_token_number(&token_map, "tq").or_else(|| {
-        if is_free_limited {
-            remaining_chat.map(|_| 500.0)
-        } else {
-            remaining_chat
-        }
+    let remaining_inline = remaining_from_snapshot(completions_snapshot).or_else(|| {
+        limited
+            .and_then(|obj| obj.get("completions"))
+            .and_then(parse_json_number)
+    });
+    let remaining_chat = remaining_from_snapshot(chat_snapshot).or_else(|| {
+        limited
+            .and_then(|obj| obj.get("chat"))
+            .and_then(parse_json_number)
     });
 
+    let total_inline = entitlement_from_snapshot(completions_snapshot)
+        .or_else(|| parse_token_number(&token_map, "cq"))
+        .or(remaining_inline);
+    let total_chat = entitlement_from_snapshot(chat_snapshot)
+        .or_else(|| parse_token_number(&token_map, "tq"))
+        .or_else(|| {
+            if is_free_limited {
+                remaining_chat.map(|_| 500.0)
+            } else {
+                remaining_chat
+            }
+        });
+
     CopilotUsage {
-        inline_used_percent: calc_used_percent(total_inline, remaining_inline),
-        chat_used_percent: calc_used_percent(total_chat, remaining_chat),
+        inline: CopilotMetric {
+            used_percent: used_percent_from_snapshot(completions_snapshot)
+                .or_else(|| calc_used_percent(total_inline, remaining_inline)),
+            included: is_included_snapshot(completions_snapshot),
+        },
+        chat: CopilotMetric {
+            used_percent: used_percent_from_snapshot(chat_snapshot)
+                .or_else(|| calc_used_percent(total_chat, remaining_chat)),
+            included: is_included_snapshot(chat_snapshot),
+        },
+        premium: CopilotMetric {
+            used_percent: used_percent_from_snapshot(premium_snapshot),
+            included: is_included_snapshot(premium_snapshot),
+        },
         reset_ts,
     }
+}
+
+fn get_quota_snapshot<'a>(
+    quota_snapshots: Option<&'a serde_json::Value>,
+    key: &str,
+) -> Option<&'a serde_json::Map<String, serde_json::Value>> {
+    let snapshots = quota_snapshots.and_then(|value| value.as_object())?;
+    let primary = snapshots.get(key).and_then(|snapshot| snapshot.as_object());
+    if primary.is_some() {
+        return primary;
+    }
+    if key == "premium_interactions" {
+        return snapshots
+            .get("premium_models")
+            .and_then(|snapshot| snapshot.as_object());
+    }
+    None
+}
+
+fn entitlement_from_snapshot(
+    snapshot: Option<&serde_json::Map<String, serde_json::Value>>,
+) -> Option<f64> {
+    snapshot
+        .and_then(|data| data.get("entitlement"))
+        .and_then(parse_json_number)
+        .filter(|value| *value > 0.0)
+}
+
+fn remaining_from_snapshot(
+    snapshot: Option<&serde_json::Map<String, serde_json::Value>>,
+) -> Option<f64> {
+    if let Some(remaining) = snapshot
+        .and_then(|data| data.get("remaining"))
+        .and_then(parse_json_number)
+    {
+        return Some(remaining);
+    }
+
+    let entitlement = snapshot
+        .and_then(|data| data.get("entitlement"))
+        .and_then(parse_json_number)?;
+    let percent_remaining = snapshot
+        .and_then(|data| data.get("percent_remaining"))
+        .and_then(parse_json_number)?;
+    if entitlement <= 0.0 {
+        return None;
+    }
+    Some((entitlement * (percent_remaining / 100.0)).max(0.0))
+}
+
+fn is_included_snapshot(snapshot: Option<&serde_json::Map<String, serde_json::Value>>) -> bool {
+    if snapshot
+        .and_then(|data| data.get("unlimited"))
+        .and_then(|value| value.as_bool())
+        == Some(true)
+    {
+        return true;
+    }
+
+    snapshot
+        .and_then(|data| data.get("entitlement"))
+        .and_then(parse_json_number)
+        .map(|value| value < 0.0)
+        .unwrap_or(false)
+}
+
+fn used_percent_from_snapshot(
+    snapshot: Option<&serde_json::Map<String, serde_json::Value>>,
+) -> Option<i32> {
+    if snapshot
+        .and_then(|data| data.get("unlimited"))
+        .and_then(|value| value.as_bool())
+        == Some(true)
+    {
+        return Some(0);
+    }
+
+    let entitlement = snapshot
+        .and_then(|data| data.get("entitlement"))
+        .and_then(parse_json_number);
+    let remaining = snapshot
+        .and_then(|data| data.get("remaining"))
+        .and_then(parse_json_number);
+
+    if let (Some(total), Some(left)) = (entitlement, remaining) {
+        return calc_used_percent(Some(total), Some(left));
+    }
+
+    let percent_remaining = snapshot
+        .and_then(|data| data.get("percent_remaining"))
+        .and_then(parse_json_number)
+        .map(clamp_percent)?;
+    Some(clamp_percent((100 - percent_remaining) as f64))
 }
 
 fn resolve_windsurf_plan_end_ts(account: &crate::models::windsurf::WindsurfAccount) -> Option<i64> {
@@ -941,24 +1065,6 @@ fn calc_used_percent(total: Option<f64>, remaining: Option<f64>) -> Option<i32> 
 
     let used = (total - remaining).max(0.0);
     Some(clamp_percent((used / total) * 100.0))
-}
-
-fn premium_used_percent(quota_snapshots: Option<&serde_json::Value>) -> Option<i32> {
-    let snapshots = quota_snapshots?.as_object()?;
-    let premium = snapshots
-        .get("premium_interactions")
-        .or_else(|| snapshots.get("premium_models"))
-        .and_then(|value| value.as_object())?;
-
-    if premium.get("unlimited").and_then(|value| value.as_bool()) == Some(true) {
-        return Some(0);
-    }
-
-    let percent_remaining = premium
-        .get("percent_remaining")
-        .and_then(parse_json_number)
-        .map(clamp_percent)?;
-    Some(clamp_percent((100 - percent_remaining) as f64))
 }
 
 fn parse_reset_date_to_ts(reset_date: Option<&str>) -> Option<i64> {
@@ -1162,6 +1268,10 @@ fn get_text(key: &str, lang: &str) -> String {
         ("loading", "zh-cn") => "加载中...".to_string(),
         ("reset", "zh-cn") => "重置".to_string(),
         ("reset_done", "zh-cn") => "已重置".to_string(),
+        ("included", "zh-cn") => "包含".to_string(),
+        ("ghcp_inline", "zh-cn") => "Inline".to_string(),
+        ("ghcp_chat", "zh-cn") => "Chat".to_string(),
+        ("ghcp_premium", "zh-cn") => "Premium".to_string(),
         ("more_platforms", "zh-cn") => "更多平台".to_string(),
         ("no_platform_selected", "zh-cn") => "未选择托盘平台".to_string(),
 
@@ -1174,6 +1284,10 @@ fn get_text(key: &str, lang: &str) -> String {
         ("loading", "zh-tw") => "載入中...".to_string(),
         ("reset", "zh-tw") => "重置".to_string(),
         ("reset_done", "zh-tw") => "已重置".to_string(),
+        ("included", "zh-tw") => "已包含".to_string(),
+        ("ghcp_inline", "zh-tw") => "Inline".to_string(),
+        ("ghcp_chat", "zh-tw") => "Chat".to_string(),
+        ("ghcp_premium", "zh-tw") => "Premium".to_string(),
         ("more_platforms", "zh-tw") => "更多平台".to_string(),
         ("no_platform_selected", "zh-tw") => "未選擇托盤平台".to_string(),
 
@@ -1186,6 +1300,10 @@ fn get_text(key: &str, lang: &str) -> String {
         ("loading", "en") => "Loading...".to_string(),
         ("reset", "en") => "Reset".to_string(),
         ("reset_done", "en") => "Reset done".to_string(),
+        ("included", "en") => "Included".to_string(),
+        ("ghcp_inline", "en") => "Inline".to_string(),
+        ("ghcp_chat", "en") => "Chat".to_string(),
+        ("ghcp_premium", "en") => "Premium".to_string(),
         ("more_platforms", "en") => "More platforms".to_string(),
         ("no_platform_selected", "en") => "No tray platforms selected".to_string(),
 
@@ -1198,6 +1316,10 @@ fn get_text(key: &str, lang: &str) -> String {
         ("loading", "ja") => "読み込み中...".to_string(),
         ("reset", "ja") => "リセット".to_string(),
         ("reset_done", "ja") => "リセット済み".to_string(),
+        ("included", "ja") => "含まれる".to_string(),
+        ("ghcp_inline", "ja") => "Inline".to_string(),
+        ("ghcp_chat", "ja") => "Chat".to_string(),
+        ("ghcp_premium", "ja") => "Premium".to_string(),
         ("more_platforms", "ja") => "その他のプラットフォーム".to_string(),
         ("no_platform_selected", "ja") => {
             "トレイに表示するプラットフォームがありません".to_string()
@@ -1212,6 +1334,10 @@ fn get_text(key: &str, lang: &str) -> String {
         ("loading", "ru") => "Загрузка...".to_string(),
         ("reset", "ru") => "Сброс".to_string(),
         ("reset_done", "ru") => "Сброс выполнен".to_string(),
+        ("included", "ru") => "Включено".to_string(),
+        ("ghcp_inline", "ru") => "Inline".to_string(),
+        ("ghcp_chat", "ru") => "Chat".to_string(),
+        ("ghcp_premium", "ru") => "Premium".to_string(),
         ("more_platforms", "ru") => "Другие платформы".to_string(),
         ("no_platform_selected", "ru") => "Платформы для трея не выбраны".to_string(),
 
@@ -1224,6 +1350,10 @@ fn get_text(key: &str, lang: &str) -> String {
         ("loading", _) => "Loading...".to_string(),
         ("reset", _) => "Reset".to_string(),
         ("reset_done", _) => "Reset done".to_string(),
+        ("included", _) => "Included".to_string(),
+        ("ghcp_inline", _) => "Inline".to_string(),
+        ("ghcp_chat", _) => "Chat".to_string(),
+        ("ghcp_premium", _) => "Premium".to_string(),
         ("more_platforms", _) => "More platforms".to_string(),
         ("no_platform_selected", _) => "No tray platforms selected".to_string(),
 

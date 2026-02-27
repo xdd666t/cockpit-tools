@@ -218,6 +218,11 @@ pub fn run() {
             commands::update::update_last_check_time,
             commands::update::get_update_settings,
             commands::update::save_update_settings,
+            // Announcement Commands
+            commands::announcement::announcement_get_state,
+            commands::announcement::announcement_mark_as_read,
+            commands::announcement::announcement_mark_all_as_read,
+            commands::announcement::announcement_force_refresh,
             // Group Commands
             commands::group::get_group_settings,
             commands::group::save_group_settings,

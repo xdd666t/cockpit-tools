@@ -7,6 +7,21 @@ All notable changes to Cockpit Tools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
+## [0.9.1] - 2026-02-27
+
+### Added
+- **Announcement system (desktop)**: Added a full announcement pipeline with Tauri commands, frontend store/service/types, and announcement center UI (list/detail modal, unread badge, mark-read, refresh, popup, image preview, and action handling for tab/url/command).
+- **Announcement source controls for dev testing**: Added local override support (`~/.antigravity_cockpit/announcements.local.json`) and debug workspace source (`announcements.json`) for `npm run tauri dev` testing, with persisted read-state/cache files.
+- **Repository announcement seed file**: Added a repository-level `announcements.json` with a welcome announcement and feedback action for quick local debugging and remote source alignment.
+
+### Changed
+- **Remote-first announcement strategy for normal users**: Non-dev/runtime builds now skip local override files and use remote announcements (with cache/fallback) by default.
+- **Dashboard header action area**: Replaced the dashboard date display with an inline `Announcement` action button; announcement entry is now shown in dashboard context instead of global full-page placement.
+- **v0.9.0 announcement content is now fully localized**: Added/filled title, summary, body, and action copy for all 17 supported languages in `announcements.json`, so users see localized announcement content per language environment.
+- **GitHub Copilot usage rendering alignment (dashboard + tray)**: Switched usage parsing to structured snapshot semantics (`completions` / `chat` / `premium_interactions`), added `Included` handling, and added a `Premium` metric line/dimension in both dashboard cards and tray summaries.
+- **Locale and copy coverage for announcement/tray semantics**: Added `announcement.*` keys across all locale files and extended tray copy mapping with `Included` and GitHub Copilot metric labels (`Inline` / `Chat` / `Premium`).
+
+---
 ## [0.9.0] - 2026-02-27
 
 ### Added

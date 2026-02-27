@@ -1435,5 +1435,29 @@
       "localClient": "현지 키로에서 수입"
     },
     "injectToVSCode": "키로로 전환"
+  },
+  "announcement": {
+    "title": "알림",
+    "empty": "알림이 없습니다",
+    "markAllRead": "모두 읽음으로 표시",
+    "gotIt": "확인",
+    "later": "나중에",
+    "clickToClose": "클릭하여 닫기",
+    "new": "새로운 알림",
+    "timeAgo": {
+      "justNow": "방금 전",
+      "minutesAgo": "{count}분 전",
+      "hoursAgo": "{count}시간 전",
+      "daysAgo": "{count}일 전"
+    },
+    "type": {
+      "feature": "✨ 새로운 기능",
+      "warning": "⚠️ 경고",
+      "info": "ℹ️ 정보",
+      "urgent": "🚨 긴급"
+    },
+    "refreshed": "알림이 업데이트되었습니다 (총 {count}개)",
+    "clickToEnlarge": "클릭하여 확대",
+    "imageLoadFailed": "이미지를 불러오지 못했습니다"
   }
 }

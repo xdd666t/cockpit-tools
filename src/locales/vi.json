@@ -1435,5 +1435,29 @@
       "localClient": "Nhập khẩu từ Kiro địa phương"
     },
     "injectToVSCode": "Chuyển sang Kiro"
+  },
+  "announcement": {
+    "title": "Thông báo",
+    "empty": "Không có thông báo",
+    "markAllRead": "Đánh dấu tất cả đã đọc",
+    "gotIt": "Đã hiểu",
+    "later": "Để sau",
+    "new": "Mới",
+    "timeAgo": {
+      "justNow": "Vừa xong",
+      "minutesAgo": "{count} phút trước",
+      "hoursAgo": "{count} giờ trước",
+      "daysAgo": "{count} ngày trước"
+    },
+    "type": {
+      "feature": "✨ Tính năng mới",
+      "warning": "⚠️ Cảnh báo",
+      "info": "ℹ️ Thông tin",
+      "urgent": "🚨 Khẩn cấp"
+    },
+    "refreshed": "Đã làm mới thông báo ({count} tổng cộng)",
+    "clickToClose": "Nhấn để đóng",
+    "clickToEnlarge": "Nhấn để phóng to",
+    "imageLoadFailed": "Không thể tải hình ảnh"
   }
 }
