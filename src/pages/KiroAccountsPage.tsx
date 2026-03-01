@@ -27,6 +27,7 @@ import {
 import { useKiroAccountStore } from '../stores/useKiroAccountStore';
 import * as kiroService from '../services/kiroService';
 import { TagEditModal } from '../components/TagEditModal';
+import { ExportJsonModal } from '../components/ExportJsonModal';
 import {
   getKiroCreditsSummary,
 } from '../types/kiro';
@@ -97,7 +98,11 @@ export function KiroAccountsPage() {
     handleRefresh, handleRefreshAll, handleDelete, handleBatchDelete,
     deleteConfirm, setDeleteConfirm, deleting, confirmDelete,
     message, setMessage,
-    exporting, handleExport,
+    exporting, handleExport, handleExportByIds,
+    showExportModal, closeExportModal, exportJsonContent, exportJsonHidden,
+    toggleExportJsonHidden, exportJsonCopied, copyExportJson,
+    savingExportJson, saveExportJson, exportSavedPath,
+    canOpenExportSavedDirectory, openExportSavedDirectory, copyExportSavedPath, exportPathCopied,
     showAddModal, addTab, addStatus, addMessage, tokenInput, setTokenInput,
     importing, openAddModal, closeAddModal,
     handleTokenImport, handleImportJsonFile, handleImportFromLocal, handlePickImportFile, importFileInputRef,
@@ -195,6 +200,15 @@ export function KiroAccountsPage() {
   const resolveDisplayEmail = useCallback((account: KiroAccount) => {
     return resolvePresentation(account).displayName.trim();
   }, [resolvePresentation]);
+
+  const resolveSingleExportBaseName = useCallback(
+    (account: KiroAccount) => {
+      const display = resolveDisplayEmail(account) || account.id;
+      const atIndex = display.indexOf('@');
+      return atIndex > 0 ? display.slice(0, atIndex) : display;
+    },
+    [resolveDisplayEmail],
+  );
 
   const resolveDisplayUserId = useCallback((account: KiroAccount) => {
     return resolvePresentation(account).userIdText.trim();
@@ -531,6 +545,13 @@ export function KiroAccountsPage() {
               <button className="card-action-btn" onClick={() => handleRefresh(account.id)} disabled={refreshing === account.id} title={t('common.shared.refreshQuota', '刷新配额')}>
                 <RotateCw size={14} className={refreshing === account.id ? 'loading-spinner' : ''} />
               </button>
+              <button
+                className="card-action-btn export-btn"
+                onClick={() => handleExportByIds([account.id], resolveSingleExportBaseName(account))}
+                title={t('common.shared.export', '导出')}
+              >
+                <Upload size={14} />
+              </button>
               <button className="card-action-btn danger" onClick={() => handleDelete(account.id)} title={t('common.delete', '删除')}>
                 <Trash2 size={14} />
               </button>
@@ -643,6 +664,13 @@ export function KiroAccountsPage() {
               </button>
               <button className="action-btn" onClick={() => handleRefresh(account.id)} disabled={refreshing === account.id} title={t('common.shared.refreshQuota', '刷新配额')}>
                 <RotateCw size={14} className={refreshing === account.id ? 'loading-spinner' : ''} />
+              </button>
+              <button
+                className="action-btn"
+                onClick={() => handleExportByIds([account.id], resolveSingleExportBaseName(account))}
+                title={t('common.shared.export', '导出')}
+              >
+                <Upload size={14} />
               </button>
               <button className="action-btn danger" onClick={() => handleDelete(account.id)} title={t('common.delete', '删除')}>
                 <Trash2 size={14} />
@@ -979,6 +1007,24 @@ export function KiroAccountsPage() {
           </div>
         </div>
       )}
+
+      <ExportJsonModal
+        isOpen={showExportModal}
+        title={`${t('common.shared.export', '导出')} JSON`}
+        jsonContent={exportJsonContent}
+        hidden={exportJsonHidden}
+        copied={exportJsonCopied}
+        saving={savingExportJson}
+        savedPath={exportSavedPath}
+        canOpenSavedDirectory={canOpenExportSavedDirectory}
+        pathCopied={exportPathCopied}
+        onClose={closeExportModal}
+        onToggleHidden={toggleExportJsonHidden}
+        onCopyJson={copyExportJson}
+        onSaveJson={saveExportJson}
+        onOpenSavedDirectory={openExportSavedDirectory}
+        onCopySavedPath={copyExportSavedPath}
+      />
 
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => !deleting && setDeleteConfirm(null)}>

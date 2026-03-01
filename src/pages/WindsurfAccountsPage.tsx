@@ -27,6 +27,7 @@ import {
 import { useWindsurfAccountStore } from '../stores/useWindsurfAccountStore';
 import * as windsurfService from '../services/windsurfService';
 import { TagEditModal } from '../components/TagEditModal';
+import { ExportJsonModal } from '../components/ExportJsonModal';
 import {
   getWindsurfCreditsSummary,
 } from '../types/windsurf';
@@ -103,7 +104,11 @@ export function WindsurfAccountsPage() {
     handleRefresh, handleRefreshAll, handleDelete, handleBatchDelete,
     deleteConfirm, setDeleteConfirm, deleting, confirmDelete,
     message, setMessage,
-    exporting, handleExport,
+    exporting, handleExport, handleExportByIds,
+    showExportModal, closeExportModal, exportJsonContent, exportJsonHidden,
+    toggleExportJsonHidden, exportJsonCopied, copyExportJson,
+    savingExportJson, saveExportJson, exportSavedPath,
+    canOpenExportSavedDirectory, openExportSavedDirectory, copyExportSavedPath, exportPathCopied,
     showAddModal, addTab, addStatus, addMessage, tokenInput, setTokenInput,
     importing, openAddModal, closeAddModal, setAddStatus, setAddMessage,
     handleTokenImport, handleImportJsonFile, handleImportFromLocal, handlePickImportFile, importFileInputRef,
@@ -182,6 +187,15 @@ export function WindsurfAccountsPage() {
   const resolvePresentation = useCallback(
     (account: WindsurfAccount) => accountPresentations.get(account.id) ?? buildWindsurfAccountPresentation(account, t),
     [accountPresentations, t],
+  );
+
+  const resolveSingleExportBaseName = useCallback(
+    (account: WindsurfAccount) => {
+      const display = (resolvePresentation(account).displayName || account.id).trim();
+      const atIndex = display.indexOf('@');
+      return atIndex > 0 ? display.slice(0, atIndex) : display;
+    },
+    [resolvePresentation],
   );
 
   const resolvePlanKey = useCallback(
@@ -379,6 +393,13 @@ export function WindsurfAccountsPage() {
               <button className="card-action-btn" onClick={() => handleRefresh(account.id)} disabled={refreshing === account.id} title={t('common.shared.refreshQuota', '刷新配额')}>
                 <RotateCw size={14} className={refreshing === account.id ? 'loading-spinner' : ''} />
               </button>
+              <button
+                className="card-action-btn export-btn"
+                onClick={() => handleExportByIds([account.id], resolveSingleExportBaseName(account))}
+                title={t('common.shared.export', '导出')}
+              >
+                <Upload size={14} />
+              </button>
               <button className="card-action-btn danger" onClick={() => handleDelete(account.id)} title={t('common.delete', '删除')}><Trash2 size={14} /></button>
             </div>
           </div>
@@ -451,6 +472,13 @@ export function WindsurfAccountsPage() {
               <button className="action-btn" onClick={() => openTagModal(account.id)} title={t('accounts.editTags', '编辑标签')}><Tag size={14} /></button>
               <button className="action-btn" onClick={() => handleRefresh(account.id)} disabled={refreshing === account.id} title={t('common.shared.refreshQuota', '刷新配额')}>
                 <RotateCw size={14} className={refreshing === account.id ? 'loading-spinner' : ''} />
+              </button>
+              <button
+                className="action-btn"
+                onClick={() => handleExportByIds([account.id], resolveSingleExportBaseName(account))}
+                title={t('common.shared.export', '导出')}
+              >
+                <Upload size={14} />
               </button>
               <button className="action-btn danger" onClick={() => handleDelete(account.id)} title={t('common.delete', '删除')}><Trash2 size={14} /></button>
             </div>
@@ -671,6 +699,24 @@ export function WindsurfAccountsPage() {
           </div>
         </div></div>
       )}
+
+      <ExportJsonModal
+        isOpen={showExportModal}
+        title={`${t('common.shared.export', '导出')} JSON`}
+        jsonContent={exportJsonContent}
+        hidden={exportJsonHidden}
+        copied={exportJsonCopied}
+        saving={savingExportJson}
+        savedPath={exportSavedPath}
+        canOpenSavedDirectory={canOpenExportSavedDirectory}
+        pathCopied={exportPathCopied}
+        onClose={closeExportModal}
+        onToggleHidden={toggleExportJsonHidden}
+        onCopyJson={copyExportJson}
+        onSaveJson={saveExportJson}
+        onOpenSavedDirectory={openExportSavedDirectory}
+        onCopySavedPath={copyExportSavedPath}
+      />
 
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => !deleting && setDeleteConfirm(null)}><div className="modal" onClick={(e) => e.stopPropagation()}>

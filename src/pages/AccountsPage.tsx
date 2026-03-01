@@ -43,10 +43,9 @@ import {
   getSubscriptionTier,
 } from '../utils/account'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
-import { save } from '@tauri-apps/plugin-dialog'
-import { invoke } from '@tauri-apps/api/core'
 import { GroupSettingsModal } from '../components/GroupSettingsModal'
 import { TagEditModal } from '../components/TagEditModal'
+import { ExportJsonModal } from '../components/ExportJsonModal'
 import {
   GroupSettings,
   DisplayGroup,
@@ -68,6 +67,7 @@ import {
   maskSensitiveValue,
   persistPrivacyModeEnabled
 } from '../utils/privacy'
+import { useExportJsonModal } from '../hooks/useExportJsonModal'
 
 interface AccountsPageProps {
   onNavigate?: (page: Page) => void
@@ -158,7 +158,6 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
   const [refreshingAll, setRefreshingAll] = useState(false)
   const [switching, setSwitching] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
-  const [exporting, setExporting] = useState(false)
   const [refreshWarnings, setRefreshWarnings] = useState<
     Record<string, { kind: 'auth' | 'error'; message: string }>
   >({})
@@ -166,6 +165,17 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
     text: string
     tone?: 'error'
   } | null>(null)
+  const exportModal = useExportJsonModal({
+    exportFilePrefix: 'accounts_export',
+    exportJsonByIds: accountService.exportAccounts,
+    onError: (error) => {
+      setMessage({
+        text: t('messages.exportFailed', { error: String(error) }),
+        tone: 'error',
+      })
+    },
+  })
+  const exporting = exportModal.preparing
   const [addStatus, setAddStatus] = useState<
     'idle' | 'loading' | 'success' | 'error'
   >('idle')
@@ -1083,44 +1093,10 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
     }
   }
 
-  const resolveDefaultExportPath = async (fileName: string) => {
-    const userAgent = navigator.userAgent.toLowerCase();
-    if (!userAgent.includes('mac')) return fileName;
-    try {
-      const dir = await invoke<string>('get_downloads_dir');
-      if (!dir) return fileName;
-      const normalized = dir.endsWith('/') ? dir.slice(0, -1) : dir;
-      return `${normalized}/${fileName}`;
-    } catch (e) {
-      console.error('获取下载目录失败:', e);
-      return fileName;
-    }
-  };
-
-  const saveJsonFile = async (json: string, defaultFileName: string) => {
-    const defaultPath = await resolveDefaultExportPath(defaultFileName);
-    const filePath = await save({
-      defaultPath,
-      filters: [{ name: 'JSON', extensions: ['json'] }]
-    })
-    if (!filePath) return null
-    await invoke('save_text_file', { path: filePath, content: json })
-    return filePath
-  }
-
   const handleExport = async () => {
-    setExporting(true)
-    try {
-      const json = await accountService.exportAccounts(Array.from(selected))
-      const defaultName = `accounts_export_${new Date().toISOString().slice(0, 10)}.json`
-      const savedPath = await saveJsonFile(json, defaultName)
-      if (savedPath) {
-        setMessage({ text: `${t('common.success')}: ${savedPath}` })
-      }
-    } catch (e) {
-      alert(t('messages.exportFailed', { error: String(e) }))
-    }
-    setExporting(false)
+    const ids = selected.size > 0 ? Array.from(selected) : accounts.map((account) => account.id)
+    if (ids.length === 0) return
+    await exportModal.startExport(ids)
   }
 
   const toggleSelect = (id: string) => {
@@ -1559,16 +1535,10 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
   }
 
   const handleExportSingle = async (account: Account) => {
-    try {
-      const json = await accountService.exportAccounts([account.id])
-      const defaultName = `${account.email.split('@')[0]}_${new Date().toISOString().slice(0, 10)}.json`
-      const savedPath = await saveJsonFile(json, defaultName)
-      if (savedPath) {
-        setMessage({ text: `${t('common.success')}: ${savedPath}` })
-      }
-    } catch (e) {
-      alert(t('messages.exportFailed', { error: String(e) }))
-    }
+    const baseName = account.email.includes('@')
+      ? account.email.slice(0, account.email.indexOf('@'))
+      : account.email
+    await exportModal.startExport([account.id], baseName)
   }
 
   // 渲染紧凑视图 - 只显示邮箱和配额百分比
@@ -2027,6 +1997,13 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
                   size={16}
                   className={refreshing === account.id ? 'loading-spinner' : ''}
                 />
+              </button>
+              <button
+                className="action-btn"
+                onClick={() => handleExportSingle(account)}
+                title={t('accounts.export')}
+              >
+                <Upload size={16} />
               </button>
               <button
                 className="action-btn danger"
@@ -2600,6 +2577,24 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
           </div>
         </div>
       )}
+
+      <ExportJsonModal
+        isOpen={exportModal.showModal}
+        title={`${t('accounts.export')} JSON`}
+        jsonContent={exportModal.jsonContent}
+        hidden={exportModal.hidden}
+        copied={exportModal.copied}
+        saving={exportModal.saving}
+        savedPath={exportModal.savedPath}
+        canOpenSavedDirectory={exportModal.canOpenSavedDirectory}
+        pathCopied={exportModal.pathCopied}
+        onClose={exportModal.closeModal}
+        onToggleHidden={exportModal.toggleHidden}
+        onCopyJson={exportModal.copyJson}
+        onSaveJson={exportModal.saveJson}
+        onOpenSavedDirectory={exportModal.openSavedDirectory}
+        onCopySavedPath={exportModal.copySavedPath}
+      />
 
       {deleteConfirm && (
         <div

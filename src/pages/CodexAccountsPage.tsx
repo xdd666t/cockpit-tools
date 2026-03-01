@@ -27,6 +27,7 @@ import {
 import { useCodexAccountStore } from '../stores/useCodexAccountStore';
 import * as codexService from '../services/codexService';
 import { TagEditModal } from '../components/TagEditModal';
+import { ExportJsonModal } from '../components/ExportJsonModal';
 import { type CodexQuotaErrorInfo } from '../types/codex';
 import { buildCodexAccountPresentation } from '../presentation/platformAccountPresentation';
 
@@ -100,7 +101,11 @@ export function CodexAccountsPage() {
     handleRefresh, handleRefreshAll, handleDelete, handleBatchDelete,
     deleteConfirm, setDeleteConfirm, deleting, confirmDelete,
     message, setMessage,
-    exporting, handleExport,
+    exporting, handleExport, handleExportByIds,
+    showExportModal, closeExportModal, exportJsonContent, exportJsonHidden,
+    toggleExportJsonHidden, exportJsonCopied, copyExportJson,
+    savingExportJson, saveExportJson, exportSavedPath,
+    canOpenExportSavedDirectory, openExportSavedDirectory, copyExportSavedPath, exportPathCopied,
     showAddModal, addTab, addStatus, addMessage, tokenInput, setTokenInput,
     importing, openAddModal, closeAddModal,
     formatDate, normalizeTag,
@@ -357,6 +362,15 @@ export function CodexAccountsPage() {
     [accountPresentations, t],
   );
 
+  const resolveSingleExportBaseName = useCallback(
+    (account: CodexAccount) => {
+      const display = (resolvePresentation(account).displayName || account.id).trim();
+      const atIndex = display.indexOf('@');
+      return atIndex > 0 ? display.slice(0, atIndex) : display;
+    },
+    [resolvePresentation],
+  );
+
   const resolvePlanKey = useCallback(
     (account: CodexAccount) => resolvePresentation(account).planClass.toUpperCase(),
     [resolvePresentation],
@@ -463,6 +477,13 @@ export function CodexAccountsPage() {
               <button className="card-action-btn" onClick={() => handleRefresh(account.id)} disabled={refreshing === account.id} title={t('common.shared.refreshQuota', '刷新配额')}>
                 <RotateCw size={14} className={refreshing === account.id ? 'loading-spinner' : ''} />
               </button>
+              <button
+                className="card-action-btn export-btn"
+                onClick={() => handleExportByIds([account.id], resolveSingleExportBaseName(account))}
+                title={t('common.shared.export', '导出')}
+              >
+                <Upload size={14} />
+              </button>
               <button className="card-action-btn danger" onClick={() => handleDelete(account.id)} title={t('common.delete', '删除')}><Trash2 size={14} /></button>
             </div>
           </div>
@@ -500,6 +521,13 @@ export function CodexAccountsPage() {
             </button>
             <button className="action-btn" onClick={() => handleRefresh(account.id)} disabled={refreshing === account.id} title={t('common.shared.refreshQuota', '刷新配额')}>
               <RotateCw size={14} className={refreshing === account.id ? 'loading-spinner' : ''} />
+            </button>
+            <button
+              className="action-btn"
+              onClick={() => handleExportByIds([account.id], resolveSingleExportBaseName(account))}
+              title={t('common.shared.export', '导出')}
+            >
+              <Upload size={14} />
             </button>
             <button className="action-btn danger" onClick={() => handleDelete(account.id)} title={t('common.delete', '删除')}><Trash2 size={14} /></button>
           </div></td>
@@ -635,6 +663,24 @@ export function CodexAccountsPage() {
           {addStatus !== 'idle' && addStatus !== 'loading' && (<div className={`add-status ${addStatus}`}>{addStatus === 'success' ? <Check size={16} /> : <CircleAlert size={16} />}<span>{addMessage}</span></div>)}
         </div>
       </div></div>)}
+
+      <ExportJsonModal
+        isOpen={showExportModal}
+        title={`${t('common.shared.export', '导出')} JSON`}
+        jsonContent={exportJsonContent}
+        hidden={exportJsonHidden}
+        copied={exportJsonCopied}
+        saving={savingExportJson}
+        savedPath={exportSavedPath}
+        canOpenSavedDirectory={canOpenExportSavedDirectory}
+        pathCopied={exportPathCopied}
+        onClose={closeExportModal}
+        onToggleHidden={toggleExportJsonHidden}
+        onCopyJson={copyExportJson}
+        onSaveJson={saveExportJson}
+        onOpenSavedDirectory={openExportSavedDirectory}
+        onCopySavedPath={copyExportSavedPath}
+      />
 
       {deleteConfirm && (<div className="modal-overlay" onClick={() => !deleting && setDeleteConfirm(null)}><div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header"><h2>{t('common.confirm')}</h2><button className="modal-close" onClick={() => !deleting && setDeleteConfirm(null)} aria-label={t('common.close', '关闭')}><X /></button></div>

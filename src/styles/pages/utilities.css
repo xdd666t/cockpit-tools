@@ -1043,6 +1043,86 @@
   color: #2563eb;
 }
 
+/* Export JSON modal */
+.modal.export-json-modal {
+  width: min(980px, calc(100vw - 36px));
+  max-width: 980px;
+}
+
+.export-json-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.export-json-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.export-json-textarea {
+  width: 100%;
+  min-height: 320px;
+  max-height: 52vh;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.export-json-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+}
+
+.export-json-path-box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.export-json-path-title {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.export-json-path-value {
+  font-size: 12px;
+  color: var(--text-primary);
+  word-break: break-all;
+  font-family: var(--font-mono);
+}
+
+.export-json-path-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .modal.export-json-modal {
+    width: calc(100vw - 24px);
+  }
+
+  .export-json-textarea {
+    min-height: 220px;
+    max-height: 46vh;
+  }
+}
+
 /* Quota Detail Modal */
 .quota-detail-list {
   display: flex;

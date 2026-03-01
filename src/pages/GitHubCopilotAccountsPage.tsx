@@ -28,6 +28,7 @@ import {
 import { useGitHubCopilotAccountStore } from '../stores/useGitHubCopilotAccountStore';
 import * as githubCopilotService from '../services/githubCopilotService';
 import { TagEditModal } from '../components/TagEditModal';
+import { ExportJsonModal } from '../components/ExportJsonModal';
 import { buildGitHubCopilotAccountPresentation } from '../presentation/platformAccountPresentation';
 
 import { GitHubCopilotOverviewTabsHeader, GitHubCopilotTab } from '../components/GitHubCopilotOverviewTabsHeader';
@@ -100,7 +101,11 @@ export function GitHubCopilotAccountsPage() {
     handleRefresh, handleRefreshAll, handleDelete, handleBatchDelete,
     deleteConfirm, setDeleteConfirm, deleting, confirmDelete,
     message, setMessage,
-    exporting, handleExport,
+    exporting, handleExport, handleExportByIds,
+    showExportModal, closeExportModal, exportJsonContent, exportJsonHidden,
+    toggleExportJsonHidden, exportJsonCopied, copyExportJson,
+    savingExportJson, saveExportJson, exportSavedPath,
+    canOpenExportSavedDirectory, openExportSavedDirectory, copyExportSavedPath, exportPathCopied,
     showAddModal, addTab, addStatus, addMessage, tokenInput, setTokenInput,
     importing, openAddModal, closeAddModal,
     handleTokenImport, handleImportJsonFile, handlePickImportFile, importFileInputRef,
@@ -131,6 +136,15 @@ export function GitHubCopilotAccountsPage() {
       accountPresentations.get(account.id) ??
       buildGitHubCopilotAccountPresentation(account, t),
     [accountPresentations, t],
+  );
+
+  const resolveSingleExportBaseName = useCallback(
+    (account: GitHubCopilotAccount) => {
+      const display = (resolvePresentation(account).displayName || account.id).trim();
+      const atIndex = display.indexOf('@');
+      return atIndex > 0 ? display.slice(0, atIndex) : display;
+    },
+    [resolvePresentation],
   );
 
   const resolvePlanKey = useCallback(
@@ -419,6 +433,13 @@ export function GitHubCopilotAccountsPage() {
                 />
               </button>
               <button
+                className="card-action-btn export-btn"
+                onClick={() => handleExportByIds([account.id], resolveSingleExportBaseName(account))}
+                title={t('common.shared.export', '导出')}
+              >
+                <Upload size={14} />
+              </button>
+              <button
                 className="card-action-btn danger"
                 onClick={() => handleDelete(account.id)}
                 title={t('common.delete', '删除')}
@@ -547,6 +568,13 @@ export function GitHubCopilotAccountsPage() {
                 title={t('common.shared.refreshQuota', '刷新配额')}
               >
                 <RotateCw size={14} className={refreshing === account.id ? 'loading-spinner' : ''} />
+              </button>
+              <button
+                className="action-btn"
+                onClick={() => handleExportByIds([account.id], resolveSingleExportBaseName(account))}
+                title={t('common.shared.export', '导出')}
+              >
+                <Upload size={14} />
               </button>
               <button
                 className="action-btn danger"
@@ -1101,6 +1129,24 @@ export function GitHubCopilotAccountsPage() {
           </div>
         </div>
       )}
+
+      <ExportJsonModal
+        isOpen={showExportModal}
+        title={`${t('common.shared.export', '导出')} JSON`}
+        jsonContent={exportJsonContent}
+        hidden={exportJsonHidden}
+        copied={exportJsonCopied}
+        saving={savingExportJson}
+        savedPath={exportSavedPath}
+        canOpenSavedDirectory={canOpenExportSavedDirectory}
+        pathCopied={exportPathCopied}
+        onClose={closeExportModal}
+        onToggleHidden={toggleExportJsonHidden}
+        onCopyJson={copyExportJson}
+        onSaveJson={saveExportJson}
+        onOpenSavedDirectory={openExportSavedDirectory}
+        onCopySavedPath={copyExportSavedPath}
+      />
 
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => !deleting && setDeleteConfirm(null)}>

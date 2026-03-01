@@ -18,14 +18,13 @@ import {
   type SetStateAction,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { save } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { invoke } from '@tauri-apps/api/core';
 import {
   isPrivacyModeEnabledByDefault,
   maskSensitiveValue,
   persistPrivacyModeEnabled,
 } from '../utils/privacy';
+import { useExportJsonModal } from './useExportJsonModal';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -179,6 +178,21 @@ export interface UseProviderAccountsPageReturn {
   // Export
   exporting: boolean;
   handleExport: () => Promise<void>;
+  handleExportByIds: (ids: string[], fileNameBase?: string) => Promise<void>;
+  showExportModal: boolean;
+  closeExportModal: () => void;
+  exportJsonContent: string;
+  exportJsonHidden: boolean;
+  toggleExportJsonHidden: () => void;
+  exportJsonCopied: boolean;
+  copyExportJson: () => Promise<void>;
+  savingExportJson: boolean;
+  saveExportJson: () => Promise<void>;
+  exportSavedPath: string | null;
+  canOpenExportSavedDirectory: boolean;
+  openExportSavedDirectory: () => Promise<void>;
+  copyExportSavedPath: () => Promise<void>;
+  exportPathCopied: boolean;
 
   // Add modal
   showAddModal: boolean;
@@ -506,51 +520,40 @@ export function useProviderAccountsPage<TAccount extends ProviderAccountBase>(
   }, [dataService.injectToVSCode, accounts, config, t, maskAccountText]);
 
   // ─── Export ───────────────────────────────────────────────────────────
-  const [exporting, setExporting] = useState(false);
-
-  const resolveDefaultExportPath = useCallback(async (fileName: string) => {
-    const userAgent = navigator.userAgent.toLowerCase();
-    if (!userAgent.includes('mac')) return fileName;
-    try {
-      const dir = await invoke<string>('get_downloads_dir');
-      if (!dir) return fileName;
-      const normalized = dir.endsWith('/') ? dir.slice(0, -1) : dir;
-      return `${normalized}/${fileName}`;
-    } catch (e) {
-      console.error('获取下载目录失败:', e);
-      return fileName;
-    }
-  }, []);
-
-  const saveJsonFile = useCallback(
-    async (json: string, defaultFileName: string) => {
-      const defaultPath = await resolveDefaultExportPath(defaultFileName);
-      const filePath = await save({
-        defaultPath,
-        filters: [{ name: 'JSON', extensions: ['json'] }],
+  const handleExportError = useCallback(
+    (error: unknown) => {
+      setMessage({
+        text: t('messages.exportFailed', { error: String(error) }),
+        tone: 'error',
       });
-      if (!filePath) return null;
-      await invoke('save_text_file', { path: filePath, content: json });
-      return filePath;
     },
-    [resolveDefaultExportPath],
+    [t],
+  );
+
+  const exportModal = useExportJsonModal({
+    exportFilePrefix,
+    exportJsonByIds: dataService.exportAccounts,
+    onError: handleExportError,
+  });
+
+  const handleExportByIds = useCallback(
+    async (ids: string[], fileNameBase?: string) => {
+      if (!ids.length) return;
+      await exportModal.startExport(ids, fileNameBase);
+    },
+    [exportModal.startExport],
   );
 
   const handleExport = useCallback(async () => {
-    setExporting(true);
     try {
       const ids = selected.size > 0 ? Array.from(selected) : accounts.map((a) => a.id);
-      const json = await dataService.exportAccounts(ids);
-      const defaultName = `${exportFilePrefix}_${new Date().toISOString().slice(0, 10)}.json`;
-      const savedPath = await saveJsonFile(json, defaultName);
-      if (savedPath) {
-        setMessage({ text: `${t('common.success')}: ${savedPath}` });
-      }
-    } catch (e) {
-      setMessage({ text: t('messages.exportFailed', { error: String(e) }), tone: 'error' });
+      await handleExportByIds(ids);
+    } catch (error) {
+      handleExportError(error);
     }
-    setExporting(false);
-  }, [selected, accounts, dataService, exportFilePrefix, saveJsonFile, t]);
+  }, [selected, accounts, handleExportByIds, handleExportError]);
+
+  const exporting = exportModal.preparing;
 
   // ─── Add Modal ────────────────────────────────────────────────────────
   const [showAddModal, setShowAddModal] = useState(false);
@@ -1079,6 +1082,21 @@ export function useProviderAccountsPage<TAccount extends ProviderAccountBase>(
     setMessage,
     exporting,
     handleExport,
+    handleExportByIds,
+    showExportModal: exportModal.showModal,
+    closeExportModal: exportModal.closeModal,
+    exportJsonContent: exportModal.jsonContent,
+    exportJsonHidden: exportModal.hidden,
+    toggleExportJsonHidden: exportModal.toggleHidden,
+    exportJsonCopied: exportModal.copied,
+    copyExportJson: exportModal.copyJson,
+    savingExportJson: exportModal.saving,
+    saveExportJson: exportModal.saveJson,
+    exportSavedPath: exportModal.savedPath,
+    canOpenExportSavedDirectory: exportModal.canOpenSavedDirectory,
+    openExportSavedDirectory: exportModal.openSavedDirectory,
+    copyExportSavedPath: exportModal.copySavedPath,
+    exportPathCopied: exportModal.pathCopied,
     showAddModal,
     setShowAddModal,
     addTab,
@@ -1118,7 +1136,7 @@ export function useProviderAccountsPage<TAccount extends ProviderAccountBase>(
     setCurrentAccountId,
     formatDate,
     normalizeTag,
-    resolveDefaultExportPath,
-    saveJsonFile,
+    resolveDefaultExportPath: exportModal.resolveDefaultExportPath,
+    saveJsonFile: exportModal.saveJsonFile,
   };
 }
