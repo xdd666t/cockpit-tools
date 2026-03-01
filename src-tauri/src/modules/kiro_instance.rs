@@ -498,7 +498,7 @@ fn command_trace_enabled() -> bool {
             _ => {}
         }
     }
-    cfg!(debug_assertions)
+    false
 }
 
 fn quote_command_part(part: &str) -> String {
