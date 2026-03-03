@@ -202,6 +202,9 @@ export function FingerprintsPage({ onNavigate }: FingerprintsPageProps) {
 
   const selectableFps = fingerprints.filter(fp => !fp.is_original);
   const allSelected = selectableFps.length > 0 && selectedFpIds.size === selectableFps.length;
+  const unboundDeletableFps = selectableFps.filter(fp => fp.bound_account_count === 0);
+  const unboundDeletableIdSet = new Set(unboundDeletableFps.map(fp => fp.id));
+  const unboundDeletableCount = unboundDeletableFps.length;
 
   const toggleSelectFp = (fpId: string) => {
     setSelectedFpIds((prev) => {
@@ -232,6 +235,33 @@ export function FingerprintsPage({ onNavigate }: FingerprintsPageProps) {
       await Promise.all(targetIds.map(id => accountService.deleteFingerprint(id)));
       setMessage(t('fingerprints.messages.deleted'));
       setSelectedFpIds(new Set());
+      await loadFingerprints();
+    } catch (e) {
+      setMessage(typeof e === 'string' ? e : t('common.failed'));
+    }
+    setActionLoading(null);
+  };
+
+  const handleDeleteUnboundFingerprints = async () => {
+    if (unboundDeletableCount === 0) {
+      setMessage(t('fingerprints.messages.noUnboundToDelete'));
+      return;
+    }
+
+    const confirmed = await confirmDialog(
+      t('fingerprints.messages.deleteUnboundConfirm', { count: unboundDeletableCount })
+    );
+    if (!confirmed) return;
+
+    setActionLoading('delete-unbound');
+    try {
+      const deletedCount = await accountService.deleteUnboundFingerprints();
+      if (deletedCount === 0) {
+        setMessage(t('fingerprints.messages.noUnboundToDelete'));
+      } else {
+        setMessage(t('fingerprints.messages.deletedUnbound', { count: deletedCount }));
+      }
+      setSelectedFpIds((prev) => new Set(Array.from(prev).filter(id => !unboundDeletableIdSet.has(id))));
       await loadFingerprints();
     } catch (e) {
       setMessage(typeof e === 'string' ? e : t('common.failed'));
@@ -348,6 +378,13 @@ export function FingerprintsPage({ onNavigate }: FingerprintsPageProps) {
             </button>
             <button className="btn btn-secondary" onClick={() => setShowImportModal(true)} disabled={!!actionLoading || importing}>
               <Download size={18} />{t('fingerprints.toolbar.import')}
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={handleDeleteUnboundFingerprints}
+              disabled={!!actionLoading || importing || unboundDeletableCount === 0}
+            >
+              <Trash2 size={18} />{t('fingerprints.toolbar.deleteUnbound')} ({unboundDeletableCount})
             </button>
             {selectedFpIds.size > 0 && (
               <button className="btn btn-danger" onClick={handleBatchDelete} disabled={!!actionLoading || importing}>

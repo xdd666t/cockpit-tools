@@ -625,7 +625,8 @@
       "capture": "현재 지문 캡처",
       "import": "가져오기",
       "folder": "폴더",
-      "delete": "삭제"
+      "delete": "삭제",
+      "deleteUnbound": "미연결 삭제"
     },
     "table": {
       "name": "지문 이름",
@@ -703,7 +704,10 @@
       "loadFailed": "지문 목록 불러오기 실패",
       "processing": "처리 중...",
       "renameFailed": "이름 변경 실패",
-      "serviceMachineIdEmpty": "비어 있음"
+      "serviceMachineIdEmpty": "비어 있음",
+      "deleteUnboundConfirm": "연결된 계정이 없는 지문 {{count}}개를 삭제할까요?",
+      "deletedUnbound": "연결되지 않은 지문 {{count}}개를 삭제했습니다",
+      "noUnboundToDelete": "삭제할 미연결 지문이 없습니다"
     }
   },
   "modals": {

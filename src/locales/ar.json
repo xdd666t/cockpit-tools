@@ -625,7 +625,8 @@
       "capture": "التقاط البصمة الحالية",
       "import": "استيراد",
       "folder": "مجلد",
-      "delete": "حذف"
+      "delete": "حذف",
+      "deleteUnbound": "حذف غير المرتبط"
     },
     "table": {
       "name": "اسم البصمة",
@@ -703,7 +704,10 @@
       "loadFailed": "فشل تحميل قائمة البصمات",
       "processing": "جارٍ المعالجة...",
       "renameFailed": "فشل إعادة التسمية",
-      "serviceMachineIdEmpty": "فارغ"
+      "serviceMachineIdEmpty": "فارغ",
+      "deleteUnboundConfirm": "حذف {{count}} بصمة غير مرتبطة بأي حساب؟",
+      "deletedUnbound": "تم حذف {{count}} بصمة غير مرتبطة",
+      "noUnboundToDelete": "لا توجد بصمات غير مرتبطة للحذف"
     }
   },
   "modals": {

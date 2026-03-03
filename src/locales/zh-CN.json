@@ -624,6 +624,7 @@
       "generate": "生成新指纹",
       "capture": "捕获当前",
       "import": "导入",
+      "deleteUnbound": "清理未绑定",
       "folder": "目录",
       "delete": "删除"
     },
@@ -677,11 +678,14 @@
     "messages": {
       "deleteConfirm": "确定要删除这个指纹吗？绑定此指纹的账号将自动改为原始指纹。",
       "batchDeleteConfirm": "确定要删除选中的 {{count}} 个指纹吗？绑定此指纹的账号将自动改为原始指纹。",
+      "deleteUnboundConfirm": "确定要删除 {{count}} 个未绑定账号的指纹吗？",
       "generated": "已生成新指纹",
       "captured": "已捕获当前指纹",
       "renamed": "已重命名",
       "deleted": "已删除指纹",
+      "deletedUnbound": "已删除 {{count}} 个未绑定指纹",
       "imported": "已导入 {{count}} 个指纹",
+      "noUnboundToDelete": "没有可删除的未绑定指纹",
       "addedAccounts": "已添加 {{count}} 个账号",
       "enterName": "请输入指纹名称",
       "previewNotReady": "预览未就绪，请稍后重试",

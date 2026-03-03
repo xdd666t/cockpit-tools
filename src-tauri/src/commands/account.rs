@@ -9,10 +9,10 @@ pub async fn list_accounts() -> Result<Vec<models::Account>, String> {
     modules::list_accounts()
 }
 
-/// 从插件共享目录同步账号（credentials.json）
+/// 从 VS Code SecretStorage 同步插件账号
 #[tauri::command]
-pub async fn sync_from_extension() -> Result<usize, String> {
-    modules::import::import_from_extension_credentials().await
+pub async fn sync_from_extension(app: tauri::AppHandle) -> Result<usize, String> {
+    modules::import::import_from_extension_credentials(Some(&app)).await
 }
 
 #[tauri::command]

@@ -625,7 +625,8 @@
       "capture": "現在をキャプチャ",
       "import": "インポート",
       "folder": "フォルダー",
-      "delete": "削除"
+      "delete": "削除",
+      "deleteUnbound": "未紐付けを削除"
     },
     "table": {
       "name": "指紋名",
@@ -703,7 +704,10 @@
       "loadFailed": "指紋リストの読み込みに失敗しました",
       "processing": "処理中...",
       "renameFailed": "名前変更に失敗しました",
-      "serviceMachineIdEmpty": "空"
+      "serviceMachineIdEmpty": "空",
+      "deleteUnboundConfirm": "紐付けアカウントのない指紋を{{count}}件削除しますか？",
+      "deletedUnbound": "未紐付け指紋を{{count}}件削除しました",
+      "noUnboundToDelete": "削除できる未紐付け指紋はありません"
     }
   },
   "modals": {

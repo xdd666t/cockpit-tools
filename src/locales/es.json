@@ -625,7 +625,8 @@
       "capture": "Capturar Actual",
       "import": "Importar",
       "folder": "Carpeta",
-      "delete": "Eliminar"
+      "delete": "Eliminar",
+      "deleteUnbound": "Eliminar no vinculadas"
     },
     "table": {
       "name": "Nombre de Huella",
@@ -703,7 +704,10 @@
       "loadFailed": "Error al cargar la lista de huellas",
       "processing": "Procesando...",
       "renameFailed": "Error al renombrar",
-      "serviceMachineIdEmpty": "Vacío"
+      "serviceMachineIdEmpty": "Vacío",
+      "deleteUnboundConfirm": "¿Eliminar {{count}} huellas sin cuentas vinculadas?",
+      "deletedUnbound": "Se eliminaron {{count}} huellas no vinculadas",
+      "noUnboundToDelete": "No hay huellas no vinculadas para eliminar"
     }
   },
   "modals": {

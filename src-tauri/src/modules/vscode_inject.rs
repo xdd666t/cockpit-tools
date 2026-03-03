@@ -13,6 +13,8 @@
 //! re-encrypts, and writes back.
 
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "macos")]
+use std::collections::HashSet;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 use std::process::Command;
 
@@ -52,6 +54,12 @@ const V11_PREFIX: &[u8] = b"v11";
 const CBC_IV: [u8; 16] = [b' '; 16];
 #[cfg(not(target_os = "windows"))]
 const SALT: &[u8] = b"saltysalt";
+
+#[derive(Clone, Copy)]
+enum SafeStorageReadMode {
+    Default,
+    AntigravityOnly,
+}
 
 // PBKDF2-HMAC-SHA1(1 iteration, key = "peanuts", salt = "saltysalt")
 #[cfg(target_os = "linux")]
@@ -125,6 +133,13 @@ fn get_vscode_db_path_from_data_root(data_root: &Path) -> Result<PathBuf, String
 pub fn get_vscode_db_path() -> Result<PathBuf, String> {
     let data_root = resolve_vscode_data_root(None)?;
     get_vscode_db_path_from_data_root(&data_root)
+}
+
+fn build_secret_storage_item_key(extension_id: &str, key: &str) -> String {
+    format!(
+        r#"secret://{{"extensionId":"{}","key":"{}"}}"#,
+        extension_id, key
+    )
 }
 
 #[cfg(target_os = "windows")]
@@ -322,30 +337,90 @@ fn run_command_get_trimmed(program: &str, args: &[&str]) -> Option<String> {
 }
 
 #[cfg(target_os = "macos")]
-fn get_macos_safe_storage_password() -> Result<String, String> {
-    let candidates = [
-        ("Code Safe Storage", "Code"),
-        ("Code Safe Storage", "Code Safe Storage"),
-        ("Visual Studio Code Safe Storage", "Visual Studio Code"),
-        ("Code - OSS Safe Storage", "Code - OSS"),
-        ("VSCodium Safe Storage", "VSCodium"),
-    ];
+fn build_macos_safe_storage_candidates(
+    data_root: Option<&Path>,
+    mode: SafeStorageReadMode,
+) -> Vec<(String, Option<String>)> {
+    if matches!(mode, SafeStorageReadMode::AntigravityOnly) {
+        return vec![
+            (
+                "Antigravity Safe Storage".to_string(),
+                Some("Antigravity".to_string()),
+            ),
+            ("Antigravity Safe Storage".to_string(), None),
+            (
+                "Antigravity Safe Storage".to_string(),
+                Some("Antigravity Safe Storage".to_string()),
+            ),
+        ];
+    }
 
+    let mut app_names: Vec<String> = Vec::new();
+    if let Some(root) = data_root {
+        if let Some(name) = root.file_name().and_then(|value| value.to_str()) {
+            let trimmed = name.trim();
+            if !trimmed.is_empty() {
+                app_names.push(trimmed.to_string());
+            }
+        }
+    }
+
+    app_names.extend(
+        [
+            "Antigravity",
+            "Antigravity Cockpit",
+            "Code",
+            "Visual Studio Code",
+            "Code - OSS",
+            "VSCodium",
+        ]
+        .iter()
+        .map(|value| value.to_string()),
+    );
+
+    let mut candidates: Vec<(String, Option<String>)> = Vec::new();
+    let mut seen = HashSet::new();
+
+    for app_name in app_names {
+        let service = format!("{} Safe Storage", app_name);
+        let account = Some(app_name.clone());
+        if seen.insert((service.clone(), account.clone())) {
+            candidates.push((service.clone(), account));
+        }
+        if seen.insert((service.clone(), None)) {
+            candidates.push((service.clone(), None));
+        }
+        let alt_account = Some(service.clone());
+        if seen.insert((service.clone(), alt_account.clone())) {
+            candidates.push((service, alt_account));
+        }
+    }
+
+    candidates
+}
+
+#[cfg(target_os = "macos")]
+fn get_macos_safe_storage_password(
+    data_root: Option<&Path>,
+    mode: SafeStorageReadMode,
+) -> Result<String, String> {
+    let candidates = build_macos_safe_storage_candidates(data_root, mode);
     for (service, account) in candidates {
-        if let Some(password) = run_command_get_trimmed(
-            "security",
-            &["find-generic-password", "-w", "-s", service, "-a", account],
-        ) {
-            return Ok(password);
+        if let Some(account_value) = account.as_deref() {
+            if let Some(password) = run_command_get_trimmed(
+                "security",
+                &["find-generic-password", "-w", "-s", &service, "-a", account_value],
+            ) {
+                return Ok(password);
+            }
         }
         if let Some(password) =
-            run_command_get_trimmed("security", &["find-generic-password", "-w", "-s", service])
+            run_command_get_trimmed("security", &["find-generic-password", "-w", "-s", &service])
         {
             return Ok(password);
         }
     }
-
-    Err("Failed to read VS Code Safe Storage password from Keychain".to_string())
+    Err("Failed to read Safe Storage password from Keychain".to_string())
 }
 
 #[cfg(target_os = "linux")]
@@ -377,9 +452,13 @@ fn get_linux_v11_key() -> Option<[u8; 16]> {
     None
 }
 
-fn decrypt_secret_payload(encrypted: &[u8], data_root: Option<&Path>) -> Result<Vec<u8>, String> {
+fn decrypt_secret_payload_with_mode(
+    encrypted: &[u8],
+    data_root: Option<&Path>,
+    mode: SafeStorageReadMode,
+) -> Result<Vec<u8>, String> {
     #[cfg(not(target_os = "windows"))]
-    let _ = data_root;
+    let _ = (data_root, mode);
 
     #[cfg(target_os = "windows")]
     {
@@ -389,7 +468,7 @@ fn decrypt_secret_payload(encrypted: &[u8], data_root: Option<&Path>) -> Result<
 
     #[cfg(target_os = "macos")]
     {
-        let password = get_macos_safe_storage_password()?;
+        let password = get_macos_safe_storage_password(data_root, mode)?;
         let key = pbkdf2_sha1_key(&password, 1003);
         return decrypt_cbc_prefixed(encrypted, V10_PREFIX, &key);
     }
@@ -420,9 +499,13 @@ fn decrypt_secret_payload(encrypted: &[u8], data_root: Option<&Path>) -> Result<
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
         let _ = encrypted;
-        let _ = data_root;
+        let _ = (data_root, mode);
         Err("Unsupported platform".to_string())
     }
+}
+
+fn decrypt_secret_payload(encrypted: &[u8], data_root: Option<&Path>) -> Result<Vec<u8>, String> {
+    decrypt_secret_payload_with_mode(encrypted, data_root, SafeStorageReadMode::Default)
 }
 
 fn encrypt_secret_payload(
@@ -433,7 +516,7 @@ fn encrypt_secret_payload(
     #[cfg(not(target_os = "linux"))]
     let _ = preferred_prefix;
 
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[cfg(target_os = "linux")]
     let _ = data_root;
 
     #[cfg(target_os = "windows")]
@@ -444,7 +527,7 @@ fn encrypt_secret_payload(
 
     #[cfg(target_os = "macos")]
     {
-        let password = get_macos_safe_storage_password()?;
+        let password = get_macos_safe_storage_password(data_root, SafeStorageReadMode::Default)?;
         let key = pbkdf2_sha1_key(&password, 1003);
         return encrypt_cbc_prefixed(V10_PREFIX, &key, plaintext);
     }
@@ -563,6 +646,111 @@ fn decode_buffer_data(buffer: &serde_json::Value) -> Result<Vec<u8>, String> {
     }
 
     Ok(encrypted_bytes)
+}
+
+fn decode_secret_storage_value_with_mode(
+    raw_value: &str,
+    data_root: Option<&Path>,
+    mode: SafeStorageReadMode,
+) -> Result<String, String> {
+    let parsed: serde_json::Value = match serde_json::from_str(raw_value) {
+        Ok(value) => value,
+        Err(_) => return Ok(raw_value.to_string()),
+    };
+
+    if parsed.get("data").is_some() {
+        let encrypted_bytes = decode_buffer_data(&parsed)?;
+        let decrypted = decrypt_secret_payload_with_mode(&encrypted_bytes, data_root, mode)?;
+        return String::from_utf8(decrypted)
+            .map_err(|e| format!("Decrypted data is not valid UTF-8: {}", e));
+    }
+
+    if let Some(value) = parsed.as_str() {
+        return Ok(value.to_string());
+    }
+
+    Ok(raw_value.to_string())
+}
+
+#[allow(dead_code)]
+fn decode_secret_storage_value(raw_value: &str, data_root: Option<&Path>) -> Result<String, String> {
+    decode_secret_storage_value_with_mode(raw_value, data_root, SafeStorageReadMode::Default)
+}
+
+#[allow(dead_code)]
+fn read_secret_storage_value_with_data_root(
+    data_root: &Path,
+    extension_id: &str,
+    key: &str,
+) -> Result<Option<String>, String> {
+    read_secret_storage_value_with_data_root_and_mode(
+        data_root,
+        extension_id,
+        key,
+        SafeStorageReadMode::Default,
+    )
+}
+
+fn read_secret_storage_value_with_data_root_and_mode(
+    data_root: &Path,
+    extension_id: &str,
+    key: &str,
+    mode: SafeStorageReadMode,
+) -> Result<Option<String>, String> {
+    let db_path = data_root
+        .join("User")
+        .join("globalStorage")
+        .join("state.vscdb");
+    if !db_path.exists() {
+        return Ok(None);
+    }
+
+    let conn = Connection::open(&db_path)
+        .map_err(|e| format!("Failed to open VS Code database {}: {}", db_path.display(), e))?;
+    let secret_key = build_secret_storage_item_key(extension_id, key);
+    let raw_value: Option<String> = match conn.query_row(
+        "SELECT value FROM ItemTable WHERE key = ?1",
+        [secret_key.as_str()],
+        |row| row.get(0),
+    ) {
+        Ok(value) => Some(value),
+        Err(rusqlite::Error::QueryReturnedNoRows) => None,
+        Err(err) => {
+            return Err(format!(
+                "Failed to query VS Code secret '{}' for extension '{}': {}",
+                key, extension_id, err
+            ))
+        }
+    };
+
+    match raw_value {
+        Some(value) => decode_secret_storage_value_with_mode(&value, Some(data_root), mode).map(Some),
+        None => Ok(None),
+    }
+}
+
+#[allow(dead_code)]
+pub fn read_vscode_secret_storage_value(
+    extension_id: &str,
+    key: &str,
+    user_data_dir: Option<&str>,
+) -> Result<Option<String>, String> {
+    let data_root = resolve_vscode_data_root(user_data_dir)?;
+    read_secret_storage_value_with_data_root(&data_root, extension_id, key)
+}
+
+pub fn read_antigravity_secret_storage_value(
+    extension_id: &str,
+    key: &str,
+    user_data_dir: Option<&str>,
+) -> Result<Option<String>, String> {
+    let data_root = resolve_vscode_data_root(user_data_dir)?;
+    read_secret_storage_value_with_data_root_and_mode(
+        &data_root,
+        extension_id,
+        key,
+        SafeStorageReadMode::AntigravityOnly,
+    )
 }
 
 fn load_existing_sessions(

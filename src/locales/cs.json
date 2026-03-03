@@ -625,7 +625,8 @@
       "capture": "Zachytit aktuální",
       "import": "Importovat",
       "folder": "Složka",
-      "delete": "Smazat"
+      "delete": "Smazat",
+      "deleteUnbound": "Odstranit nepřiřazené"
     },
     "table": {
       "name": "Název otisku",
@@ -703,7 +704,10 @@
       "loadFailed": "Nepodařilo se načíst seznam otisků",
       "processing": "Zpracování...",
       "renameFailed": "Přejmenování se nezdařilo",
-      "serviceMachineIdEmpty": "Prázdné"
+      "serviceMachineIdEmpty": "Prázdné",
+      "deleteUnboundConfirm": "Odstranit {{count}} otisků bez přiřazeného účtu?",
+      "deletedUnbound": "Odstraněno {{count}} nepřiřazených otisků",
+      "noUnboundToDelete": "Žádné nepřiřazené otisky k odstranění"
     }
   },
   "modals": {

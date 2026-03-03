@@ -625,7 +625,8 @@
       "capture": "Cattura Corrente",
       "import": "Importa",
       "folder": "Cartella",
-      "delete": "Elimina"
+      "delete": "Elimina",
+      "deleteUnbound": "Elimina non associate"
     },
     "table": {
       "name": "Nome Impronta",
@@ -703,7 +704,10 @@
       "loadFailed": "Impossibile caricare l'elenco delle impronte",
       "processing": "Elaborazione in corso...",
       "renameFailed": "Rinomina non riuscita",
-      "serviceMachineIdEmpty": "Vuoto"
+      "serviceMachineIdEmpty": "Vuoto",
+      "deleteUnboundConfirm": "Eliminare {{count}} impronte senza account associati?",
+      "deletedUnbound": "Eliminate {{count}} impronte non associate",
+      "noUnboundToDelete": "Nessuna impronta non associata da eliminare"
     }
   },
   "modals": {

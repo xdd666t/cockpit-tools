@@ -625,7 +625,8 @@
       "capture": "擷取目前",
       "import": "匯入",
       "folder": "目錄",
-      "delete": "刪除"
+      "delete": "刪除",
+      "deleteUnbound": "清理未綁定"
     },
     "table": {
       "name": "指紋名稱",
@@ -703,7 +704,10 @@
       "loadFailed": "載入指紋列表失敗",
       "processing": "處理中...",
       "renameFailed": "重新命名失敗",
-      "serviceMachineIdEmpty": "空"
+      "serviceMachineIdEmpty": "空",
+      "deleteUnboundConfirm": "確定要刪除 {{count}} 個未綁定帳號的指紋嗎？",
+      "deletedUnbound": "已刪除 {{count}} 個未綁定指紋",
+      "noUnboundToDelete": "沒有可刪除的未綁定指紋"
     }
   },
   "modals": {

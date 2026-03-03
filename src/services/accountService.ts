@@ -167,6 +167,10 @@ export async function deleteFingerprint(fingerprintId: string): Promise<void> {
     return await invoke('delete_fingerprint', { fingerprintId });
 }
 
+export async function deleteUnboundFingerprints(): Promise<number> {
+    return await invoke('delete_unbound_fingerprints');
+}
+
 export async function renameFingerprint(fingerprintId: string, name: string): Promise<void> {
     return await invoke('rename_fingerprint', { fingerprintId, name });
 }

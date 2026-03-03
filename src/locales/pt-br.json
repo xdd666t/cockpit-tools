@@ -625,7 +625,8 @@
       "capture": "Capturar Atual",
       "import": "Importar",
       "folder": "Pasta",
-      "delete": "Excluir"
+      "delete": "Excluir",
+      "deleteUnbound": "Excluir não vinculadas"
     },
     "table": {
       "name": "Nome da Impressão",
@@ -703,7 +704,10 @@
       "loadFailed": "Falha ao carregar a lista de impressões digitais",
       "processing": "Processando...",
       "renameFailed": "Falha ao renomear",
-      "serviceMachineIdEmpty": "Vazio"
+      "serviceMachineIdEmpty": "Vazio",
+      "deleteUnboundConfirm": "Excluir {{count}} impressões sem contas vinculadas?",
+      "deletedUnbound": "Foram excluídas {{count}} impressões não vinculadas",
+      "noUnboundToDelete": "Não há impressões não vinculadas para excluir"
     }
   },
   "modals": {

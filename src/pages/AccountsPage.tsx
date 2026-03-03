@@ -86,6 +86,13 @@ interface AccountsPageProps {
 type ViewMode = 'grid' | 'list' | 'compact'
 type FilterType = 'all' | 'PRO' | 'ULTRA' | 'FREE' | 'UNKNOWN'
 
+interface ExtensionImportProgressPayload {
+  phase?: string
+  current?: number
+  total?: number
+  email?: string
+}
+
 const ANTIGRAVITY_TOKEN_SINGLE_EXAMPLE = `{"refresh_token":"1//0gAbCdEf..."}`
 const ANTIGRAVITY_TOKEN_BATCH_EXAMPLE = `[
   {"refresh_token":"1//0gTokenA..."},
@@ -953,9 +960,27 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
     setImporting(true)
     setAddStatus('loading')
     setAddMessage(t('modals.import.importingExtension'))
+    let unlistenProgress: UnlistenFn | undefined
     try {
+      unlistenProgress = await listen<ExtensionImportProgressPayload>(
+        'accounts:extension-import-progress',
+        (event) => {
+          const payload = event.payload ?? {}
+          const current = Number(payload.current ?? 0)
+          const total = Number(payload.total ?? 0)
+          if (current > 0 && total > 0) {
+            setAddMessage(
+              t('accounts.token.importProgress', {
+                current,
+                total
+              })
+            )
+          }
+        }
+      )
       const count = await accountService.syncFromExtension()
       await fetchAccounts()
+      await fetchCurrentAccount()
       if (count === 0) {
         setAddStatus('error')
         setAddMessage(t('modals.import.noAccountsFound'))
@@ -970,8 +995,12 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
     } catch (e) {
       setAddStatus('error')
       setAddMessage(t('messages.importFailed', { error: String(e) }))
+    } finally {
+      if (unlistenProgress) {
+        unlistenProgress()
+      }
+      setImporting(false)
     }
-    setImporting(false)
   }
 
   const extractRefreshTokens = (input: string) => {

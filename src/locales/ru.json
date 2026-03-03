@@ -625,7 +625,8 @@
       "capture": "Захватить текущий",
       "import": "Импорт",
       "folder": "Папка",
-      "delete": "Удалить"
+      "delete": "Удалить",
+      "deleteUnbound": "Удалить непривязанные"
     },
     "table": {
       "name": "Название отпечатка",
@@ -703,7 +704,10 @@
       "loadFailed": "Не удалось загрузить список отпечатков",
       "processing": "Обработка...",
       "renameFailed": "Не удалось переименовать",
-      "serviceMachineIdEmpty": "Пусто"
+      "serviceMachineIdEmpty": "Пусто",
+      "deleteUnboundConfirm": "Удалить {{count}} отпечатков без привязанных аккаунтов?",
+      "deletedUnbound": "Удалено непривязанных отпечатков: {{count}}",
+      "noUnboundToDelete": "Нет непривязанных отпечатков для удаления"
     }
   },
   "modals": {

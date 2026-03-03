@@ -625,7 +625,8 @@
       "capture": "Aktuelle erfassen",
       "import": "Importieren",
       "folder": "Ordner",
-      "delete": "Löschen"
+      "delete": "Löschen",
+      "deleteUnbound": "Ungebundene löschen"
     },
     "table": {
       "name": "Fingerabdruck-Name",
@@ -703,7 +704,10 @@
       "loadFailed": "Fingerabdruckliste konnte nicht geladen werden",
       "processing": "Wird verarbeitet...",
       "renameFailed": "Umbenennen fehlgeschlagen",
-      "serviceMachineIdEmpty": "Leer"
+      "serviceMachineIdEmpty": "Leer",
+      "deleteUnboundConfirm": "{{count}} Fingerabdrücke ohne verknüpftes Konto löschen?",
+      "deletedUnbound": "{{count}} ungebundene Fingerabdrücke gelöscht",
+      "noUnboundToDelete": "Keine ungebundenen Fingerabdrücke zum Löschen"
     }
   },
   "modals": {

@@ -180,6 +180,7 @@ pub fn run() {
             commands::device::create_fingerprint_with_profile,
             commands::device::apply_fingerprint,
             commands::device::delete_fingerprint,
+            commands::device::delete_unbound_fingerprints,
             commands::device::rename_fingerprint,
             commands::device::get_current_fingerprint_id,
             // OAuth Commands

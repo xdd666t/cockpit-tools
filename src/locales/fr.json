@@ -625,7 +625,8 @@
       "capture": "Capturer actuelle",
       "import": "Importer",
       "folder": "Dossier",
-      "delete": "Supprimer"
+      "delete": "Supprimer",
+      "deleteUnbound": "Supprimer non liées"
     },
     "table": {
       "name": "Nom de l'empreinte",
@@ -703,7 +704,10 @@
       "loadFailed": "Échec du chargement de la liste d'empreintes",
       "processing": "Traitement en cours...",
       "renameFailed": "Échec du renommage",
-      "serviceMachineIdEmpty": "Vide"
+      "serviceMachineIdEmpty": "Vide",
+      "deleteUnboundConfirm": "Supprimer {{count}} empreintes sans compte lié ?",
+      "deletedUnbound": "{{count}} empreintes non liées supprimées",
+      "noUnboundToDelete": "Aucune empreinte non liée à supprimer"
     }
   },
   "modals": {

@@ -1,9 +1,9 @@
 use crate::models;
 use crate::modules;
 use crate::utils;
-use serde::Deserialize;
-use std::collections::HashMap;
-use std::fs;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use tauri::Emitter;
 use uuid::Uuid;
 
 // ==================== 辅助结构体和函数 ====================
@@ -37,6 +37,15 @@ struct ExtensionCredentialsFile {
     accounts: HashMap<String, ExtensionCredential>,
 }
 
+const EXTENSION_SECRET_STORAGE_KEYS: [&str; 2] = [
+    "antigravity.autoTrigger.credentials",
+    "antigravity.autoTrigger.credential",
+];
+const EXTENSION_SECRET_STORAGE_EXTENSION_IDS: [&str; 2] = [
+    "jlcodes.antigravity-cockpit",
+    "jlcodes99.antigravity-cockpit",
+];
+
 #[derive(Debug, Deserialize)]
 struct ExtensionCredential {
     pub email: Option<String>,
@@ -50,6 +59,214 @@ struct ExtensionCredential {
     pub expires_at: Option<String>,
     #[serde(rename = "projectId", alias = "project_id")]
     pub project_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct ExtensionImportProgressPayload {
+    pub phase: String,
+    pub current: usize,
+    pub total: usize,
+    pub email: Option<String>,
+}
+
+fn emit_extension_import_progress(
+    app: Option<&tauri::AppHandle>,
+    phase: &str,
+    current: usize,
+    total: usize,
+    email: Option<&str>,
+) {
+    let Some(app_handle) = app else {
+        return;
+    };
+    let payload = ExtensionImportProgressPayload {
+        phase: phase.to_string(),
+        current,
+        total,
+        email: email.map(|value| value.to_string()),
+    };
+    let _ = app_handle.emit("accounts:extension-import-progress", payload);
+}
+
+fn is_probably_email(value: &str) -> bool {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let mut parts = trimmed.split('@');
+    let local = parts.next().unwrap_or_default();
+    let domain = parts.next().unwrap_or_default();
+    if parts.next().is_some() {
+        return false;
+    }
+    !local.is_empty() && domain.contains('.')
+}
+
+fn normalize_extension_credentials(
+    accounts: HashMap<String, ExtensionCredential>,
+) -> HashMap<String, ExtensionCredential> {
+    let mut filtered = HashMap::new();
+    for (key, mut item) in accounts {
+        let email = item
+            .email
+            .clone()
+            .unwrap_or(key)
+            .trim()
+            .to_lowercase();
+        let refresh_token = item
+            .refresh_token
+            .clone()
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+
+        if !is_probably_email(&email) || refresh_token.is_empty() {
+            continue;
+        }
+
+        item.email = Some(email.clone());
+        item.refresh_token = Some(refresh_token);
+        filtered.insert(email, item);
+    }
+    filtered
+}
+
+fn resolve_antigravity_user_data_dir() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        let appdata = std::env::var("APPDATA").ok()?;
+        return Some(format!("{}\\Antigravity", appdata));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let home = dirs::home_dir()?;
+        return Some(
+            home.join("Library")
+                .join("Application Support")
+                .join("Antigravity")
+                .to_string_lossy()
+                .to_string(),
+        );
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(xdg_config_home) = std::env::var("XDG_CONFIG_HOME") {
+            let trimmed = xdg_config_home.trim();
+            if !trimmed.is_empty() {
+                return Some(format!("{}/Antigravity", trimmed));
+            }
+        }
+        let home = dirs::home_dir()?;
+        return Some(
+            home.join(".config")
+                .join("Antigravity")
+                .to_string_lossy()
+                .to_string(),
+        );
+    }
+    #[allow(unreachable_code)]
+    None
+}
+
+fn extension_secret_storage_sources() -> Vec<(Option<String>, &'static str)> {
+    resolve_antigravity_user_data_dir()
+        .map(|path| vec![(Some(path), "antigravity")])
+        .unwrap_or_default()
+}
+
+fn parse_extension_credentials_payload(
+    payload: &str,
+) -> Result<HashMap<String, ExtensionCredential>, String> {
+    if let Ok(parsed) = serde_json::from_str::<ExtensionCredentialsFile>(payload) {
+        return Ok(parsed.accounts);
+    }
+
+    let single: ExtensionCredential = serde_json::from_str(payload)
+        .map_err(|e| format!("解析插件 SecretStorage 凭据失败: {}", e))?;
+    let mut accounts = HashMap::new();
+    let key = single
+        .email
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "__legacy__".to_string());
+    accounts.insert(key, single);
+    Ok(accounts)
+}
+
+fn load_extension_credentials_from_secret_storage(
+) -> Result<HashMap<String, ExtensionCredential>, String> {
+    for (user_data_dir, source_label) in extension_secret_storage_sources() {
+        for extension_id in EXTENSION_SECRET_STORAGE_EXTENSION_IDS {
+            // 优先读取多账号 key；只有该 key 不存在时才回退 legacy key
+            let mut try_keys: Vec<&str> = Vec::new();
+            let multi_key = EXTENSION_SECRET_STORAGE_KEYS[0];
+            match modules::vscode_inject::read_antigravity_secret_storage_value(
+                extension_id,
+                multi_key,
+                user_data_dir.as_deref(),
+            ) {
+                Ok(Some(content)) => {
+                    let parsed = parse_extension_credentials_payload(&content).map_err(|e| {
+                        format!(
+                            "解析 VS Code SecretStorage 失败 (source={}, extensionId={}, key={}): {}",
+                            source_label, extension_id, multi_key, e
+                        )
+                    })?;
+                    let normalized = normalize_extension_credentials(parsed);
+                    modules::logger::log_info(&format!(
+                        "从插件 SecretStorage 读取多账号凭据 source={} extensionId={} count={}",
+                        source_label,
+                        extension_id,
+                        normalized.len()
+                    ));
+                    return Ok(normalized);
+                }
+                Ok(None) => {
+                    try_keys.push(EXTENSION_SECRET_STORAGE_KEYS[1]);
+                }
+                Err(err) => {
+                    modules::logger::log_warn(&format!(
+                        "读取插件 SecretStorage 失败，尝试下一个来源 source={} extensionId={} key={} error={}",
+                        source_label, extension_id, multi_key, err
+                    ));
+                    continue;
+                }
+            }
+
+            for secret_key in try_keys {
+                match modules::vscode_inject::read_antigravity_secret_storage_value(
+                    extension_id,
+                    secret_key,
+                    user_data_dir.as_deref(),
+                ) {
+                    Ok(Some(content)) => {
+                        let parsed = parse_extension_credentials_payload(&content).map_err(|e| {
+                            format!(
+                                "解析 VS Code SecretStorage 失败 (source={}, extensionId={}, key={}): {}",
+                                source_label, extension_id, secret_key, e
+                            )
+                        })?;
+                        let normalized = normalize_extension_credentials(parsed);
+                        modules::logger::log_info(&format!(
+                            "从插件 SecretStorage 读取 legacy 凭据 source={} extensionId={} count={}",
+                            source_label,
+                            extension_id,
+                            normalized.len()
+                        ));
+                        return Ok(normalized);
+                    }
+                    Ok(None) => continue,
+                    Err(err) => {
+                        modules::logger::log_warn(&format!(
+                            "读取插件 SecretStorage 失败，尝试下一个来源 source={} extensionId={} key={} error={}",
+                            source_label, extension_id, secret_key, err
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    Ok(HashMap::new())
 }
 
 pub fn normalize_service_machine_id(value: &str) -> Option<String> {
@@ -695,45 +912,43 @@ pub async fn import_from_json_logic(json_content: String) -> Result<Vec<models::
     Ok(imported)
 }
 
-/// 从插件共享目录导入账号（credentials.json）
-pub async fn import_from_extension_credentials() -> Result<usize, String> {
-    let data_dir = modules::config::get_data_dir()?;
-    let file_path = data_dir.join("credentials.json");
+/// 从 VS Code SecretStorage 导入插件账号
+pub async fn import_from_extension_credentials(app: Option<&tauri::AppHandle>) -> Result<usize, String> {
+    let parsed_accounts = load_extension_credentials_from_secret_storage()?;
 
-    if !file_path.exists() {
+    if parsed_accounts.is_empty() {
         return Ok(0);
     }
 
-    let content =
-        fs::read_to_string(&file_path).map_err(|e| format!("读取 credentials.json 失败: {}", e))?;
-
-    let parsed: ExtensionCredentialsFile =
-        serde_json::from_str(&content).map_err(|e| format!("解析 credentials.json 失败: {}", e))?;
-
-    if parsed.accounts.is_empty() {
-        return Ok(0);
-    }
-
-    // 现有账号 refresh_token，用于去重
+    // 现有账号邮箱，用于“仅新增”导入（已存在账号一律跳过，不覆盖）
     let existing_accounts = modules::list_accounts()?;
-    let mut existing_tokens = HashMap::new();
+    let mut existing_emails = HashSet::new();
     for acc in existing_accounts {
-        existing_tokens.insert(acc.email.clone(), acc.token.refresh_token.clone());
+        existing_emails.insert(acc.email.trim().to_lowercase());
     }
 
     let mut imported_count = 0;
+    let mut imported_account_ids: Vec<String> = Vec::new();
+    let candidates: Vec<(String, ExtensionCredential)> = parsed_accounts.into_iter().collect();
+    let total_candidates = candidates.len();
 
-    for (key, item) in parsed.accounts {
+    for (index, (key, item)) in candidates.into_iter().enumerate() {
         let email = item.email.unwrap_or_else(|| key.clone());
+        emit_extension_import_progress(
+            app,
+            "import",
+            index + 1,
+            total_candidates,
+            Some(&email),
+        );
         let refresh_token = match item.refresh_token {
             Some(token) if !token.trim().is_empty() => token,
             _ => continue,
         };
 
-        if let Some(existing) = existing_tokens.get(&email) {
-            if existing == &refresh_token {
-                continue;
-            }
+        if existing_emails.contains(&email.trim().to_lowercase()) {
+            modules::logger::log_info(&format!("插件导入跳过已存在账号: {}", email));
+            continue;
         }
 
         match modules::oauth::refresh_access_token(&refresh_token).await {
@@ -748,13 +963,15 @@ pub async fn import_from_extension_credentials() -> Result<usize, String> {
                     None,
                 );
 
-                match modules::upsert_account(
+                match modules::add_account(
                     user_info.email.clone(),
                     user_info.get_display_name(),
                     token,
                 ) {
-                    Ok(_) => {
+                    Ok(account) => {
                         imported_count += 1;
+                        imported_account_ids.push(account.id.clone());
+                        existing_emails.insert(account.email.trim().to_lowercase());
                     }
                     Err(e) => {
                         modules::logger::log_error(&format!("导入账号失败 {}: {}", email, e));
@@ -763,6 +980,40 @@ pub async fn import_from_extension_credentials() -> Result<usize, String> {
             }
             Err(e) => {
                 modules::logger::log_error(&format!("刷新 Token 失败 {}: {}", email, e));
+            }
+        }
+    }
+
+    let total_refresh = imported_account_ids.len();
+    for (index, account_id) in imported_account_ids.into_iter().enumerate() {
+        let mut account = match modules::load_account(&account_id) {
+            Ok(value) => value,
+            Err(e) => {
+                modules::logger::log_warn(&format!("导入后加载账号失败 {}: {}", account_id, e));
+                continue;
+            }
+        };
+        emit_extension_import_progress(
+            app,
+            "quota",
+            index + 1,
+            total_refresh,
+            Some(&account.email),
+        );
+        match modules::fetch_quota_with_retry(&mut account, true).await {
+            Ok(quota) => {
+                if let Err(e) = modules::update_account_quota(&account_id, quota) {
+                    modules::logger::log_warn(&format!(
+                        "导入后刷新订阅失败 {}: {}",
+                        account.email, e
+                    ));
+                }
+            }
+            Err(e) => {
+                modules::logger::log_warn(&format!(
+                    "导入后刷新配额失败 {}: {}",
+                    account.email, e
+                ));
             }
         }
     }

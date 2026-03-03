@@ -624,6 +624,7 @@
       "generate": "Generate New",
       "capture": "Capture Current",
       "import": "Import",
+      "deleteUnbound": "Delete Unbound",
       "folder": "Folder",
       "delete": "Delete"
     },
@@ -677,11 +678,14 @@
     "messages": {
       "deleteConfirm": "Delete this fingerprint? Accounts bound to it will revert to original.",
       "batchDeleteConfirm": "Delete {{count}} fingerprints? Accounts bound to them will revert to original.",
+      "deleteUnboundConfirm": "Delete {{count}} fingerprints with no bound accounts?",
       "generated": "New fingerprint generated",
       "captured": "Current fingerprint captured",
       "renamed": "Renamed",
       "deleted": "Fingerprint deleted",
+      "deletedUnbound": "Deleted {{count}} unbound fingerprints",
       "imported": "Imported {{count}} fingerprints",
+      "noUnboundToDelete": "No unbound fingerprints to delete",
       "addedAccounts": "Added {{count}} accounts",
       "enterName": "Enter fingerprint name",
       "previewNotReady": "Preview not ready, please wait",

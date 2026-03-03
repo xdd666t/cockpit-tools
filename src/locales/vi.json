@@ -625,7 +625,8 @@
       "capture": "Chụp vân tay hiện tại",
       "import": "Nhập",
       "folder": "Thư mục",
-      "delete": "Xóa"
+      "delete": "Xóa",
+      "deleteUnbound": "Xóa chưa liên kết"
     },
     "table": {
       "name": "Tên vân tay",
@@ -703,7 +704,10 @@
       "loadFailed": "Không thể tải danh sách vân tay",
       "processing": "Đang xử lý...",
       "renameFailed": "Đổi tên thất bại",
-      "serviceMachineIdEmpty": "Trống"
+      "serviceMachineIdEmpty": "Trống",
+      "deleteUnboundConfirm": "Xóa {{count}} vân tay chưa liên kết tài khoản?",
+      "deletedUnbound": "Đã xóa {{count}} vân tay chưa liên kết",
+      "noUnboundToDelete": "Không có vân tay chưa liên kết để xóa"
     }
   },
   "modals": {

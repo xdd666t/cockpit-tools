@@ -7,6 +7,17 @@ All notable changes to Cockpit Tools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
+## [0.9.12] - 2026-03-03
+
+### Added
+- **Delete unbound fingerprints in one click**: Added a "Delete Unbound" toolbar button on the Fingerprints page that batch-deletes all custom fingerprints not bound to any account, with a live count of deletable items.
+
+### Changed
+- **Extension import now strictly uses Antigravity SecretStorage**: Antigravity “Import from Extension” now reads credentials only from the Antigravity user-data database (`state.vscdb`) and no longer falls back to VS Code profile storage.
+- **Extension import is now add-only (no overwrite updates)**: Existing local accounts are skipped during extension import instead of being updated in place; success count now reflects newly added accounts only.
+- **Extension import now shows live progress and immediately refreshes subscription tier**: Import emits per-account progress events (`current/total`) and refreshes quota/subscription data for newly imported accounts right after import, reducing initial `UNKNOWN` plan badges.
+
+---
 ## [0.9.11] - 2026-03-03
 
 ### Fixed

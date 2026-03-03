@@ -625,7 +625,8 @@
       "capture": "Mevcudu Yakala",
       "import": "İçe Aktar",
       "folder": "Klasör",
-      "delete": "Sil"
+      "delete": "Sil",
+      "deleteUnbound": "Bağsızları sil"
     },
     "table": {
       "name": "Parmak İzi Adı",
@@ -703,7 +704,10 @@
       "loadFailed": "Parmak izi listesi yüklenemedi",
       "processing": "İşleniyor...",
       "renameFailed": "Yeniden adlandırma başarısız",
-      "serviceMachineIdEmpty": "Boş"
+      "serviceMachineIdEmpty": "Boş",
+      "deleteUnboundConfirm": "Bağlı hesabı olmayan {{count}} parmak izi silinsin mi?",
+      "deletedUnbound": "{{count}} bağsız parmak izi silindi",
+      "noUnboundToDelete": "Silinecek bağsız parmak izi yok"
     }
   },
   "modals": {

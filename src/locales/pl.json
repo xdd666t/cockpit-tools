@@ -625,7 +625,8 @@
       "capture": "Przechwyć aktualny",
       "import": "Importuj",
       "folder": "Folder",
-      "delete": "Usuń"
+      "delete": "Usuń",
+      "deleteUnbound": "Usuń niepowiązane"
     },
     "table": {
       "name": "Nazwa odcisku",
@@ -703,7 +704,10 @@
       "loadFailed": "Nie udało się wczytać listy odcisków",
       "processing": "Przetwarzanie...",
       "renameFailed": "Zmiana nazwy nieudana",
-      "serviceMachineIdEmpty": "Puste"
+      "serviceMachineIdEmpty": "Puste",
+      "deleteUnboundConfirm": "Usunąć {{count}} odcisków bez powiązanego konta?",
+      "deletedUnbound": "Usunięto {{count}} niepowiązanych odcisków",
+      "noUnboundToDelete": "Brak niepowiązanych odcisków do usunięcia"
     }
   },
   "modals": {

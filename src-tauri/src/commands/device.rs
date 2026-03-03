@@ -115,6 +115,11 @@ pub async fn delete_fingerprint(fingerprint_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn delete_unbound_fingerprints() -> Result<usize, String> {
+    modules::fingerprint::delete_unbound_fingerprints()
+}
+
+#[tauri::command]
 pub async fn rename_fingerprint(fingerprint_id: String, name: String) -> Result<(), String> {
     modules::fingerprint::rename_fingerprint(&fingerprint_id, name)
 }

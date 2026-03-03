@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -230,6 +231,47 @@ pub fn delete_fingerprint(fingerprint_id: &str) -> Result<(), String> {
 
     logger::log_info(&format!("已删除指纹: {}", fingerprint_id));
     Ok(())
+}
+
+/// 删除所有未绑定账号的指纹（排除原始指纹）
+pub fn delete_unbound_fingerprints() -> Result<usize, String> {
+    let accounts = crate::modules::account::list_accounts()?;
+    let bound_ids: HashSet<String> = accounts
+        .into_iter()
+        .filter_map(|account| account.fingerprint_id)
+        .collect();
+
+    let mut store = load_fingerprint_store()?;
+    let to_delete_ids: HashSet<String> = store
+        .fingerprints
+        .iter()
+        .filter(|fp| !bound_ids.contains(&fp.id))
+        .map(|fp| fp.id.clone())
+        .collect();
+
+    if to_delete_ids.is_empty() {
+        return Ok(0);
+    }
+
+    let deleted_count = to_delete_ids.len();
+    store
+        .fingerprints
+        .retain(|fp| !to_delete_ids.contains(&fp.id));
+
+    if store
+        .current_fingerprint_id
+        .as_ref()
+        .is_some_and(|fid| to_delete_ids.contains(fid))
+    {
+        store.current_fingerprint_id = Some("original".to_string());
+    }
+
+    save_fingerprint_store(&store)?;
+    logger::log_info(&format!(
+        "已批量删除未绑定账号指纹: {} 个",
+        deleted_count
+    ));
+    Ok(deleted_count)
 }
 
 /// 更新账号的指纹绑定（当指纹被删除时）
