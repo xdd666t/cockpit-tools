@@ -266,6 +266,12 @@ fn account_matches_payload_identity(
 
     if let (Some(existing), Some(incoming)) = (existing_email, incoming_email) {
         if existing == incoming {
+            // 双方都有 user_id 且不同时，不按邮箱合并（同邮箱不同账号，如 GitHub/Google 各自登录）
+            if let (Some(eu), Some(iu)) = (existing_user, incoming_user_id) {
+                if eu != iu {
+                    return false;
+                }
+            }
             // 已有账号有 user_id 而 payload 无时，不按邮箱合并（按唯一标识区分）
             if existing_user.is_some() && incoming_user_id.is_none() {
                 return false;
