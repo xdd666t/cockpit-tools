@@ -7,6 +7,13 @@ All notable changes to Cockpit Tools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
+## [0.11.3] - 2026-03-10
+
+### Fixed
+- **Gemini OAuth app identity now matches official Gemini CLI**: Gemini authorization now uses the official Gemini CLI OAuth client credentials, so the consent page aligns with `Gemini Code Assist and Gemini CLI` instead of legacy app identity.
+- **Gemini web OAuth callback flow now aligns with official behavior**: the browser auth URL uses the official parameter set (without extra `prompt=consent`), and callback handling now redirects to the official Gemini success/failure pages.
+
+---
 ## [0.11.2] - 2026-03-08
 
 ### Fixed

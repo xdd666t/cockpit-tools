@@ -7,6 +7,13 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
 ---
+## [0.11.3] - 2026-03-10
+
+### 修复
+- **Gemini OAuth 应用身份已对齐官方 Gemini CLI**：Gemini 授权流程改用官方 Gemini CLI OAuth 客户端凭据，授权页展示与 `Gemini Code Assist and Gemini CLI` 保持一致，不再显示旧应用身份。
+- **Gemini 网页 OAuth 回调流程已对齐官方行为**：浏览器授权 URL 使用官方参数集合（移除额外 `prompt=consent`），回调结果改为跳转到官方 Gemini 授权成功/失败页面。
+
+---
 ## [0.11.2] - 2026-03-08
 
 ### 修复
