@@ -29,7 +29,9 @@
         "addOnPromptCredits": "أرصدة الأوامر الإضافية",
         "credits": "الأرصدة",
         "email": "البريد الإلكتروني",
-        "promptCredits": "أرصدة الأوامر"
+        "promptCredits": "أرصدة الأوامر",
+        "creditPackage": "حزمة الرصيد",
+        "sharedCreditPackage": "حزمة الرصيد المشتركة"
       },
       "empty": {
         "title": "لا توجد حسابات"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "تتم إعادة تعيين الحصة {{dateText}}.",
         "resetUnknown": "إعادة تعيين الحصة بعد -"
+      },
+      "updated": {
+        "label": "تم التحديث قبل {{relative}}"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "المستخدم $ {{used}} من $ {{total}}",
+      "usageUnknown": "الاستخدام: --",
       "resetAt": "وقت إعادة التعيين: {{date}}",
-      "resetUnknown": "وقت إعادة التعيين غير معروف"
+      "resetUnknown": "وقت إعادة التعيين غير معروف",
+      "statusUnknown": "الحالة: غير معروفة",
+      "statusNormal": "الحالة: طبيعي",
+      "statusExhaustedFree": "الحالة: تم استنفاد الاستخدام، نوصي بالترقية",
+      "statusExhaustedPro": "الحالة: تم استنفاد الاستخدام، قم بالترقية أو فعّل الاستخدام حسب الطلب",
+      "bonusUsed": "الرصيد الإضافي: +{{amount}}",
+      "bonusIncluded": "الرصيد الإضافي: متضمن",
+      "bonusEmpty": "الرصيد الإضافي: --",
+      "packageConsuming": "حزمة الاستخدام: قيد الاستهلاك",
+      "packageAvailable": "حزمة الاستخدام: متاحة",
+      "packageEmpty": "حزمة الاستخدام: --",
+      "payAsYouGoConsuming": "الاستخدام حسب الطلب: قيد الاستهلاك",
+      "payAsYouGoEnabled": "الاستخدام حسب الطلب: مفعل",
+      "payAsYouGoEmpty": "الاستخدام حسب الطلب: --"
     },
     "flowNotice": {
       "title": "دليل حساب Trae (انقر للتوسيع أو الطي)",

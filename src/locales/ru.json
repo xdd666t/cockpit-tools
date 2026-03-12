@@ -29,7 +29,9 @@
         "addOnPromptCredits": "Доп. кредиты промптов",
         "credits": "Кредиты",
         "email": "Электронная почта",
-        "promptCredits": "Кредиты промптов"
+        "promptCredits": "Кредиты промптов",
+        "creditPackage": "Пакет кредитов",
+        "sharedCreditPackage": "Общий пакет кредитов"
       },
       "empty": {
         "title": "Нет аккаунтов"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "Лимит будет сброшен {{dateText}}.",
         "resetUnknown": "Лимит сбрасывается через -"
+      },
+      "updated": {
+        "label": "Обновлено {{relative}} назад"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "Использовано $ {{used}} из $ {{total}}",
+      "usageUnknown": "Использование: --",
       "resetAt": "Сброс: {{date}}",
-      "resetUnknown": "Время сброса неизвестно"
+      "resetUnknown": "Время сброса неизвестно",
+      "statusUnknown": "Статус: неизвестно",
+      "statusNormal": "Статус: нормально",
+      "statusExhaustedFree": "Статус: лимит использования исчерпан, рекомендуем повысить тариф",
+      "statusExhaustedPro": "Статус: лимит использования исчерпан, повысьте тариф или включите оплату по факту",
+      "bonusUsed": "Бонус: +{{amount}}",
+      "bonusIncluded": "Бонус: включен",
+      "bonusEmpty": "Бонус: --",
+      "packageConsuming": "Пакет использования: расходуется",
+      "packageAvailable": "Пакет использования: доступен",
+      "packageEmpty": "Пакет использования: --",
+      "payAsYouGoConsuming": "Оплата по факту: расходуется",
+      "payAsYouGoEnabled": "Оплата по факту: включена",
+      "payAsYouGoEmpty": "Оплата по факту: --"
     },
     "flowNotice": {
       "title": "Руководство по аккаунту Trae (нажмите, чтобы развернуть или свернуть)",

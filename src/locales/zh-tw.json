@@ -29,7 +29,9 @@
         "addOnPromptCredits": "Add-on Prompt 點數",
         "credits": "點數",
         "email": "電子郵件",
-        "promptCredits": "User Prompt 點數"
+        "promptCredits": "User Prompt 點數",
+        "creditPackage": "附加 Credits",
+        "sharedCreditPackage": "共享資源包"
       },
       "empty": {
         "title": "暫無帳號"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "額度將於 {{dateText}} 重置。",
         "resetUnknown": "額度重置倒數 -"
+      },
+      "updated": {
+        "label": "更新於 {{relative}}前"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "已用 $ {{used}} / $ {{total}}",
+      "usageUnknown": "用量：--",
       "resetAt": "重設時間：{{date}}",
-      "resetUnknown": "重設時間未知"
+      "resetUnknown": "重設時間未知",
+      "statusUnknown": "狀態：--",
+      "statusNormal": "狀態：正常",
+      "statusExhaustedFree": "狀態：用量已耗盡，建議升級方案",
+      "statusExhaustedPro": "狀態：用量已耗盡，建議升級方案或開啟超額自動扣費",
+      "bonusUsed": "Bonus：+{{amount}}",
+      "bonusIncluded": "Bonus：已包含",
+      "bonusEmpty": "Bonus：--",
+      "packageConsuming": "用量包：消耗中",
+      "packageAvailable": "用量包：可用",
+      "packageEmpty": "用量包：--",
+      "payAsYouGoConsuming": "超額自動扣費：消耗中",
+      "payAsYouGoEnabled": "超額自動扣費：已開啟",
+      "payAsYouGoEmpty": "超額自動扣費：--"
     },
     "flowNotice": {
       "title": "Trae 帳號接入說明（點擊展開/收起）",

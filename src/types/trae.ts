@@ -42,6 +42,15 @@ export type TraeUsage = {
   spentUsd: number | null;
   totalUsd: number | null;
   resetAt: number | null;
+  basicQuota?: number | null;
+  basicUsage?: number | null;
+  bonusQuota?: number | null;
+  bonusUsage?: number | null;
+  nextBillingAt?: number | null;
+  nextResetDays?: number | null;
+  isActive?: boolean | null;
+  isCanceled?: boolean | null;
+  isBilledYearly?: boolean | null;
   identityStr?: string | null;
   consumingProductType?: number | null;
   hasPackage?: boolean | null;
@@ -145,7 +154,7 @@ function pickNestedObject(
   return null;
 }
 
-const TRAE_PRODUCT_TYPE = {
+export const TRAE_PRODUCT_TYPE = {
   FREE: 0,
   PRO: 1,
   PACKAGE: 2,
@@ -263,6 +272,44 @@ function getPackPayAsYouGoUsd(pack: Record<string, unknown> | null): number {
   return pickFirstNumber(getPackUsage(pack), ['pay_go_amount']) ?? 0;
 }
 
+function getPackTimeInfo(pack: Record<string, unknown> | null) {
+  if (!pack) {
+    return {
+      nextBillingAt: null,
+      nextResetAt: null,
+      nextResetDays: null,
+      isActive: null,
+      isCanceled: null,
+      isBilledYearly: null,
+    };
+  }
+
+  const entitlementBase = pickNestedObject(pack, ['entitlement_base_info']);
+  const productExtra = pickNestedObject(entitlementBase, ['product_extra']);
+  const subscriptionExtra = pickNestedObject(productExtra, ['subscription_extra']);
+
+  const endTime = pickFirstNumber(entitlementBase, ['end_time']);
+  const nextResetAt = endTime != null && endTime > 0 ? endTime + 1 : null;
+  const nextResetDays = (() => {
+    if (endTime == null || endTime <= 0) return null;
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const diff = endTime - nowSeconds;
+    return diff <= 0 ? 0 : Math.floor(diff / (24 * 60 * 60));
+  })();
+
+  const status = pickFirstNumber(pack, ['status']);
+  const periodType = pickFirstNumber(subscriptionExtra, ['period_type']);
+
+  return {
+    nextBillingAt: pickFirstNumber(pack, ['next_billing_time']),
+    nextResetAt,
+    nextResetDays,
+    isActive: status === 1,
+    isCanceled: status === 3,
+    isBilledYearly: periodType === 2,
+  };
+}
+
 function getUsageStatusFromPackList(rawUsage: unknown): TraeUsage | null {
   const usageRoot = toRecord(rawUsage);
   if (!usageRoot) return null;
@@ -294,9 +341,14 @@ function getUsageStatusFromPackList(rawUsage: unknown): TraeUsage | null {
     ? getPackProductType(selectedPack)
     : TRAE_PRODUCT_TYPE.FREE;
 
+  const basicUsage = getPackBasicUsage(selectedPack);
+  const basicQuota = getPackBasicQuota(selectedPack);
+  const bonusUsage = getPackBonusUsage(selectedPack);
+  const bonusQuota = getPackBonusQuota(selectedPack);
+  const timeInfo = getPackTimeInfo(selectedPack);
   const spentUsd = getPackBasicUsage(selectedPack) ?? 0;
   const totalUsd = getPackBasicQuota(selectedPack) ?? 0;
-  const resetAtRaw = getPackResetAt(selectedPack);
+  const resetAtRaw = timeInfo.nextResetAt ?? getPackResetAt(selectedPack);
 
   const consumingProductType = (() => {
     for (const pack of packs) {
@@ -331,6 +383,15 @@ function getUsageStatusFromPackList(rawUsage: unknown): TraeUsage | null {
     spentUsd,
     totalUsd,
     resetAt: toUnixSeconds(resetAtRaw),
+    basicQuota,
+    basicUsage,
+    bonusQuota,
+    bonusUsage,
+    nextBillingAt: toUnixSeconds(timeInfo.nextBillingAt),
+    nextResetDays: timeInfo.nextResetDays,
+    isActive: timeInfo.isActive,
+    isCanceled: timeInfo.isCanceled,
+    isBilledYearly: timeInfo.isBilledYearly,
     identityStr,
     consumingProductType,
     hasPackage,
@@ -413,7 +474,15 @@ export function getTraePlanBadgeClass(planType?: string | null): string {
   const normalized = (planType || '').trim().toLowerCase();
   if (!normalized) return 'unknown';
   if (normalized.includes('free')) return 'free';
-  if (normalized.includes('pro') || normalized.includes('plus')) return 'pro';
+  if (
+    normalized.includes('pro') ||
+    normalized.includes('plus') ||
+    normalized.includes('ultra') ||
+    normalized.includes('lite') ||
+    normalized.includes('trial')
+  ) {
+    return 'pro';
+  }
   if (normalized.includes('enterprise') || normalized.includes('team')) return 'enterprise';
   return 'unknown';
 }
@@ -428,6 +497,20 @@ export function getTraeUsage(account: TraeAccount): TraeUsage {
     usedPercent: null,
     spentUsd: null,
     totalUsd: null,
-    resetAt: null,
+    resetAt: account.plan_reset_at ?? null,
+    identityStr: account.plan_type ?? getPlanFromEntitlementOrServer(account),
+    basicQuota: null,
+    basicUsage: null,
+    bonusQuota: null,
+    bonusUsage: null,
+    nextBillingAt: null,
+    nextResetDays: null,
+    isActive: null,
+    isCanceled: null,
+    isBilledYearly: null,
+    hasPackage: false,
+    payAsYouGoOpen: false,
+    payAsYouGoUsd: null,
+    usageExhausted: false,
   };
 }

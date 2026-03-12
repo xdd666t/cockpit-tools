@@ -29,7 +29,9 @@
         "addOnPromptCredits": "追加プロンプトクレジット",
         "credits": "クレジット",
         "email": "メール",
-        "promptCredits": "プロンプトクレジット"
+        "promptCredits": "プロンプトクレジット",
+        "creditPackage": "追加 Credits",
+        "sharedCreditPackage": "共有 Credits パッケージ"
       },
       "empty": {
         "title": "アカウントなし"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "利用枠は{{dateText}}にリセットされます。",
         "resetUnknown": "利用枠のリセットまで -"
+      },
+      "updated": {
+        "label": "{{relative}}前に更新"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "使用済み $ {{used}} / $ {{total}}",
+      "usageUnknown": "利用量：--",
       "resetAt": "リセット時刻: {{date}}",
-      "resetUnknown": "リセット時刻不明"
+      "resetUnknown": "リセット時刻不明",
+      "statusUnknown": "状態：不明",
+      "statusNormal": "状態：正常",
+      "statusExhaustedFree": "状態：利用量上限に達しました。プランのアップグレードを推奨します",
+      "statusExhaustedPro": "状態：利用量上限に達しました。プランのアップグレードまたは従量課金の有効化を推奨します",
+      "bonusUsed": "ボーナス：+{{amount}}",
+      "bonusIncluded": "ボーナス：含まれる",
+      "bonusEmpty": "ボーナス：--",
+      "packageConsuming": "利用パック：消費中",
+      "packageAvailable": "利用パック：利用可能",
+      "packageEmpty": "利用パック：--",
+      "payAsYouGoConsuming": "従量課金：消費中",
+      "payAsYouGoEnabled": "従量課金：有効",
+      "payAsYouGoEmpty": "従量課金：--"
     },
     "flowNotice": {
       "title": "Trae アカウントガイド（クリックで展開/折りたたみ）",

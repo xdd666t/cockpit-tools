@@ -30,6 +30,37 @@ export interface QoderUsage {
   creditsRemaining: number | null;
 }
 
+export interface QoderQuotaBucket {
+  used: number | null;
+  total: number | null;
+  remaining: number | null;
+  percentage: number | null;
+}
+
+export interface QoderSubscriptionInfo {
+  planTag: string;
+  userType: string | null;
+  isPersonalVersion: boolean | null;
+  isHighestTier: boolean;
+  userQuota: QoderQuotaBucket;
+  addOnQuota: QoderQuotaBucket;
+  sharedCreditPackageUsed: number | null;
+  totalUsagePercentage: number | null;
+  expiresAt: number | null;
+  detailUrl: string | null;
+  upgradeUrl: string | null;
+  addCreditsUrl: string | null;
+}
+
+export function shouldShowQoderSubscriptionReset(
+  subscription: Pick<QoderSubscriptionInfo, 'expiresAt' | 'userType'>,
+): boolean {
+  return (
+    subscription.expiresAt != null &&
+    subscription.userType?.trim().toLowerCase() !== 'personal_standard'
+  );
+}
+
 export interface QoderUsageOverview {
   planTag: string;
   usagePercent: number | null;
@@ -41,6 +72,8 @@ export interface QoderUsageOverview {
   upgradeUrl: string | null;
   isQuotaExceeded: boolean;
 }
+
+const QODER_SENTINEL_EXPIRES_AT_MS = Date.UTC(9999, 11, 31, 0, 0, 0);
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -82,6 +115,22 @@ function toBoolean(value: unknown): boolean {
   return false;
 }
 
+function toBooleanOrNull(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return null;
+    if (normalized === '1' || normalized === 'true') return true;
+    if (normalized === '0' || normalized === 'false') return false;
+    return null;
+  }
+  if (typeof value === 'number') {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  return null;
+}
+
 function firstNonEmptyString(...values: unknown[]): string | null {
   for (const value of values) {
     const normalized = toNonEmptyString(value);
@@ -98,10 +147,72 @@ function firstFiniteNumber(...values: unknown[]): number | null {
   return null;
 }
 
+function firstBoolean(...values: unknown[]): boolean | null {
+  for (const value of values) {
+    const normalized = toBooleanOrNull(value);
+    if (normalized != null) return normalized;
+  }
+  return null;
+}
+
+function firstRecord(...values: unknown[]): UnknownRecord | null {
+  for (const value of values) {
+    if (isRecord(value)) return value;
+  }
+  return null;
+}
+
 function clampPercent(value: number | null): number | null {
   if (value == null) return null;
   const normalized = value <= 1 ? value * 100 : value;
   return Math.max(0, Math.min(100, normalized));
+}
+
+function normalizeTimestampMs(value: unknown): number | null {
+  const normalized = toFiniteNumber(value);
+  if (normalized == null || normalized <= 0) return null;
+  const timestampMs =
+    normalized >= 1_000_000_000_000 ? Math.round(normalized) : Math.round(normalized * 1000);
+  if (timestampMs >= QODER_SENTINEL_EXPIRES_AT_MS) return null;
+  return timestampMs;
+}
+
+function parseQuotaBucket(raw: unknown, fallback?: Partial<QoderQuotaBucket>): QoderQuotaBucket {
+  const used = firstFiniteNumber(
+    getNestedValue(raw, ['used']),
+    getNestedValue(raw, ['usage']),
+    getNestedValue(raw, ['consumed']),
+    fallback?.used,
+  );
+  const total = firstFiniteNumber(
+    getNestedValue(raw, ['total']),
+    getNestedValue(raw, ['quota']),
+    getNestedValue(raw, ['limit']),
+    fallback?.total,
+  );
+  const remaining = firstFiniteNumber(
+    getNestedValue(raw, ['remaining']),
+    getNestedValue(raw, ['available']),
+    getNestedValue(raw, ['left']),
+    fallback?.remaining,
+    total != null && used != null ? total - used : null,
+  );
+  const percentage = clampPercent(
+    firstFiniteNumber(
+      getNestedValue(raw, ['percentage']),
+      getNestedValue(raw, ['usagePercent']),
+      getNestedValue(raw, ['usage_percentage']),
+      fallback?.percentage,
+      total != null && used != null && total > 0 ? (used / total) * 100 : null,
+    ),
+  );
+
+  return {
+    used,
+    total,
+    remaining,
+    percentage,
+  };
 }
 
 function getRawPlanTag(account: QoderAccount): string | null {
@@ -136,42 +247,52 @@ export function getQoderPlanBadge(account: QoderAccount): string {
   return 'UNKNOWN';
 }
 
-export function getQoderUsage(account: QoderAccount): QoderUsage {
-  const used = firstFiniteNumber(
-    getNestedValue(account.auth_credit_usage_raw, ['userQuota', 'used']),
-    account.credits_used,
+export function getQoderSubscriptionInfo(account: QoderAccount): QoderSubscriptionInfo {
+  const planTag = getQoderPlanBadge(account);
+  const userQuota = parseQuotaBucket(
+    firstRecord(
+      getNestedValue(account.auth_credit_usage_raw, ['userQuota']),
+      getNestedValue(account.auth_user_plan_raw, ['userQuota']),
+      getNestedValue(account.auth_user_info_raw, ['userQuota']),
+    ),
+    {
+      used: account.credits_used,
+      total: account.credits_total,
+      remaining: account.credits_remaining,
+      percentage: account.credits_usage_percent,
+    },
   );
-  const total = firstFiniteNumber(
-    getNestedValue(account.auth_credit_usage_raw, ['userQuota', 'total']),
-    account.credits_total,
-  );
-  const remaining = firstFiniteNumber(
-    getNestedValue(account.auth_credit_usage_raw, ['userQuota', 'remaining']),
-    account.credits_remaining,
-    total != null && used != null ? total - used : null,
-  );
-  const percent = clampPercent(
-    firstFiniteNumber(
-      getNestedValue(account.auth_credit_usage_raw, ['totalUsagePercentage']),
-      getNestedValue(account.auth_credit_usage_raw, ['userQuota', 'percentage']),
-      account.credits_usage_percent,
-      total != null && used != null && total > 0 ? (used / total) * 100 : null,
+  const addOnQuota = parseQuotaBucket(
+    firstRecord(
+      getNestedValue(account.auth_credit_usage_raw, ['addOnQuota']),
+      getNestedValue(account.auth_credit_usage_raw, ['addonQuota']),
+      getNestedValue(account.auth_credit_usage_raw, ['add_on_quota']),
+      getNestedValue(account.auth_user_plan_raw, ['addOnQuota']),
+      getNestedValue(account.auth_user_plan_raw, ['addonQuota']),
+      getNestedValue(account.auth_user_plan_raw, ['add_on_quota']),
     ),
   );
-
-  return {
-    inlineSuggestionsUsedPercent: percent,
-    chatMessagesUsedPercent: percent,
-    allowanceResetAt: null,
-    creditsUsed: used,
-    creditsTotal: total,
-    creditsRemaining: remaining,
-  };
-}
-
-export function getQoderUsageOverview(account: QoderAccount): QoderUsageOverview {
-  const usage = getQoderUsage(account);
+  const sharedCreditPackageRaw = firstRecord(
+    getNestedValue(account.auth_credit_usage_raw, ['orgResourcePackage']),
+    getNestedValue(account.auth_credit_usage_raw, ['organizationResourcePackage']),
+    getNestedValue(account.auth_credit_usage_raw, ['sharedCreditPackage']),
+    getNestedValue(account.auth_credit_usage_raw, ['resourcePackage']),
+    getNestedValue(account.auth_user_plan_raw, ['orgResourcePackage']),
+    getNestedValue(account.auth_user_plan_raw, ['organizationResourcePackage']),
+    getNestedValue(account.auth_user_plan_raw, ['sharedCreditPackage']),
+    getNestedValue(account.auth_user_plan_raw, ['resourcePackage']),
+  );
+  const totalUsagePercentage = clampPercent(
+    firstFiniteNumber(
+      getNestedValue(account.auth_credit_usage_raw, ['totalUsagePercentage']),
+      getNestedValue(account.auth_credit_usage_raw, ['total_usage_percentage']),
+      getNestedValue(account.auth_user_plan_raw, ['totalUsagePercentage']),
+      getNestedValue(account.auth_user_plan_raw, ['total_usage_percentage']),
+    ),
+  );
   const detailUrl = firstNonEmptyString(
+    getNestedValue(account.auth_credit_usage_raw, ['creditBreakdownUrl']),
+    getNestedValue(account.auth_user_plan_raw, ['creditBreakdownUrl']),
     getNestedValue(account.auth_credit_usage_raw, ['usageDetailUrl']),
     getNestedValue(account.auth_credit_usage_raw, ['usageDetailsUrl']),
     getNestedValue(account.auth_credit_usage_raw, ['detailUrl']),
@@ -181,10 +302,96 @@ export function getQoderUsageOverview(account: QoderAccount): QoderUsageOverview
   const upgradeUrl = firstNonEmptyString(
     getNestedValue(account.auth_credit_usage_raw, ['upgradeUrl']),
     getNestedValue(account.auth_user_plan_raw, ['upgradeUrl']),
+    getNestedValue(account.auth_user_info_raw, ['upgradeUrl']),
+  );
+  const addCreditsUrl = firstNonEmptyString(
+    getNestedValue(account.auth_credit_usage_raw, ['addCreditsUrl']),
+    getNestedValue(account.auth_credit_usage_raw, ['add_credits_url']),
+    getNestedValue(account.auth_credit_usage_raw, ['topUpUrl']),
+    getNestedValue(account.auth_credit_usage_raw, ['top_up_url']),
+    getNestedValue(account.auth_user_plan_raw, ['addCreditsUrl']),
+    getNestedValue(account.auth_user_plan_raw, ['add_credits_url']),
+    getNestedValue(account.auth_user_plan_raw, ['topUpUrl']),
+    getNestedValue(account.auth_user_plan_raw, ['top_up_url']),
+  );
+  const expiresAt = normalizeTimestampMs(
+    firstFiniteNumber(
+      getNestedValue(account.auth_credit_usage_raw, ['expiresAt']),
+      getNestedValue(account.auth_credit_usage_raw, ['expires_at']),
+      getNestedValue(account.auth_credit_usage_raw, ['resetAt']),
+      getNestedValue(account.auth_credit_usage_raw, ['reset_at']),
+      getNestedValue(account.auth_user_plan_raw, ['expiresAt']),
+      getNestedValue(account.auth_user_plan_raw, ['expires_at']),
+      getNestedValue(account.auth_user_plan_raw, ['resetAt']),
+      getNestedValue(account.auth_user_plan_raw, ['reset_at']),
+      getNestedValue(account.auth_user_info_raw, ['expiresAt']),
+      getNestedValue(account.auth_user_info_raw, ['expires_at']),
+    ),
   );
 
   return {
-    planTag: getQoderPlanBadge(account),
+    planTag,
+    userType: firstNonEmptyString(
+      getNestedValue(account.auth_credit_usage_raw, ['userType']),
+      getNestedValue(account.auth_credit_usage_raw, ['user_type']),
+      getNestedValue(account.auth_user_plan_raw, ['userType']),
+      getNestedValue(account.auth_user_plan_raw, ['user_type']),
+      getNestedValue(account.auth_user_info_raw, ['userType']),
+      getNestedValue(account.auth_user_info_raw, ['user_type']),
+    ),
+    isPersonalVersion: firstBoolean(
+      getNestedValue(account.auth_credit_usage_raw, ['isPersonalVersion']),
+      getNestedValue(account.auth_credit_usage_raw, ['is_personal_version']),
+      getNestedValue(account.auth_user_plan_raw, ['isPersonalVersion']),
+      getNestedValue(account.auth_user_plan_raw, ['is_personal_version']),
+      getNestedValue(account.auth_user_info_raw, ['isPersonalVersion']),
+      getNestedValue(account.auth_user_info_raw, ['is_personal_version']),
+    ),
+    isHighestTier:
+      firstBoolean(
+        getNestedValue(account.auth_credit_usage_raw, ['isHighestTier']),
+        getNestedValue(account.auth_credit_usage_raw, ['is_highest_tier']),
+        getNestedValue(account.auth_user_plan_raw, ['isHighestTier']),
+        getNestedValue(account.auth_user_plan_raw, ['is_highest_tier']),
+        getNestedValue(account.auth_user_info_raw, ['isHighestTier']),
+        getNestedValue(account.auth_user_info_raw, ['is_highest_tier']),
+      ) ?? false,
+    userQuota,
+    addOnQuota,
+    sharedCreditPackageUsed: firstFiniteNumber(
+      getNestedValue(sharedCreditPackageRaw, ['used']),
+      getNestedValue(sharedCreditPackageRaw, ['usage']),
+      getNestedValue(sharedCreditPackageRaw, ['consumed']),
+      getNestedValue(sharedCreditPackageRaw, ['count']),
+    ),
+    totalUsagePercentage,
+    expiresAt,
+    detailUrl,
+    upgradeUrl,
+    addCreditsUrl,
+  };
+}
+
+export function getQoderUsage(account: QoderAccount): QoderUsage {
+  const subscription = getQoderSubscriptionInfo(account);
+  const percent = subscription.userQuota.percentage ?? subscription.totalUsagePercentage;
+
+  return {
+    inlineSuggestionsUsedPercent: percent,
+    chatMessagesUsedPercent: percent,
+    allowanceResetAt: subscription.expiresAt,
+    creditsUsed: subscription.userQuota.used,
+    creditsTotal: subscription.userQuota.total,
+    creditsRemaining: subscription.userQuota.remaining,
+  };
+}
+
+export function getQoderUsageOverview(account: QoderAccount): QoderUsageOverview {
+  const subscription = getQoderSubscriptionInfo(account);
+  const usage = getQoderUsage(account);
+
+  return {
+    planTag: subscription.planTag,
     usagePercent: usage.inlineSuggestionsUsedPercent,
     creditsUsed: usage.creditsUsed,
     creditsTotal: usage.creditsTotal,
@@ -192,8 +399,8 @@ export function getQoderUsageOverview(account: QoderAccount): QoderUsageOverview
     unit:
       firstNonEmptyString(getNestedValue(account.auth_credit_usage_raw, ['userQuota', 'unit'])) ||
       'Credits',
-    detailUrl: detailUrl || upgradeUrl,
-    upgradeUrl,
+    detailUrl: subscription.detailUrl || subscription.upgradeUrl,
+    upgradeUrl: subscription.upgradeUrl,
     isQuotaExceeded:
       toBoolean(getNestedValue(account.auth_credit_usage_raw, ['isQuotaExceeded'])) ||
       toBoolean(getNestedValue(account.auth_user_info_raw, ['isQuotaExceeded'])),

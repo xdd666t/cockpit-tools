@@ -29,7 +29,9 @@
         "addOnPromptCredits": "Dodatkowe kredyty promptów",
         "credits": "Kredyty",
         "email": "E-mail",
-        "promptCredits": "Kredyty promptów"
+        "promptCredits": "Kredyty promptów",
+        "creditPackage": "Pakiet kredytów",
+        "sharedCreditPackage": "Wspólny pakiet kredytów"
       },
       "empty": {
         "title": "Brak kont"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "Limit resetuje się {{dateText}}.",
         "resetUnknown": "Limit resetuje się -"
+      },
+      "updated": {
+        "label": "Zaktualizowano {{relative}} temu"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "Wykorzystano $ {{used}} z $ {{total}}",
+      "usageUnknown": "Zuzycie: --",
       "resetAt": "Reset: {{date}}",
-      "resetUnknown": "Nieznany czas resetu"
+      "resetUnknown": "Nieznany czas resetu",
+      "statusUnknown": "Status: nieznany",
+      "statusNormal": "Status: normalny",
+      "statusExhaustedFree": "Status: limit zuzycia wyczerpany, zalecamy wyzszy plan",
+      "statusExhaustedPro": "Status: limit zuzycia wyczerpany, uaktualnij plan lub wlacz rozliczanie za uzycie",
+      "bonusUsed": "Dodatkowy bonus: +{{amount}}",
+      "bonusIncluded": "Dodatkowy bonus: wliczony",
+      "bonusEmpty": "Dodatkowy bonus: --",
+      "packageConsuming": "Pakiet uzycia: w trakcie zuzycia",
+      "packageAvailable": "Pakiet uzycia: dostepny",
+      "packageEmpty": "Pakiet uzycia: --",
+      "payAsYouGoConsuming": "Rozliczanie za uzycie: w trakcie zuzycia",
+      "payAsYouGoEnabled": "Rozliczanie za uzycie: wlaczone",
+      "payAsYouGoEmpty": "Rozliczanie za uzycie: --"
     },
     "flowNotice": {
       "title": "Przewodnik po kontach Trae (kliknij, aby rozwinac/zwinac)",

@@ -43,11 +43,25 @@ import {
   getTraePlanBadgeClass,
   getTraePlanDisplayName,
   getTraeUsage,
+  TRAE_PRODUCT_TYPE,
 } from '../types/trae';
 
 const TRAE_CURRENT_ACCOUNT_ID_KEY = 'agtools.trae.current_account_id';
 const TRAE_FLOW_NOTICE_COLLAPSED_KEY = 'agtools.trae.flow_notice_collapsed';
 const TRAE_KNOWN_SORT_KEYS = ['created_at', 'plan', 'quota'] as const;
+
+type TraeQuotaSummary = {
+  percentage: number | null;
+  percentageText: string;
+  quotaClass: 'high' | 'medium' | 'critical';
+  costText: string;
+  statusText: string;
+  statusTone: 'normal' | 'warning' | 'unknown';
+  bonusText: string;
+  resetText: string;
+  packageText: string;
+  payAsYouGoText: string;
+};
 
 function formatNumber(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return '--';
@@ -70,6 +84,10 @@ function formatTraeResetAt(timestamp: number): string {
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(
     date.getHours(),
   )}:${pad(date.getMinutes())}`;
+}
+
+function formatTraeMoney(value: number | null | undefined): string {
+  return `$${formatNumber(value)}`;
 }
 
 export function TraeAccountsPage() {
@@ -326,12 +344,41 @@ export function TraeAccountsPage() {
   );
 
   const resolveQuotaSummary = useCallback(
-    (account: TraeAccount) => {
+    (account: TraeAccount): TraeQuotaSummary => {
       const usage = getTraeUsage(account);
       const percentage =
         typeof usage.usedPercent === 'number' && Number.isFinite(usage.usedPercent)
           ? Math.max(0, Math.min(100, Math.round(usage.usedPercent)))
           : null;
+
+      const isFreePlan = (usage.identityStr ?? account.plan_type ?? '')
+        .trim()
+        .toLowerCase()
+        .includes('free');
+
+      const statusTone: TraeQuotaSummary['statusTone'] = !account.trae_usage_raw
+        ? 'unknown'
+        : usage.usageExhausted
+          ? usage.payAsYouGoOpen && !isFreePlan
+            ? 'normal'
+            : 'warning'
+          : 'normal';
+
+      const statusText = !account.trae_usage_raw
+        ? t('trae.quota.statusUnknown', 'Status: --')
+        : usage.usageExhausted
+          ? isFreePlan
+            ? t(
+                'trae.quota.statusExhaustedFree',
+                'Status: Usage exhausted, upgrade recommended',
+              )
+            : usage.payAsYouGoOpen
+              ? t('trae.quota.statusNormal', 'Status: Normal')
+              : t(
+                  'trae.quota.statusExhaustedPro',
+                  'Status: Usage exhausted, upgrade or enable on-demand usage',
+                )
+          : t('trae.quota.statusNormal', 'Status: Normal');
 
       return {
         percentage,
@@ -344,14 +391,35 @@ export function TraeAccountsPage() {
                 total: formatNumber(usage.totalUsd),
                 defaultValue: '${{used}} / ${{total}}',
               })
-            : t('instances.quota.empty', '暂无配额缓存'),
+            : t('trae.quota.usageUnknown', 'Usage: --'),
+        statusText,
+        statusTone,
+        bonusText:
+          (usage.bonusUsage ?? 0) > 0
+            ? t('trae.quota.bonusUsed', {
+                amount: formatTraeMoney(usage.bonusUsage),
+                defaultValue: 'Bonus: +{{amount}}',
+              })
+            : (usage.bonusQuota ?? 0) > 0
+              ? t('trae.quota.bonusIncluded', 'Bonus: Included')
+              : t('trae.quota.bonusEmpty', 'Bonus: --'),
         resetText:
-          usage.resetAt != null
+          (usage.resetAt ?? account.plan_reset_at ?? null) != null
             ? t('trae.quota.resetAt', {
-                date: formatTraeResetAt(usage.resetAt),
+                date: formatTraeResetAt(usage.resetAt ?? account.plan_reset_at ?? 0),
                 defaultValue: '重置时间：{{date}}',
               })
             : t('trae.quota.resetUnknown', '重置时间未知'),
+        packageText: usage.hasPackage
+          ? usage.consumingProductType === TRAE_PRODUCT_TYPE.PACKAGE
+            ? t('trae.quota.packageConsuming', 'Package: Consuming')
+            : t('trae.quota.packageAvailable', 'Package: Available')
+          : t('trae.quota.packageEmpty', 'Package: --'),
+        payAsYouGoText: usage.payAsYouGoOpen
+          ? usage.consumingProductType === TRAE_PRODUCT_TYPE.PAY_GO
+            ? t('trae.quota.payAsYouGoConsuming', 'On-Demand Usage: Consuming')
+            : t('trae.quota.payAsYouGoEnabled', 'On-Demand Usage: Enabled')
+          : t('trae.quota.payAsYouGoEmpty', 'On-Demand Usage: --'),
       };
     },
     [t],
@@ -385,6 +453,52 @@ export function TraeAccountsPage() {
   const resolvePlanLabel = useCallback(
     (account: TraeAccount) => getTraePlanDisplayName(account),
     [],
+  );
+
+  const renderCompactQuota = useCallback(
+    (quota: TraeQuotaSummary, variant: 'card' | 'table' = 'card') => {
+      const labelClass = variant === 'table' ? 'quota-name' : 'quota-label';
+      const valueClass = variant === 'table' ? 'quota-value' : 'quota-pct';
+      const trackClass = variant === 'table' ? 'quota-progress-track' : 'quota-bar-track';
+      const barClass = variant === 'table' ? 'quota-progress-bar' : 'quota-bar';
+      const metaPills = [quota.bonusText, quota.packageText, quota.payAsYouGoText];
+
+      return (
+        <div className={`quota-item trae-compact-quota ${variant === 'table' ? 'is-table windsurf-table-credit-item' : 'is-card'}`}>
+          <div className="quota-header trae-compact-quota-header">
+            <span className={labelClass}>{t('instances.labels.quota', '配额')}</span>
+            <div className="trae-compact-quota-main">
+              <span className="trae-compact-quota-total" title={quota.costText}>
+                {quota.costText}
+              </span>
+              <span className={`${valueClass} ${quota.quotaClass}`}>{quota.percentageText}</span>
+            </div>
+          </div>
+          <div className={trackClass}>
+            <div
+              className={`${barClass} ${quota.quotaClass}`}
+              style={{ width: `${Math.min(quota.percentage ?? 0, 100)}%` }}
+            />
+          </div>
+          <div className="trae-compact-quota-meta-row">
+            <span className={`trae-compact-quota-status ${quota.statusTone}`} title={quota.statusText}>
+              {quota.statusText}
+            </span>
+            <span className="trae-compact-quota-reset" title={quota.resetText}>
+              {quota.resetText}
+            </span>
+          </div>
+          <div className="trae-compact-quota-pills">
+            {metaPills.map((text, index) => (
+              <span key={`${variant}-meta-${index}`} className="pill pill-secondary trae-compact-quota-pill" title={text}>
+                {text}
+              </span>
+            ))}
+          </div>
+        </div>
+      );
+    },
+    [t],
   );
 
   const renderGridCards = useCallback(
@@ -452,20 +566,7 @@ export function TraeAccountsPage() {
             )}
 
             <div className="ghcp-quota-section">
-              <div className="quota-item">
-                <div className="quota-header">
-                  <span className="quota-label">{t('instances.labels.quota', '配额')}</span>
-                  <span className={`quota-pct ${quota.quotaClass}`}>{quota.percentageText}</span>
-                </div>
-                <div className="quota-bar-track">
-                  <div
-                    className={`quota-bar ${quota.quotaClass}`}
-                    style={{ width: `${Math.min(quota.percentage ?? 0, 100)}%` }}
-                  />
-                </div>
-                <div className="quota-reset">{quota.costText}</div>
-                <div className="quota-reset">{quota.resetText}</div>
-              </div>
+              {renderCompactQuota(quota, 'card')}
             </div>
 
             <div className="card-footer">
@@ -533,6 +634,7 @@ export function TraeAccountsPage() {
       maskAccountText,
       openTagModal,
       refreshing,
+      renderCompactQuota,
       resolveDisplayEmail,
       resolveSignedInWithText,
       resolvePlanLabel,
@@ -608,24 +710,7 @@ export function TraeAccountsPage() {
               </div>
             </td>
             <td>
-              <div className="quota-item windsurf-table-credit-item">
-                <div className="quota-header">
-                  <span className="quota-name">{t('instances.labels.quota', '配额')}</span>
-                  <span className={`quota-value ${quota.quotaClass}`}>{quota.percentageText}</span>
-                </div>
-                <div className="windsurf-credit-meta-row table">
-                  <span className="windsurf-credit-left">{quota.costText}</span>
-                </div>
-                <div className="windsurf-credit-meta-row table">
-                  <span className="windsurf-credit-used">{quota.resetText}</span>
-                </div>
-                <div className="quota-progress-track">
-                  <div
-                    className={`quota-progress-bar ${quota.quotaClass}`}
-                    style={{ width: `${Math.min(quota.percentage ?? 0, 100)}%` }}
-                  />
-                </div>
-              </div>
+              {renderCompactQuota(quota, 'table')}
             </td>
             <td>{formatDate(account.created_at)}</td>
             <td className="sticky-action-cell table-action-cell">
@@ -692,6 +777,7 @@ export function TraeAccountsPage() {
       maskAccountText,
       openTagModal,
       refreshing,
+      renderCompactQuota,
       resolveDisplayEmail,
       resolveSignedInWithText,
       resolvePlanLabel,

@@ -29,7 +29,9 @@
         "addOnPromptCredits": "Tín dụng prompt bổ sung",
         "credits": "Tín dụng",
         "email": "E-mail",
-        "promptCredits": "Tín dụng prompt"
+        "promptCredits": "Tín dụng prompt",
+        "creditPackage": "Gói credit",
+        "sharedCreditPackage": "Gói credit dùng chung"
       },
       "empty": {
         "title": "Chưa có tài khoản"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "Hạn mức sẽ được đặt lại {{dateText}}.",
         "resetUnknown": "Hạn mức sẽ đặt lại sau -"
+      },
+      "updated": {
+        "label": "Cập nhật {{relative}} trước"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "Da dung $ {{used}} / $ {{total}}",
+      "usageUnknown": "Muc dung: --",
       "resetAt": "Thoi gian dat lai: {{date}}",
-      "resetUnknown": "Khong ro thoi gian dat lai"
+      "resetUnknown": "Khong ro thoi gian dat lai",
+      "statusUnknown": "Trang thai: chua ro",
+      "statusNormal": "Trang thai: binh thuong",
+      "statusExhaustedFree": "Trang thai: da het muc dung, nen nang cap goi",
+      "statusExhaustedPro": "Trang thai: da het muc dung, hay nang cap goi hoac bat thanh toan theo muc dung",
+      "bonusUsed": "Thuong them: +{{amount}}",
+      "bonusIncluded": "Thuong them: da bao gom",
+      "bonusEmpty": "Thuong them: --",
+      "packageConsuming": "Goi muc dung: dang tieu thu",
+      "packageAvailable": "Goi muc dung: kha dung",
+      "packageEmpty": "Goi muc dung: --",
+      "payAsYouGoConsuming": "Thanh toan theo muc dung: dang tieu thu",
+      "payAsYouGoEnabled": "Thanh toan theo muc dung: da bat",
+      "payAsYouGoEmpty": "Thanh toan theo muc dung: --"
     },
     "flowNotice": {
       "title": "Huong dan tai khoan Trae (nhan de mo rong/thu gon)",

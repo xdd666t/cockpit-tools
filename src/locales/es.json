@@ -29,7 +29,9 @@
         "addOnPromptCredits": "Créditos de prompts adicionales",
         "credits": "Créditos",
         "email": "Correo electrónico",
-        "promptCredits": "Créditos de prompts"
+        "promptCredits": "Créditos de prompts",
+        "creditPackage": "Paquete de créditos",
+        "sharedCreditPackage": "Paquete de créditos compartido"
       },
       "empty": {
         "title": "Sin cuentas"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "La cuota se restablece {{dateText}}.",
         "resetUnknown": "La cuota se restablece en -"
+      },
+      "updated": {
+        "label": "Actualizado hace {{relative}}"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "Usado $ {{used}} de $ {{total}}",
+      "usageUnknown": "Uso: --",
       "resetAt": "Reinicio: {{date}}",
-      "resetUnknown": "Hora de reinicio desconocida"
+      "resetUnknown": "Hora de reinicio desconocida",
+      "statusUnknown": "Estado: desconocido",
+      "statusNormal": "Estado: normal",
+      "statusExhaustedFree": "Estado: uso agotado, se recomienda mejorar el plan",
+      "statusExhaustedPro": "Estado: uso agotado, actualiza el plan o activa el cobro por uso",
+      "bonusUsed": "Bono: +{{amount}}",
+      "bonusIncluded": "Bono: incluido",
+      "bonusEmpty": "Bono: --",
+      "packageConsuming": "Paquete de uso: consumiendose",
+      "packageAvailable": "Paquete de uso: disponible",
+      "packageEmpty": "Paquete de uso: --",
+      "payAsYouGoConsuming": "Uso bajo demanda: consumiendose",
+      "payAsYouGoEnabled": "Uso bajo demanda: activado",
+      "payAsYouGoEmpty": "Uso bajo demanda: --"
     },
     "flowNotice": {
       "title": "Guia de cuentas de Trae (haz clic para expandir o contraer)",

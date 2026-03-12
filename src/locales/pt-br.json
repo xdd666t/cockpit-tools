@@ -29,7 +29,9 @@
         "addOnPromptCredits": "Créditos de prompt adicionais",
         "credits": "Créditos",
         "email": "E-mail",
-        "promptCredits": "Créditos de prompt"
+        "promptCredits": "Créditos de prompt",
+        "creditPackage": "Pacote de créditos",
+        "sharedCreditPackage": "Pacote de créditos compartilhado"
       },
       "empty": {
         "title": "Sem contas"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "A franquia será redefinida {{dateText}}.",
         "resetUnknown": "A franquia será redefinida em -"
+      },
+      "updated": {
+        "label": "Atualizado há {{relative}}"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "Usado $ {{used}} de $ {{total}}",
+      "usageUnknown": "Uso: --",
       "resetAt": "Redefinicao: {{date}}",
-      "resetUnknown": "Horario de redefinicao desconhecido"
+      "resetUnknown": "Horario de redefinicao desconhecido",
+      "statusUnknown": "Status: desconhecido",
+      "statusNormal": "Status: normal",
+      "statusExhaustedFree": "Status: uso esgotado, recomendamos fazer upgrade",
+      "statusExhaustedPro": "Status: uso esgotado, faca upgrade do plano ou ative o uso sob demanda",
+      "bonusUsed": "Bonus extra: +{{amount}}",
+      "bonusIncluded": "Bonus extra: incluido",
+      "bonusEmpty": "Bonus extra: --",
+      "packageConsuming": "Pacote de uso: consumindo",
+      "packageAvailable": "Pacote de uso: disponivel",
+      "packageEmpty": "Pacote de uso: --",
+      "payAsYouGoConsuming": "Uso sob demanda: consumindo",
+      "payAsYouGoEnabled": "Uso sob demanda: ativado",
+      "payAsYouGoEmpty": "Uso sob demanda: --"
     },
     "flowNotice": {
       "title": "Guia de contas Trae (clique para expandir/recolher)",

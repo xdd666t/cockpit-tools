@@ -87,7 +87,7 @@ impl PlatformId {
             Self::Windsurf => "Windsurf",
             Self::Kiro => "Kiro",
             Self::Cursor => "Cursor",
-            Self::Gemini => "Gemini",
+            Self::Gemini => "Gemini CLI",
             Self::Codebuddy => "CodeBuddy",
             Self::Qoder => "Qoder",
             Self::Trae => "Trae",
@@ -990,7 +990,7 @@ fn build_gemini_display_info(lang: &str) -> AccountDisplayInfo {
 
 fn build_codebuddy_display_info(lang: &str) -> AccountDisplayInfo {
     let accounts = crate::modules::codebuddy_account::list_accounts();
-    let account = accounts.iter().max_by_key(|a| a.last_used).cloned();
+    let account = resolve_codebuddy_current_account(&accounts);
     let Some(account) = account else {
         return AccountDisplayInfo {
             account: format!("📧 {}", get_text("not_logged_in", lang)),
@@ -1000,17 +1000,48 @@ fn build_codebuddy_display_info(lang: &str) -> AccountDisplayInfo {
 
     let mut quota_lines = Vec::new();
 
-    if let Some(payment) = account.payment_type.as_deref() {
-        quota_lines.push(format!("Plan: {}", payment));
+    // Plan badge from payment_type or plan_type
+    let plan_label = first_non_empty(&[
+        account.payment_type.as_deref(),
+        account.plan_type.as_deref(),
+    ]);
+    if let Some(plan) = plan_label {
+        quota_lines.push(format!("Plan: {}", plan));
     }
 
-    if let Some(code) = account.dosage_notify_code.as_deref() {
-        let msg = if lang == "zh" || lang == "zh-CN" {
-            account.dosage_notify_zh.as_deref().unwrap_or(code)
+    // Parse resource quota from quota_raw/usage_raw
+    let resource = extract_codebuddy_resource_quota(&account);
+    if let Some(res) = &resource {
+        // Fixed short label: 配额 / Credits (don't use the long package name as prefix)
+        let quota_label = if lang == "zh" || lang == "zh-CN" { "配额" } else { "Credits" };
+        let quota_text = if res.total > 0.0 {
+            let remain_pct = ((res.remain / res.total) * 100.0).round().clamp(0.0, 100.0) as i32;
+            format!("{}: {:.2} / {:.2} ({}% {})",
+                quota_label, res.remain, res.total, remain_pct, get_text("left", lang))
         } else {
-            account.dosage_notify_en.as_deref().unwrap_or(code)
+            format!("{}: {:.2} / {:.2}", quota_label, res.remain, res.total)
         };
-        quota_lines.push(msg.to_string());
+        quota_lines.push(quota_text);
+    }
+
+    // Parse extra credit from quota_raw/usage_raw
+    let extra = extract_codebuddy_extra_credit(&account);
+    // Always show 加量包/Extra line (even if 0/0), matching the dashboard card
+    {
+        let extra_label = if lang == "zh" || lang == "zh-CN" { "加量包" } else { "Extra" };
+        quota_lines.push(format!("{}: {:.0} / {:.0}", extra_label, extra.remain, extra.total));
+    }
+
+    // Dosage notification status (fallback if no resource quota)
+    if resource.is_none() {
+        if let Some(code) = account.dosage_notify_code.as_deref() {
+            let msg = if lang == "zh" || lang == "zh-CN" {
+                account.dosage_notify_zh.as_deref().unwrap_or(code)
+            } else {
+                account.dosage_notify_en.as_deref().unwrap_or(code)
+            };
+            quota_lines.push(msg.to_string());
+        }
     }
 
     if quota_lines.is_empty() {
@@ -1028,6 +1059,147 @@ fn build_codebuddy_display_info(lang: &str) -> AccountDisplayInfo {
     AccountDisplayInfo {
         account: format!("📧 {}", display_email),
         quota_lines,
+    }
+}
+
+fn resolve_codebuddy_current_account(
+    accounts: &[crate::models::codebuddy::CodebuddyAccount],
+) -> Option<crate::models::codebuddy::CodebuddyAccount> {
+    if let Ok(settings) = crate::modules::codebuddy_instance::load_default_settings() {
+        if let Some(bind_id) = settings.bind_account_id {
+            let bind_id = bind_id.trim();
+            if !bind_id.is_empty() {
+                if let Some(account) = accounts.iter().find(|account| account.id == bind_id) {
+                    return Some(account.clone());
+                }
+            }
+        }
+    }
+
+    accounts
+        .iter()
+        .max_by_key(|account| account.last_used)
+        .cloned()
+}
+
+/// CodeBuddy resource quota parsed from quota_raw/usage_raw
+struct CodebuddyResourceQuota {
+    remain: f64,
+    total: f64,
+}
+
+struct CodebuddyExtraCredit {
+    remain: f64,
+    total: f64,
+}
+
+fn json_as_f64(value: &serde_json::Value) -> Option<f64> {
+    if let Some(v) = value.as_f64() {
+        if v.is_finite() { return Some(v); }
+    }
+    if let Some(s) = value.as_str() {
+        if let Ok(v) = s.trim().parse::<f64>() {
+            if v.is_finite() { return Some(v); }
+        }
+    }
+    None
+}
+
+fn extract_codebuddy_resource_accounts(
+    account: &crate::models::codebuddy::CodebuddyAccount,
+) -> Vec<serde_json::Value> {
+    // Try usage_raw first, then quota_raw.userResource
+    let usage_root = account.usage_raw.as_ref();
+    let quota_root = account.quota_raw.as_ref();
+    let user_resource = quota_root
+        .and_then(|q| q.get("userResource"))
+        .or(usage_root);
+
+    let accounts_array = user_resource
+        .and_then(|v| v.get("data"))
+        .and_then(|v| v.get("Response"))
+        .and_then(|v| v.get("Data"))
+        .and_then(|v| v.get("Accounts"))
+        .and_then(|v| v.as_array());
+
+    match accounts_array {
+        Some(arr) => arr.clone(),
+        None => Vec::new(),
+    }
+}
+
+fn is_codebuddy_active_resource(item: &serde_json::Value) -> bool {
+    let status = item.get("Status").and_then(|v| v.as_i64()).unwrap_or(-1);
+    status == 0 || status == 3 // valid=0, usedUp=3
+}
+
+fn is_codebuddy_extra_package(item: &serde_json::Value) -> bool {
+    item.get("PackageCode")
+        .and_then(|v| v.as_str())
+        .map(|code| code == "p_tcaca_extra")
+        .unwrap_or(false)
+}
+
+fn extract_codebuddy_resource_quota(
+    account: &crate::models::codebuddy::CodebuddyAccount,
+) -> Option<CodebuddyResourceQuota> {
+    // Only available if quota_binding cookie is present
+    let cookie = account.quota_binding.as_ref()?.cookie_header.trim();
+    if cookie.is_empty() { return None; }
+
+    let all = extract_codebuddy_resource_accounts(account);
+    let active: Vec<_> = all.iter()
+        .filter(|a| is_codebuddy_active_resource(a) && !is_codebuddy_extra_package(a))
+        .collect();
+
+    if active.is_empty() { return None; }
+
+    let mut total_agg: f64 = 0.0;
+    let mut remain_agg: f64 = 0.0;
+
+    for a in &active {
+        let cap = a.get("CapacitySizePrecise").and_then(json_as_f64)
+            .or_else(|| a.get("CapacitySize").and_then(json_as_f64))
+            .unwrap_or(0.0);
+        let rem = a.get("CapacityRemainPrecise").and_then(json_as_f64)
+            .or_else(|| a.get("CapacityRemain").and_then(json_as_f64))
+            .unwrap_or(0.0);
+        total_agg += cap;
+        remain_agg += rem;
+    }
+
+    if total_agg <= 0.0 { return None; }
+
+    Some(CodebuddyResourceQuota {
+        remain: remain_agg,
+        total: total_agg,
+    })
+}
+
+fn extract_codebuddy_extra_credit(
+    account: &crate::models::codebuddy::CodebuddyAccount,
+) -> CodebuddyExtraCredit {
+    let all = extract_codebuddy_resource_accounts(account);
+    let extras: Vec<_> = all.iter()
+        .filter(|a| is_codebuddy_active_resource(a) && is_codebuddy_extra_package(a))
+        .collect();
+
+    let mut total_agg: f64 = 0.0;
+    let mut remain_agg: f64 = 0.0;
+    for a in &extras {
+        let cap = a.get("CapacitySizePrecise").and_then(json_as_f64)
+            .or_else(|| a.get("CapacitySize").and_then(json_as_f64))
+            .unwrap_or(0.0);
+        let rem = a.get("CapacityRemainPrecise").and_then(json_as_f64)
+            .or_else(|| a.get("CapacityRemain").and_then(json_as_f64))
+            .unwrap_or(0.0);
+        total_agg += cap;
+        remain_agg += rem;
+    }
+
+    CodebuddyExtraCredit {
+        remain: remain_agg,
+        total: total_agg,
     }
 }
 
@@ -1057,32 +1229,65 @@ fn build_qoder_display_info(lang: &str) -> AccountDisplayInfo {
     };
 
     let mut quota_lines = Vec::new();
-    if let Some(plan) = account.plan_type.as_deref() {
-        let trimmed = plan.trim();
-        if !trimmed.is_empty() {
-            quota_lines.push(format!("Plan: {}", trimmed));
-        }
+
+    // Parse plan tag from raw data (matching frontend getRawPlanTag)
+    let plan_tag = json_first_string(&[
+        json_nested(&account.auth_user_plan_raw, &["plan_tier_name"]),
+        json_nested(&account.auth_user_plan_raw, &["tier_name"]),
+        json_nested(&account.auth_user_plan_raw, &["tierName"]),
+        json_nested(&account.auth_user_plan_raw, &["planTierName"]),
+        json_nested(&account.auth_user_plan_raw, &["plan"]),
+        json_nested(&account.auth_user_info_raw, &["userTag"]),
+        json_nested(&account.auth_user_info_raw, &["user_tag"]),
+        json_nested(&account.auth_credit_usage_raw, &["plan_tier_name"]),
+        json_nested(&account.auth_credit_usage_raw, &["tier_name"]),
+        json_nested(&account.auth_credit_usage_raw, &["tierName"]),
+        json_nested(&account.auth_credit_usage_raw, &["planTierName"]),
+        account.plan_type.as_deref().map(|s| s.to_string()),
+    ]);
+    if let Some(ref tag) = plan_tag {
+        quota_lines.push(format!("Plan: {}", tag));
     }
 
-    if let Some(pct) = account.credits_usage_percent {
-        let used_text = account
-            .credits_used
-            .map(|v| format!("{:.0}", v))
-            .unwrap_or_else(|| "--".to_string());
-        let total_text = account
-            .credits_total
-            .map(|v| format!("{:.0}", v))
-            .unwrap_or_else(|| "--".to_string());
-        quota_lines.push(format!(
-            "Credits: {:.0}% ({} / {})",
-            pct, used_text, total_text
-        ));
-    } else if let (Some(remaining), Some(total)) =
-        (account.credits_remaining, account.credits_total)
-    {
-        quota_lines.push(format!("Credits: {:.0} / {:.0}", remaining, total));
+    // Parse userQuota from auth_credit_usage_raw / auth_user_plan_raw / auth_user_info_raw
+    let user_quota = parse_qoder_quota_bucket(&[
+        json_nested_obj(&account.auth_credit_usage_raw, &["userQuota"]),
+        json_nested_obj(&account.auth_user_plan_raw, &["userQuota"]),
+        json_nested_obj(&account.auth_user_info_raw, &["userQuota"]),
+    ], Some((&account.credits_used, &account.credits_total, &account.credits_remaining)));
+
+    let credits_label = if lang == "zh" || lang == "zh-CN" { "套餐内 Credits" } else { "Credits" };
+    quota_lines.push(format_qoder_quota_line(lang, credits_label, &plan_tag, &user_quota));
+
+    // Parse addOnQuota
+    let addon_quota = parse_qoder_quota_bucket(&[
+        json_nested_obj(&account.auth_credit_usage_raw, &["addOnQuota"]),
+        json_nested_obj(&account.auth_credit_usage_raw, &["addonQuota"]),
+        json_nested_obj(&account.auth_credit_usage_raw, &["add_on_quota"]),
+        json_nested_obj(&account.auth_user_plan_raw, &["addOnQuota"]),
+        json_nested_obj(&account.auth_user_plan_raw, &["addonQuota"]),
+        json_nested_obj(&account.auth_user_plan_raw, &["add_on_quota"]),
+    ], None);
+
+    let addon_label = if lang == "zh" || lang == "zh-CN" { "附加 Credits" } else { "Add-on Credits" };
+    quota_lines.push(format_qoder_quota_line(lang, addon_label, &None, &addon_quota));
+
+    // Parse shared credit package
+    let shared_used = json_first_f64(&[
+        json_nested_f64(&account.auth_credit_usage_raw, &["orgResourcePackage", "used"]),
+        json_nested_f64(&account.auth_credit_usage_raw, &["orgResourcePackage", "usage"]),
+        json_nested_f64(&account.auth_credit_usage_raw, &["orgResourcePackage", "consumed"]),
+        json_nested_f64(&account.auth_credit_usage_raw, &["orgResourcePackage", "count"]),
+        json_nested_f64(&account.auth_credit_usage_raw, &["organizationResourcePackage", "used"]),
+        json_nested_f64(&account.auth_credit_usage_raw, &["sharedCreditPackage", "used"]),
+        json_nested_f64(&account.auth_credit_usage_raw, &["resourcePackage", "used"]),
+        json_nested_f64(&account.auth_user_plan_raw, &["orgResourcePackage", "used"]),
+    ]);
+    let shared_label = if lang == "zh" || lang == "zh-CN" { "共享资源包" } else { "Shared Package" };
+    if let Some(used) = shared_used {
+        quota_lines.push(format!("{}: {:.0}", shared_label, used));
     } else {
-        quota_lines.push(get_text("loading", lang));
+        quota_lines.push(format!("{}: --", shared_label));
     }
 
     let display_email = first_non_empty(&[
@@ -1099,6 +1304,115 @@ fn build_qoder_display_info(lang: &str) -> AccountDisplayInfo {
     }
 }
 
+/// Qoder quota bucket parsed from nested JSON
+struct QoderQuotaBucket {
+    used: Option<f64>,
+    total: Option<f64>,
+    remaining: Option<f64>,
+    percentage: Option<f64>,
+}
+
+fn parse_qoder_quota_bucket(
+    sources: &[Option<serde_json::Value>],
+    fallback: Option<(&Option<f64>, &Option<f64>, &Option<f64>)>,
+) -> QoderQuotaBucket {
+    let raw = sources.iter().find_map(|s| s.clone());
+
+    let used = raw.as_ref()
+        .and_then(|r| json_first_f64(&[
+            r.get("used").and_then(json_as_f64),
+            r.get("usage").and_then(json_as_f64),
+            r.get("consumed").and_then(json_as_f64),
+        ]))
+        .or_else(|| fallback.and_then(|(u, _, _)| *u));
+
+    let total = raw.as_ref()
+        .and_then(|r| json_first_f64(&[
+            r.get("total").and_then(json_as_f64),
+            r.get("quota").and_then(json_as_f64),
+            r.get("limit").and_then(json_as_f64),
+        ]))
+        .or_else(|| fallback.and_then(|(_, t, _)| *t));
+
+    let remaining = raw.as_ref()
+        .and_then(|r| json_first_f64(&[
+            r.get("remaining").and_then(json_as_f64),
+            r.get("available").and_then(json_as_f64),
+            r.get("left").and_then(json_as_f64),
+        ]))
+        .or_else(|| fallback.and_then(|(_, _, rem)| *rem))
+        .or_else(|| match (total, used) {
+            (Some(t), Some(u)) => Some(t - u),
+            _ => None,
+        });
+
+    let percentage = raw.as_ref()
+        .and_then(|r| json_first_f64(&[
+            r.get("percentage").and_then(json_as_f64),
+            r.get("usagePercent").and_then(json_as_f64),
+            r.get("usage_percentage").and_then(json_as_f64),
+        ]))
+        .or_else(|| match (total, used) {
+            (Some(t), Some(u)) if t > 0.0 => Some((u / t) * 100.0),
+            _ => None,
+        });
+
+    QoderQuotaBucket { used, total, remaining, percentage }
+}
+
+/// Format a Qoder quota line like "套餐内 Credits [Free]: 0% 0 / 0"
+fn format_qoder_quota_line(
+    _lang: &str,
+    label: &str,
+    plan_tag: &Option<String>,
+    bucket: &QoderQuotaBucket,
+) -> String {
+    let pct_text = bucket.percentage
+        .map(|p| format!("{:.0}%", p.clamp(0.0, 100.0)))
+        .unwrap_or_else(|| "0%".to_string());
+    let used_text = bucket.used.map(|v| format!("{:.0}", v)).unwrap_or_else(|| "0".to_string());
+    let total_text = bucket.total.map(|v| format!("{:.0}", v)).unwrap_or_else(|| "0".to_string());
+
+    if let Some(tag) = plan_tag {
+        format!("{} [{}]: {} {} / {}", label, tag, pct_text, used_text, total_text)
+    } else {
+        format!("{}: {} {} / {}", label, pct_text, used_text, total_text)
+    }
+}
+
+/// Helpers for navigating nested JSON
+fn json_nested(root: &Option<serde_json::Value>, path: &[&str]) -> Option<String> {
+    let mut current = root.as_ref()?;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    current.as_str().map(|s| s.to_string())
+}
+
+fn json_nested_obj(root: &Option<serde_json::Value>, path: &[&str]) -> Option<serde_json::Value> {
+    let mut current = root.as_ref()?;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    if current.is_object() { Some(current.clone()) } else { None }
+}
+
+fn json_nested_f64(root: &Option<serde_json::Value>, path: &[&str]) -> Option<f64> {
+    let mut current = root.as_ref()?;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    json_as_f64(current)
+}
+
+fn json_first_string(values: &[Option<String>]) -> Option<String> {
+    values.iter().find_map(|v| v.as_ref().filter(|s| !s.trim().is_empty()).cloned())
+}
+
+fn json_first_f64(values: &[Option<f64>]) -> Option<f64> {
+    values.iter().find_map(|v| *v)
+}
+
 fn build_trae_display_info(lang: &str) -> AccountDisplayInfo {
     let accounts = crate::modules::trae_account::list_accounts();
     let Some(account) = resolve_trae_current_account(&accounts) else {
@@ -1109,28 +1423,72 @@ fn build_trae_display_info(lang: &str) -> AccountDisplayInfo {
     };
 
     let mut quota_lines = Vec::new();
-    if let Some(plan) = account.plan_type.as_deref() {
-        let trimmed = plan.trim();
-        if !trimmed.is_empty() {
-            quota_lines.push(format!("Plan: {}", trimmed));
+
+    // Parse usage from trae_usage_raw
+    let trae_usage = extract_trae_usage(&account);
+    if let Some(ref usage) = trae_usage {
+        // Plan badge from usage identity
+        if let Some(ref identity) = usage.identity_str {
+            if !identity.is_empty() {
+                quota_lines.push(format!("Plan: {}", identity));
+            }
+        }
+
+        // Usage percentage + USD amounts
+        if usage.total_usd > 0.0 {
+            let used_pct = ((usage.spent_usd / usage.total_usd) * 100.0).round().clamp(0.0, 100.0) as i32;
+            let reset_text = usage.reset_at.map(|ts| format_reset_time_from_ts(lang, Some(ts)));
+            quota_lines.push(format_quota_line(
+                lang,
+                if lang == "zh" || lang == "zh-CN" { "配额" } else { "Quota" },
+                &format!("{}%", used_pct),
+                reset_text.as_deref(),
+            ));
+            quota_lines.push(format!("${:.2} / ${:.2}", usage.spent_usd, usage.total_usd));
+        } else {
+            // total_usd is 0 — show 0% with $0 / $0
+            let reset_text = usage.reset_at.map(|ts| format_reset_time_from_ts(lang, Some(ts)));
+            quota_lines.push(format_quota_line(
+                lang,
+                if lang == "zh" || lang == "zh-CN" { "配额" } else { "Quota" },
+                "0%",
+                reset_text.as_deref(),
+            ));
+            quota_lines.push(format!("${:.0} / ${:.0}", usage.spent_usd, usage.total_usd));
         }
     }
 
+    // Fallback: show plan_type from account field if no usage data
+    if trae_usage.is_none() {
+        if let Some(plan) = account.plan_type.as_deref() {
+            let trimmed = plan.trim();
+            if !trimmed.is_empty() {
+                quota_lines.push(format!("Plan: {}", trimmed));
+            }
+        }
+    }
+
+    // Add subscription reset time if available
     if let Some(reset_ts) = account.plan_reset_at {
-        quota_lines.push(format!(
-            "{} {}",
-            get_text("subscription_reset", lang),
-            format_reset_time_from_ts(lang, Some(reset_ts))
-        ));
+        // Only show if not already shown as part of usage line
+        let already_has_reset = trae_usage.as_ref().and_then(|u| u.reset_at).is_some();
+        if !already_has_reset {
+            quota_lines.push(format!(
+                "{}: {}",
+                get_text("subscription_reset", lang),
+                format_reset_time_from_ts(lang, Some(reset_ts))
+            ));
+        }
     }
 
     if quota_lines.is_empty() {
         quota_lines.push(get_text("loading", lang));
     }
 
+    // Prefer nickname > email > user_id > id
     let display_email = first_non_empty(&[
-        Some(account.email.as_str()),
         account.nickname.as_deref(),
+        Some(account.email.as_str()),
         account.user_id.as_deref(),
         Some(account.id.as_str()),
     ])
@@ -1140,6 +1498,113 @@ fn build_trae_display_info(lang: &str) -> AccountDisplayInfo {
         account: format!("📧 {}", display_email),
         quota_lines,
     }
+}
+
+struct TraeUsageSummary {
+    identity_str: Option<String>,
+    spent_usd: f64,
+    total_usd: f64,
+    reset_at: Option<i64>,
+}
+
+fn extract_trae_usage(
+    account: &crate::models::trae::TraeAccount,
+) -> Option<TraeUsageSummary> {
+    let usage_root = account.trae_usage_raw.as_ref()?.as_object()?;
+
+    // Check API code
+    if let Some(code) = usage_root.get("code").and_then(|v| v.as_i64()) {
+        if code != 0 { return None; }
+    }
+
+    let packs = usage_root.get("user_entitlement_pack_list")
+        .and_then(|v| v.as_array())?;
+
+    if packs.is_empty() { return None; }
+
+    // Product type constants (matching frontend trae.ts exactly)
+    const PRODUCT_FREE: i64 = 0;
+    const PRODUCT_PRO: i64 = 1;
+    // const PRODUCT_PACKAGE: i64 = 2;
+    const PRODUCT_PROMO_CODE: i64 = 3;
+    const PRODUCT_PRO_PLUS: i64 = 4;
+    // const PRODUCT_5_UNUSED: i64 = 5;
+    const PRODUCT_ULTRA: i64 = 6;
+    // const PRODUCT_PAY_GO: i64 = 7;
+    const PRODUCT_LITE: i64 = 8;
+    const PRODUCT_TRIAL: i64 = 9;
+
+    let get_product_type = |pack: &serde_json::Value| -> i64 {
+        // Try entitlement_base_info.product_type first, then pack.product_type
+        pack.get("entitlement_base_info")
+            .and_then(|e| e.get("product_type"))
+            .and_then(|v| v.as_i64())
+            .or_else(|| pack.get("product_type").and_then(|v| v.as_i64()))
+            .unwrap_or(-1)
+    };
+
+    // Filter out promo code packs
+    let valid_packs: Vec<_> = packs.iter()
+        .filter(|p| get_product_type(p) != PRODUCT_PROMO_CODE)
+        .collect();
+
+    if valid_packs.is_empty() { return None; }
+
+    // Find best pack (priority: ultra > pro_plus > pro > trial > lite > free)
+    let find_by_type = |product_type: i64| -> Option<&serde_json::Value> {
+        valid_packs.iter().find(|p| get_product_type(p) == product_type).copied()
+    };
+
+    let selected_pack = find_by_type(PRODUCT_ULTRA)
+        .or_else(|| find_by_type(PRODUCT_PRO_PLUS))
+        .or_else(|| find_by_type(PRODUCT_PRO))
+        .or_else(|| find_by_type(PRODUCT_TRIAL))
+        .or_else(|| find_by_type(PRODUCT_LITE))
+        .or_else(|| find_by_type(PRODUCT_FREE));
+
+    let selected_pack = selected_pack?;
+
+    // Extract usage: pack.usage.basic_usage_amount
+    let usage_obj = selected_pack.get("usage");
+    let spent_usd = usage_obj
+        .and_then(|u| u.get("basic_usage_amount").or_else(|| u.get("basic_usage")))
+        .and_then(json_as_f64)
+        .unwrap_or(0.0);
+
+    // Extract quota: pack.entitlement_base_info.quota.basic_usage_limit
+    let entitlement_base = selected_pack.get("entitlement_base_info");
+    let quota_obj = entitlement_base.and_then(|e| e.get("quota"));
+    let total_usd = quota_obj
+        .and_then(|q| q.get("basic_usage_limit").or_else(|| q.get("basic_quota")))
+        .and_then(json_as_f64)
+        .unwrap_or(0.0);
+
+    // Extract reset_at: pack.entitlement_base_info.end_time (+1)
+    let reset_at = entitlement_base
+        .and_then(|e| e.get("end_time"))
+        .and_then(|v| {
+            v.as_i64()
+                .or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+        })
+        .filter(|ts| *ts > 0)
+        .map(|ts| {
+            let normalized = if ts > 1_000_000_000_000 { ts / 1000 } else { ts };
+            normalized + 1
+        });
+
+    // Identity string from usage
+    let identity_str = usage_obj
+        .and_then(|u| u.get("identity_str"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.to_string());
+
+    Some(TraeUsageSummary {
+        identity_str,
+        spent_usd,
+        total_usd,
+        reset_at,
+    })
 }
 
 #[derive(Debug, Clone, Default)]
@@ -2094,6 +2559,7 @@ fn get_text(key: &str, lang: &str) -> String {
         ("ghcp_inline", "zh-cn") => "Inline".to_string(),
         ("ghcp_chat", "zh-cn") => "Chat".to_string(),
         ("ghcp_premium", "zh-cn") => "Premium".to_string(),
+        ("subscription_reset", "zh-cn") => "订阅重置".to_string(),
         ("more_platforms", "zh-cn") => "更多平台".to_string(),
         ("no_platform_selected", "zh-cn") => "未选择托盘平台".to_string(),
 
@@ -2112,6 +2578,7 @@ fn get_text(key: &str, lang: &str) -> String {
         ("ghcp_inline", "zh-tw") => "Inline".to_string(),
         ("ghcp_chat", "zh-tw") => "Chat".to_string(),
         ("ghcp_premium", "zh-tw") => "Premium".to_string(),
+        ("subscription_reset", "zh-tw") => "訂閱重置".to_string(),
         ("more_platforms", "zh-tw") => "更多平台".to_string(),
         ("no_platform_selected", "zh-tw") => "未選擇托盤平台".to_string(),
 
@@ -2130,6 +2597,7 @@ fn get_text(key: &str, lang: &str) -> String {
         ("ghcp_inline", "en") => "Inline".to_string(),
         ("ghcp_chat", "en") => "Chat".to_string(),
         ("ghcp_premium", "en") => "Premium".to_string(),
+        ("subscription_reset", "en") => "Subscription reset".to_string(),
         ("more_platforms", "en") => "More platforms".to_string(),
         ("no_platform_selected", "en") => "No tray platforms selected".to_string(),
 
@@ -2148,6 +2616,7 @@ fn get_text(key: &str, lang: &str) -> String {
         ("ghcp_inline", "ja") => "Inline".to_string(),
         ("ghcp_chat", "ja") => "Chat".to_string(),
         ("ghcp_premium", "ja") => "Premium".to_string(),
+        ("subscription_reset", "ja") => "サブスクリプションリセット".to_string(),
         ("more_platforms", "ja") => "その他のプラットフォーム".to_string(),
         ("no_platform_selected", "ja") => {
             "トレイに表示するプラットフォームがありません".to_string()
@@ -2168,6 +2637,7 @@ fn get_text(key: &str, lang: &str) -> String {
         ("ghcp_inline", "ru") => "Inline".to_string(),
         ("ghcp_chat", "ru") => "Chat".to_string(),
         ("ghcp_premium", "ru") => "Premium".to_string(),
+        ("subscription_reset", "ru") => "Сброс подписки".to_string(),
         ("more_platforms", "ru") => "Другие платформы".to_string(),
         ("no_platform_selected", "ru") => "Платформы для трея не выбраны".to_string(),
 
@@ -2186,6 +2656,7 @@ fn get_text(key: &str, lang: &str) -> String {
         ("ghcp_inline", _) => "Inline".to_string(),
         ("ghcp_chat", _) => "Chat".to_string(),
         ("ghcp_premium", _) => "Premium".to_string(),
+        ("subscription_reset", _) => "Subscription reset".to_string(),
         ("more_platforms", _) => "More platforms".to_string(),
         ("no_platform_selected", _) => "No tray platforms selected".to_string(),
 

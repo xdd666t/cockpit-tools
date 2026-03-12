@@ -29,7 +29,9 @@
         "addOnPromptCredits": "Add-on prompt credits",
         "credits": "制作人员",
         "email": "邮箱",
-        "promptCredits": "User Prompt credits"
+        "promptCredits": "User Prompt credits",
+        "creditPackage": "附加 Credits",
+        "sharedCreditPackage": "共享资源包"
       },
       "empty": {
         "title": "暂无账号"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "Allowance resets {{dateText}}.",
         "resetUnknown": "Allowance resets -"
+      },
+      "updated": {
+        "label": "更新于 {{relative}}前"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "${{used}} / ${{total}}",
+      "usageUnknown": "用量：--",
       "resetAt": "订阅重置：{{date}}",
-      "resetUnknown": "重置时间未知"
+      "resetUnknown": "订阅重置：--",
+      "statusUnknown": "状态：--",
+      "statusNormal": "状态：正常",
+      "statusExhaustedFree": "状态：用量已耗尽，建议升级方案",
+      "statusExhaustedPro": "状态：用量已耗尽，建议升级方案或开启超额自动扣费",
+      "bonusUsed": "Bonus：+{{amount}}",
+      "bonusIncluded": "Bonus：已包含",
+      "bonusEmpty": "Bonus：--",
+      "packageConsuming": "用量包：消耗中",
+      "packageAvailable": "用量包：可用",
+      "packageEmpty": "用量包：--",
+      "payAsYouGoConsuming": "超额自动扣费：消耗中",
+      "payAsYouGoEnabled": "超额自动扣费：已开启",
+      "payAsYouGoEmpty": "超额自动扣费：--"
     },
     "flowNotice": {
       "title": "Trae 账号接入说明（点击展开/收起）",

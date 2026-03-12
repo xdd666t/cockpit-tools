@@ -29,7 +29,9 @@
         "addOnPromptCredits": "Doplňkové kredity promptů",
         "credits": "Kredity",
         "email": "E-mail",
-        "promptCredits": "Kredity promptů"
+        "promptCredits": "Kredity promptů",
+        "creditPackage": "Balíček kreditů",
+        "sharedCreditPackage": "Sdílený balíček kreditů"
       },
       "empty": {
         "title": "Žádné účty"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "Limit se obnoví {{dateText}}.",
         "resetUnknown": "Limit se obnoví -"
+      },
+      "updated": {
+        "label": "Aktualizováno před {{relative}}"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "Vyuzito $ {{used}} z $ {{total}}",
+      "usageUnknown": "Vyuziti: --",
       "resetAt": "Cas resetu: {{date}}",
-      "resetUnknown": "Cas resetu neni znam"
+      "resetUnknown": "Cas resetu neni znam",
+      "statusUnknown": "Stav: neznamy",
+      "statusNormal": "Stav: normalni",
+      "statusExhaustedFree": "Stav: vyuziti vycerpano, doporucujeme upgrade",
+      "statusExhaustedPro": "Stav: vyuziti vycerpano, upgradujte nebo zapnete prubezne uctovani",
+      "bonusUsed": "Bonus navic: +{{amount}}",
+      "bonusIncluded": "Bonus navic: zahrnut",
+      "bonusEmpty": "Bonus navic: --",
+      "packageConsuming": "Balicek pouziti: cerpa se",
+      "packageAvailable": "Balicek pouziti: dostupny",
+      "packageEmpty": "Balicek pouziti: --",
+      "payAsYouGoConsuming": "Prubezne uctovani: cerpa se",
+      "payAsYouGoEnabled": "Prubezne uctovani: zapnuto",
+      "payAsYouGoEmpty": "Prubezne uctovani: --"
     },
     "flowNotice": {
       "title": "Prirucka k uctu Trae (kliknutim rozbalit/sbalit)",

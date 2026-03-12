@@ -29,7 +29,9 @@
         "addOnPromptCredits": "Zusatz-Prompt-Credits",
         "credits": "Credits",
         "email": "E-Mail",
-        "promptCredits": "Prompt-Credits"
+        "promptCredits": "Prompt-Credits",
+        "creditPackage": "Credit-Paket",
+        "sharedCreditPackage": "Geteiltes Credit-Paket"
       },
       "empty": {
         "title": "Keine Konten"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "Kontingent wird {{dateText}} zurückgesetzt.",
         "resetUnknown": "Kontingent wird zurückgesetzt -"
+      },
+      "updated": {
+        "label": "Vor {{relative}} aktualisiert"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "Verbraucht $ {{used}} von $ {{total}}",
+      "usageUnknown": "Nutzung: --",
       "resetAt": "Zurucksetzung: {{date}}",
-      "resetUnknown": "Zeit der Zurucksetzung unbekannt"
+      "resetUnknown": "Zeit der Zurucksetzung unbekannt",
+      "statusUnknown": "Status: unbekannt",
+      "statusNormal": "Status: normal",
+      "statusExhaustedFree": "Status: Nutzung aufgebraucht, Upgrade empfohlen",
+      "statusExhaustedPro": "Status: Nutzung aufgebraucht, bitte upgraden oder nutzungsbasierte Abrechnung aktivieren",
+      "bonusUsed": "Bonusguthaben: +{{amount}}",
+      "bonusIncluded": "Bonusguthaben: enthalten",
+      "bonusEmpty": "Bonusguthaben: --",
+      "packageConsuming": "Nutzungspaket: wird verbraucht",
+      "packageAvailable": "Nutzungspaket: verfugbar",
+      "packageEmpty": "Nutzungspaket: --",
+      "payAsYouGoConsuming": "Nutzung nach Verbrauch: wird verbraucht",
+      "payAsYouGoEnabled": "Nutzung nach Verbrauch: aktiviert",
+      "payAsYouGoEmpty": "Nutzung nach Verbrauch: --"
     },
     "flowNotice": {
       "title": "Trae-Kontoleitfaden (zum Auf- und Zuklappen klicken)",

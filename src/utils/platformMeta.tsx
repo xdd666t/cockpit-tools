@@ -27,7 +27,7 @@ export function getPlatformLabel(platformId: PlatformId, _t: TFunction): string 
     case 'cursor':
       return 'Cursor';
     case 'gemini':
-      return _t('nav.gemini', 'Gemini');
+      return _t('nav.gemini', 'Gemini CLI');
     case 'codebuddy':
       return 'CodeBuddy';
     case 'qoder':

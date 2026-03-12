@@ -661,6 +661,126 @@
   border-radius: var(--radius-sm);
 }
 
+.trae-accounts-page .ghcp-account-card {
+  padding: 18px;
+  gap: 12px;
+  min-height: 0;
+}
+
+.trae-accounts-page .ghcp-quota-section {
+  gap: 0;
+}
+
+.trae-accounts-page .ghcp-account-card .card-footer {
+  padding-top: 10px;
+}
+
+.trae-accounts-page .trae-compact-quota {
+  gap: 8px;
+}
+
+.trae-accounts-page .trae-compact-quota-header {
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.trae-accounts-page .trae-compact-quota-main {
+  margin-left: auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trae-accounts-page .trae-compact-quota-total {
+  font-size: 12px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+
+.trae-accounts-page .trae-compact-quota-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.trae-accounts-page .trae-compact-quota-status,
+.trae-accounts-page .trae-compact-quota-reset {
+  min-width: 0;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trae-accounts-page .trae-compact-quota-status {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.trae-accounts-page .trae-compact-quota-status.normal {
+  color: var(--success);
+}
+
+.trae-accounts-page .trae-compact-quota-status.warning {
+  color: #d97706;
+}
+
+.trae-accounts-page .trae-compact-quota-status.unknown,
+.trae-accounts-page .trae-compact-quota-reset {
+  color: var(--text-secondary);
+}
+
+.trae-accounts-page .trae-compact-quota-reset {
+  text-align: right;
+}
+
+.trae-accounts-page .trae-compact-quota-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trae-accounts-page .trae-compact-quota-pill {
+  max-width: 100%;
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
+.trae-accounts-page .trae-compact-quota.is-table {
+  min-width: 260px;
+  gap: 6px;
+}
+
+.trae-accounts-page .trae-compact-quota.is-table .trae-compact-quota-total {
+  font-size: 11px;
+}
+
+.trae-accounts-page .trae-compact-quota.is-table .trae-compact-quota-pill {
+  padding: 3px 7px;
+}
+
+@media (max-width: 720px) {
+  .trae-accounts-page .trae-compact-quota-meta-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .trae-accounts-page .trae-compact-quota-reset {
+    text-align: left;
+  }
+}
+
 .qoder-accounts-page .qoder-account-subline {
   margin-top: -2px;
 }
@@ -670,49 +790,23 @@
   letter-spacing: -0.2px;
 }
 
-.qoder-accounts-page .qoder-usage-overview {
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--border-light);
-  border-radius: 12px;
-  background: var(--bg-tertiary);
-}
-
-.qoder-accounts-page .qoder-usage-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.qoder-accounts-page .qoder-usage-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.qoder-accounts-page .qoder-usage-link {
-  height: 22px;
-  border: 1px solid var(--border-light);
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.08);
-  color: var(--text-secondary);
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0 8px;
-}
-
-.qoder-accounts-page .qoder-usage-link:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.qoder-accounts-page .qoder-usage-section {
+  gap: 14px;
 }
 
 .qoder-accounts-page .qoder-usage-item {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+}
+
+.qoder-accounts-page .qoder-usage-item.is-stat {
+  gap: 4px;
+}
+
+.qoder-accounts-page .qoder-usage-section .quota-bar-track {
+  background: rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(148, 163, 184, 0.24);
 }
 
 .qoder-accounts-page .qoder-usage-summary-row {
@@ -720,6 +814,10 @@
   grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: 8px;
+}
+
+.qoder-accounts-page .qoder-usage-item.is-stat .qoder-usage-summary-row {
+  grid-template-columns: 1fr auto;
 }
 
 .qoder-accounts-page .qoder-usage-label-wrap {
@@ -741,49 +839,38 @@
   font-size: 10px;
 }
 
-.qoder-accounts-page .qoder-usage-total {
-  font-size: 12px;
-  color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-weight: 600;
-  letter-spacing: -0.2px;
+.qoder-accounts-page .qoder-usage-meta-primary {
   white-space: nowrap;
 }
 
-.qoder-accounts-page .qoder-usage-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.qoder-accounts-page .qoder-usage-meta-secondary {
+  min-width: 0;
+  text-align: right;
 }
 
-.qoder-accounts-page .qoder-usage-upgrade-hint {
-  font-size: 11px;
-  color: var(--text-secondary);
+.qoder-accounts-page .qoder-usage-item.is-stat .qoder-usage-meta-row-stat {
+  justify-content: flex-end;
+}
+
+.qoder-accounts-page .qoder-usage-reset-note {
+  margin-top: -2px;
   line-height: 1.4;
 }
 
-.qoder-accounts-page .qoder-usage-upgrade-btn {
-  min-width: 50px;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.qoder-accounts-page .qoder-usage-upgrade-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .qoder-accounts-page .qoder-table-quota {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
+  gap: 8px;
+  min-width: 230px;
+}
+
+.qoder-accounts-page .qoder-table-quota-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.qoder-accounts-page .qoder-table-quota-item.is-stat {
   gap: 4px;
 }
 
@@ -808,6 +895,11 @@
   font-size: 11px;
   color: var(--text-secondary);
   font-family: var(--font-mono);
+}
+
+.qoder-accounts-page .qoder-table-reset {
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .ghcp-accounts-page .windsurf-credit-item {
@@ -1845,20 +1937,9 @@
   color: #93c5fd;
 }
 
-[data-theme="dark"] .qoder-accounts-page .qoder-usage-overview {
-  border-color: rgba(148, 163, 184, 0.24);
-  background: rgba(2, 6, 23, 0.45);
-}
-
-[data-theme="dark"] .qoder-accounts-page .qoder-usage-link {
-  border-color: rgba(148, 163, 184, 0.32);
-  background: rgba(15, 23, 42, 0.65);
-  color: rgba(226, 232, 240, 0.76);
-}
-
-[data-theme="dark"] .qoder-accounts-page .qoder-usage-upgrade-btn {
-  border-color: rgba(148, 163, 184, 0.32);
-  background: rgba(15, 23, 42, 0.72);
+[data-theme="dark"] .qoder-accounts-page .qoder-usage-section .quota-bar-track {
+  background: rgba(30, 41, 59, 0.72);
+  border-color: rgba(148, 163, 184, 0.3);
 }
 
 @keyframes fadeUp {

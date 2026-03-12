@@ -29,7 +29,9 @@
         "addOnPromptCredits": "Crediti prompt aggiuntivi",
         "credits": "Crediti",
         "email": "E-mail",
-        "promptCredits": "Crediti prompt"
+        "promptCredits": "Crediti prompt",
+        "creditPackage": "Pacchetto crediti",
+        "sharedCreditPackage": "Pacchetto crediti condiviso"
       },
       "empty": {
         "title": "Nessun account"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "Il limite si reimposta {{dateText}}.",
         "resetUnknown": "Il limite si reimposta -"
+      },
+      "updated": {
+        "label": "Aggiornato {{relative}} fa"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "Utilizzati $ {{used}} di $ {{total}}",
+      "usageUnknown": "Utilizzo: --",
       "resetAt": "Reset: {{date}}",
-      "resetUnknown": "Ora di reset sconosciuta"
+      "resetUnknown": "Ora di reset sconosciuta",
+      "statusUnknown": "Stato: sconosciuto",
+      "statusNormal": "Stato: normale",
+      "statusExhaustedFree": "Stato: utilizzo esaurito, upgrade consigliato",
+      "statusExhaustedPro": "Stato: utilizzo esaurito, aggiorna il piano o abilita il consumo on-demand",
+      "bonusUsed": "Credito bonus: +{{amount}}",
+      "bonusIncluded": "Credito bonus: incluso",
+      "bonusEmpty": "Credito bonus: --",
+      "packageConsuming": "Pacchetto utilizzo: in consumo",
+      "packageAvailable": "Pacchetto utilizzo: disponibile",
+      "packageEmpty": "Pacchetto utilizzo: --",
+      "payAsYouGoConsuming": "Consumo on-demand: in consumo",
+      "payAsYouGoEnabled": "Consumo on-demand: attivo",
+      "payAsYouGoEmpty": "Consumo on-demand: --"
     },
     "flowNotice": {
       "title": "Guida account Trae (clicca per espandere/ridurre)",

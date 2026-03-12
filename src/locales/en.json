@@ -29,7 +29,9 @@
         "addOnPromptCredits": "Add-on prompt credits",
         "credits": "Credits",
         "email": "Email",
-        "promptCredits": "User Prompt credits"
+        "promptCredits": "User Prompt credits",
+        "creditPackage": "Credit Package",
+        "sharedCreditPackage": "Shared Credit Package"
       },
       "empty": {
         "title": "No Accounts"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "Allowance resets {{dateText}}.",
         "resetUnknown": "Allowance resets -"
+      },
+      "updated": {
+        "label": "Updated {{relative}} ago"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "${{used}} / ${{total}}",
+      "usageUnknown": "Usage: --",
       "resetAt": "Subscription reset: {{date}}",
-      "resetUnknown": "Reset time unknown"
+      "resetUnknown": "Subscription reset: --",
+      "statusUnknown": "Status: --",
+      "statusNormal": "Status: Normal",
+      "statusExhaustedFree": "Status: Usage exhausted, upgrade recommended",
+      "statusExhaustedPro": "Status: Usage exhausted, upgrade or enable on-demand usage",
+      "bonusUsed": "Bonus: +{{amount}}",
+      "bonusIncluded": "Bonus: Included",
+      "bonusEmpty": "Bonus: --",
+      "packageConsuming": "Package: Consuming",
+      "packageAvailable": "Package: Available",
+      "packageEmpty": "Package: --",
+      "payAsYouGoConsuming": "On-Demand Usage: Consuming",
+      "payAsYouGoEnabled": "On-Demand Usage: Enabled",
+      "payAsYouGoEmpty": "On-Demand Usage: --"
     },
     "flowNotice": {
       "title": "Trae account guide (click to expand/collapse)",

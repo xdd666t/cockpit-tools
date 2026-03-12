@@ -29,7 +29,9 @@
         "addOnPromptCredits": "Crédits de prompts additionnels",
         "credits": "Crédits",
         "email": "E-mail",
-        "promptCredits": "Crédits de prompts"
+        "promptCredits": "Crédits de prompts",
+        "creditPackage": "Pack de crédits",
+        "sharedCreditPackage": "Pack de crédits partagé"
       },
       "empty": {
         "title": "Aucun compte"
@@ -141,6 +143,9 @@
       "usage": {
         "resetLine": "L'allocation se réinitialise {{dateText}}.",
         "resetUnknown": "Réinitialisation de l'allocation -"
+      },
+      "updated": {
+        "label": "Mis à jour il y a {{relative}}"
       }
     }
   },
@@ -2202,8 +2207,22 @@
     },
     "quota": {
       "usedOfTotal": "Utilise $ {{used}} sur $ {{total}}",
+      "usageUnknown": "Utilisation : --",
       "resetAt": "Reinitialisation : {{date}}",
-      "resetUnknown": "Heure de reinitialisation inconnue"
+      "resetUnknown": "Heure de reinitialisation inconnue",
+      "statusUnknown": "Statut : inconnu",
+      "statusNormal": "Statut : normal",
+      "statusExhaustedFree": "Statut : utilisation epuisee, mise a niveau recommandee",
+      "statusExhaustedPro": "Statut : utilisation epuisee, mettez a niveau ou activez la facturation a l'usage",
+      "bonusUsed": "Bonus : +{{amount}}",
+      "bonusIncluded": "Bonus : inclus",
+      "bonusEmpty": "Bonus : --",
+      "packageConsuming": "Pack d'utilisation : en cours",
+      "packageAvailable": "Pack d'utilisation : disponible",
+      "packageEmpty": "Pack d'utilisation : --",
+      "payAsYouGoConsuming": "Paiement a l'usage : en cours",
+      "payAsYouGoEnabled": "Paiement a l'usage : active",
+      "payAsYouGoEmpty": "Paiement a l'usage : --"
     },
     "flowNotice": {
       "title": "Guide du compte Trae (cliquez pour developper/reduire)",

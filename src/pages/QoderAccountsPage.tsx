@@ -40,8 +40,9 @@ import {
   QoderAccount,
   getQoderAccountDisplayEmail,
   getQoderPlanBadge,
+  getQoderSubscriptionInfo,
   getQoderUsage,
-  getQoderUsageOverview,
+  shouldShowQoderSubscriptionReset,
 } from '../types/qoder';
 import {
   isPrivacyModeEnabledByDefault,
@@ -57,6 +58,23 @@ const UNTAGGED_KEY = '__untagged__';
 type ViewMode = 'grid' | 'list';
 type SortBy = 'created_at' | 'plan' | 'quota';
 type SortDirection = 'asc' | 'desc';
+
+type QoderQuotaDisplayItem = {
+  key: 'included' | 'creditPackage' | 'sharedCreditPackage';
+  label: string;
+  normalizedPercent: number;
+  quotaClass: 'high' | 'medium' | 'critical';
+  percentageText: string | null;
+  valueText: string;
+  showProgress: boolean;
+};
+
+type QoderQuotaDisplay = {
+  planTag: string;
+  planClass: string;
+  items: QoderQuotaDisplayItem[];
+  resetText: string | null;
+};
 
 function readBooleanStorage(key: string, fallback: boolean) {
   try {
@@ -116,6 +134,18 @@ function formatDateTime(value: number): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function formatDisplayDate(value: number): string {
+  return new Date(value).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function formatQuotaValue(value: number | null | undefined): string {
+  return formatNumber(value ?? 0);
 }
 
 function resolveQoderPlanBadgeClass(plan: string): string {
@@ -981,46 +1011,165 @@ export function QoderAccountsPage() {
     await handleExportByIds(ids, 'qoder_accounts');
   }, [filteredIds, handleExportByIds, selected]);
 
+  const formatRelativeDuration = useCallback(
+    (seconds: number) => {
+      if (seconds < 60) {
+        return t('common.shared.time.lessThanMinute', '<1分钟');
+      }
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+
+      if (days > 0) {
+        const remainingHours = hours % 24;
+        if (remainingHours > 0) {
+          return t('common.shared.time.relativeDaysHours', '{{days}}天{{hours}}小时', {
+            days,
+            hours: remainingHours,
+          });
+        }
+        return t('common.shared.time.relativeDays', '{{days}}天', { days });
+      }
+      if (hours > 0) {
+        const remainingMinutes = minutes % 60;
+        if (remainingMinutes > 0) {
+          return t('common.shared.time.relativeHoursMinutes', '{{hours}}小时{{minutes}}分钟', {
+            hours,
+            minutes: remainingMinutes,
+          });
+        }
+        return t('common.shared.time.relativeHours', '{{hours}}小时', { hours });
+      }
+      return t('common.shared.time.relativeMinutes', '{{minutes}}分钟', { minutes });
+    },
+    [t],
+  );
+
+  const resolveUpdatedText = useCallback(
+    (account: QoderAccount) => {
+      const updatedAt = account.last_used || account.created_at || 0;
+      const secondsAgo = Math.max(0, Math.floor(Date.now() / 1000) - updatedAt);
+      return t('common.shared.updated.label', '更新于 {{relative}}前', {
+        relative: formatRelativeDuration(secondsAgo),
+      });
+    },
+    [formatRelativeDuration, t],
+  );
+
+  const resolveQuotaDisplay = useCallback(
+    (account: QoderAccount): QoderQuotaDisplay => {
+      const subscription = getQoderSubscriptionInfo(account);
+      const resetAt = shouldShowQoderSubscriptionReset(subscription) ? subscription.expiresAt : null;
+      const buildQuotaItem = (
+        key: 'included' | 'creditPackage',
+        label: string,
+        used: number | null | undefined,
+        total: number | null | undefined,
+        percentage: number | null | undefined,
+      ): QoderQuotaDisplayItem => {
+        const normalizedUsed = used ?? 0;
+        const normalizedTotal = total ?? 0;
+        const resolvedPercent =
+          percentage ?? (normalizedTotal > 0 ? (normalizedUsed / normalizedTotal) * 100 : 0);
+        const normalizedPercent = Math.max(0, Math.min(100, Math.round(resolvedPercent)));
+
+        return {
+          key,
+          label,
+          normalizedPercent,
+          quotaClass: computeQuotaClass(resolvedPercent),
+          percentageText: `${normalizedPercent}%`,
+          valueText: t('qoder.usageOverview.usedOfTotal', {
+            used: formatQuotaValue(normalizedUsed),
+            total: formatQuotaValue(normalizedTotal),
+            defaultValue: '{{used}} / {{total}}',
+          }),
+          showProgress: true,
+        };
+      };
+
+      return {
+        planTag: subscription.planTag,
+        planClass: resolveQoderPlanBadgeClass(subscription.planTag),
+        items: [
+          buildQuotaItem(
+            'included',
+            t('qoder.usageOverview.includedCredits', '套餐内 Credits'),
+            subscription.userQuota.used,
+            subscription.userQuota.total,
+            subscription.userQuota.percentage,
+          ),
+          buildQuotaItem(
+            'creditPackage',
+            t('common.shared.columns.creditPackage', 'Credit Package'),
+            subscription.addOnQuota.used,
+            subscription.addOnQuota.total,
+            subscription.addOnQuota.percentage,
+          ),
+          {
+            key: 'sharedCreditPackage',
+            label: t('common.shared.columns.sharedCreditPackage', 'Shared Credit Package'),
+            normalizedPercent: 0,
+            quotaClass: 'high',
+            percentageText: null,
+            valueText: formatQuotaValue(subscription.sharedCreditPackageUsed),
+            showProgress: false,
+          },
+        ],
+        resetText:
+          resetAt != null
+            ? t('trae.quota.resetAt', {
+                date: formatDisplayDate(resetAt),
+                defaultValue: 'Subscription reset: {{date}}',
+              })
+            : null,
+      };
+    },
+    [t],
+  );
+
   const renderQuotaSection = useCallback(
     (account: QoderAccount) => {
-      const overview = getQoderUsageOverview(account);
-      const percent = overview.usagePercent;
-      const normalizedPercent = percent == null ? 0 : Math.max(0, Math.min(100, Math.round(percent)));
-      const quotaClass = computeQuotaClass(percent);
-      const usedTotalText =
-        overview.creditsUsed != null && overview.creditsTotal != null
-          ? t('qoder.usageOverview.usedOfTotal', {
-              used: formatNumber(overview.creditsUsed),
-              total: formatNumber(overview.creditsTotal),
-              defaultValue: '{{used}} / {{total}}',
-            })
-          : t('qoder.usageOverview.usedEmpty', '-- / --');
+      const quota = resolveQuotaDisplay(account);
 
       return (
-        <div className="ghcp-quota-section qoder-usage-overview">
-          <div className="qoder-usage-header">
-            <span className="qoder-usage-title">{t('qoder.usageOverview.title', '用量概览')}</span>
-          </div>
-          <div className="quota-item qoder-usage-item">
-            <div className="qoder-usage-summary-row">
-              <div className="qoder-usage-label-wrap">
-                <span className="qoder-usage-label">
-                  {t('qoder.usageOverview.includedCredits', '套餐内 Credits')}
+        <div className="ghcp-quota-section qoder-usage-section">
+          {quota.items.map((item) => (
+            <div
+              key={item.key}
+              className={`quota-item windsurf-credit-item qoder-usage-item ${item.showProgress ? '' : 'is-stat'}`}
+            >
+              <div className="quota-header">
+                <span className="qoder-usage-label-wrap">
+                  <span className="quota-label qoder-usage-label">{item.label}</span>
+                  {item.key === 'included' && (
+                    <span className={`tier-badge ${quota.planClass} raw-value qoder-inline-plan-badge`}>
+                      {quota.planTag}
+                    </span>
+                  )}
                 </span>
               </div>
-              <span className={`quota-pct ${quotaClass}`}>
-                {percent == null ? '--' : `${normalizedPercent}%`}
-              </span>
-              <span className="qoder-usage-total">{usedTotalText}</span>
+              {item.showProgress && (
+                <div className="quota-bar-track">
+                  <div
+                    className={`quota-bar ${item.quotaClass}`}
+                    style={{ width: `${item.normalizedPercent}%` }}
+                  />
+                </div>
+              )}
+              <div className={`windsurf-credit-meta-row ${item.showProgress ? '' : 'qoder-usage-meta-row-stat'}`}>
+                {item.percentageText ? (
+                  <span className="windsurf-credit-left qoder-usage-meta-primary">{item.percentageText}</span>
+                ) : null}
+                <span className="windsurf-credit-used qoder-usage-meta-secondary">{item.valueText}</span>
+              </div>
             </div>
-            <div className="quota-bar-track">
-              <div className={`quota-bar ${quotaClass}`} style={{ width: `${normalizedPercent}%` }} />
-            </div>
-          </div>
+          ))}
+          {quota.resetText && <div className="quota-reset qoder-usage-reset-note">{quota.resetText}</div>}
         </div>
       );
     },
-    [t],
+    [resolveQuotaDisplay],
   );
 
   const renderGridCards = useCallback(
@@ -1034,9 +1183,7 @@ export function QoderAccountsPage() {
         const moreTagCount = Math.max(0, accountTags.length - visibleTags.length);
         const plan = getQoderPlanBadge(account);
         const planClass = resolveQoderPlanBadgeClass(plan);
-        const userIdText = account.user_id || account.id;
-        const accountIdLabel = t('common.shared.columns.userId', 'User ID');
-        const accountSubline = `${accountIdLabel}: ${maskAccountText(userIdText)}`;
+        const updatedText = resolveUpdatedText(account);
         const createdAtText = formatDateTime(account.created_at);
         const isRefreshing = refreshing === account.id;
         const isInjecting = injecting === account.id;
@@ -1057,13 +1204,13 @@ export function QoderAccountsPage() {
               <span className="account-email" title={maskedEmail}>
                 {maskedEmail}
               </span>
-              {isCurrent && <span className="current-tag">{t('accounts.status.current', '当前')}</span>}
               <span className={`tier-badge ${planClass} raw-value`}>{plan}</span>
+              {isCurrent && <span className="current-tag">{t('accounts.status.current', '当前')}</span>}
             </div>
 
             <div className="account-sub-line qoder-account-subline">
-              <span className="kiro-table-subline" title={accountSubline}>
-                {accountSubline}
+              <span className="kiro-table-subline" title={createdAtText}>
+                {updatedText}
               </span>
             </div>
 
@@ -1082,7 +1229,7 @@ export function QoderAccountsPage() {
 
             <div className="card-footer">
               <span className="card-date qoder-card-created-at" title={createdAtText}>
-                {createdAtText}
+                {updatedText}
               </span>
               <div className="card-actions">
                 <button
@@ -1143,6 +1290,7 @@ export function QoderAccountsPage() {
       maskAccountText,
       refreshing,
       renderQuotaSection,
+      resolveUpdatedText,
       selected,
       t,
       toggleSelect,
@@ -1154,17 +1302,7 @@ export function QoderAccountsPage() {
       items.map((account) => {
         const plan = getQoderPlanBadge(account);
         const planClass = resolveQoderPlanBadgeClass(plan);
-        const overview = getQoderUsageOverview(account);
-        const percent = overview.usagePercent;
-        const quotaClass = computeQuotaClass(percent);
-        const usedTotalText =
-          overview.creditsUsed != null && overview.creditsTotal != null
-            ? t('qoder.usageOverview.usedOfTotal', {
-                used: formatNumber(overview.creditsUsed),
-                total: formatNumber(overview.creditsTotal),
-                defaultValue: '{{used}} / {{total}}',
-              })
-            : t('qoder.usageOverview.usedEmpty', '-- / --');
+        const quota = resolveQuotaDisplay(account);
         const isCurrent = currentAccountId === account.id;
         const isSelected = selected.has(account.id);
         const isRefreshing = refreshing === account.id;
@@ -1187,10 +1325,38 @@ export function QoderAccountsPage() {
             </td>
             <td>
               <div className="qoder-table-quota">
-                <span className={`qoder-table-quota-pct ${quotaClass}`}>
-                  {percent == null ? '--' : `${Math.round(percent)}%`}
-                </span>
-                <span className="qoder-table-quota-total">{usedTotalText}</span>
+                {quota.items.map((item) => (
+                  <div
+                    key={item.key}
+                    className={`quota-item qoder-table-quota-item ${item.showProgress ? '' : 'is-stat'}`}
+                  >
+                    <div className="qoder-usage-summary-row">
+                      <span className="qoder-usage-label-wrap">
+                        <span className="quota-name qoder-usage-label">{item.label}</span>
+                        {item.key === 'included' && (
+                          <span className={`tier-badge raw-value ${quota.planClass} qoder-inline-plan-badge`}>
+                            {quota.planTag}
+                          </span>
+                        )}
+                      </span>
+                      {item.percentageText && (
+                        <span className={`quota-value qoder-table-quota-pct ${item.quotaClass}`}>
+                          {item.percentageText}
+                        </span>
+                      )}
+                      <span className="windsurf-credit-left qoder-table-quota-total">{item.valueText}</span>
+                    </div>
+                    {item.showProgress && (
+                      <div className="quota-progress-track">
+                        <div
+                          className={`quota-progress-bar ${item.quotaClass}`}
+                          style={{ width: `${item.normalizedPercent}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {quota.resetText && <div className="quota-reset qoder-table-reset">{quota.resetText}</div>}
               </div>
             </td>
             <td>{formatDateTime(account.created_at)}</td>
@@ -1253,6 +1419,7 @@ export function QoderAccountsPage() {
       injecting,
       maskAccountText,
       refreshing,
+      resolveQuotaDisplay,
       selected,
       t,
       toggleSelect,
