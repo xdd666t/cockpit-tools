@@ -1150,6 +1150,24 @@
   white-space: normal;
 }
 
+.quota-credits-field {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 6px;
+}
+
+.card-quota-grid .quota-credits-field,
+.quota-grid .quota-credits-field {
+  grid-column: 1 / -1;
+}
+
+.quota-credits-label {
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
 /* Actions */
 .action-buttons {
   display: flex;
