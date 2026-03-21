@@ -7,6 +7,12 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
 ---
+## [0.17.8] - 2026-03-21
+
+### 修复
+- **Codex API Key 账号在配置自定义 Base URL 时，现已向 `~/.codex/config.toml` 写入官方要求的 `openai_base_url` 键**：切换账号与本地注入流程不再落盘错误的 `base_url` 键，Codex 可以正确读取已配置的上游 API 地址。
+
+---
 ## [0.17.7] - 2026-03-21
 
 ### 变更

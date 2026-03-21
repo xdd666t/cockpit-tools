@@ -7,6 +7,12 @@ All notable changes to Cockpit Tools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
+## [0.17.8] - 2026-03-21
+
+### Fixed
+- **Codex API Key accounts now write the official `openai_base_url` key into `~/.codex/config.toml` when a custom base URL is configured**: account switching and local injection no longer persist the incorrect `base_url` key, so Codex can read the configured upstream API endpoint correctly.
+
+---
 ## [0.17.7] - 2026-03-21
 
 ### Changed

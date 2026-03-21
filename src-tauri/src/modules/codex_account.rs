@@ -22,7 +22,7 @@ const API_KEY_LOGIN_PLAN_TYPE: &str = "API_KEY";
 const API_KEY_EMAIL_PREFIX: &str = "api-key";
 const API_KEY_AUTH_MODE: &str = "apikey";
 const CODEX_CONFIG_FILE_NAME: &str = "config.toml";
-const CODEX_CONFIG_BASE_URL_KEY: &str = "base_url";
+const CODEX_CONFIG_BASE_URL_KEY: &str = "openai_base_url";
 #[cfg(target_os = "macos")]
 const CODEX_KEYCHAIN_SERVICE: &str = "Codex Auth";
 
@@ -1471,7 +1471,11 @@ fn extract_codex_tokens_from_value(
 
 #[cfg(test)]
 mod tests {
-    use super::extract_codex_tokens_from_value;
+    use super::{
+        extract_codex_tokens_from_value, read_api_base_url_from_config_toml,
+        write_api_base_url_to_config_toml,
+    };
+    use std::fs;
 
     #[test]
     fn extract_tokens_from_flat_codex_json() {
@@ -1511,6 +1515,32 @@ mod tests {
         assert_eq!(tokens.access_token, "access.jwt.token");
         assert_eq!(tokens.refresh_token.as_deref(), Some("rt_456"));
         assert_eq!(account_id_hint.as_deref(), Some("acc_2"));
+    }
+
+    #[test]
+    fn config_toml_uses_openai_base_url_key() {
+        let base_dir = std::env::temp_dir().join(format!(
+            "codex-config-key-test-{}",
+            std::process::id()
+        ));
+        if base_dir.exists() {
+            fs::remove_dir_all(&base_dir).expect("cleanup old temp dir");
+        }
+
+        fs::create_dir_all(&base_dir).expect("create temp dir");
+        write_api_base_url_to_config_toml(&base_dir, Some("https://api.example.com/"))
+            .expect("write config");
+
+        let config_path = base_dir.join("config.toml");
+        let content = fs::read_to_string(&config_path).expect("read config");
+        assert!(content.contains("openai_base_url = \"https://api.example.com\""));
+        assert!(!content.lines().any(|line| line.trim_start().starts_with("base_url =")));
+        assert_eq!(
+            read_api_base_url_from_config_toml(&base_dir).as_deref(),
+            Some("https://api.example.com")
+        );
+
+        fs::remove_dir_all(&base_dir).expect("cleanup temp dir");
     }
 }
 
