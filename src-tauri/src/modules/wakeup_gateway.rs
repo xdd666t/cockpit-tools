@@ -640,6 +640,43 @@ fn official_antigravity_info_plist_path() -> Option<std::path::PathBuf> {
     }
 }
 
+fn read_json_string_field(path: &std::path::Path, key: &str) -> Option<String> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let value = serde_json::from_str::<serde_json::Value>(&content).ok()?;
+    value
+        .get(key)
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string)
+}
+
+fn official_antigravity_product_json_path() -> Option<std::path::PathBuf> {
+    let root = official_antigravity_root_for_version()?;
+    #[cfg(target_os = "macos")]
+    let candidates = [
+        root.join("Contents")
+            .join("Resources")
+            .join("app")
+            .join("product.json"),
+        root.join("resources").join("app").join("product.json"),
+        root.join("app").join("product.json"),
+    ];
+    #[cfg(not(target_os = "macos"))]
+    let candidates = [
+        root.join("resources").join("app").join("product.json"),
+        root.join("app").join("product.json"),
+    ];
+
+    for path in candidates {
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
 fn parse_version_from_plutil_output(text: &str) -> Option<String> {
     for line in text.lines() {
         let line = line.trim();
@@ -681,6 +718,14 @@ pub(crate) fn official_antigravity_app_version() -> String {
         let trimmed = v.trim();
         if !trimmed.is_empty() {
             return trimmed.to_string();
+        }
+    }
+
+    if let Some(product_json_path) = official_antigravity_product_json_path() {
+        if let Some(version) = read_json_string_field(&product_json_path, "ideVersion")
+            .or_else(|| read_json_string_field(&product_json_path, "version"))
+        {
+            return version;
         }
     }
 
