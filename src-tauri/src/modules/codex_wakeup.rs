@@ -614,6 +614,24 @@ fn collect_path_dirs() -> Vec<PathBuf> {
         .unwrap_or_default()
 }
 
+fn append_home_cli_dirs(dirs: &mut Vec<PathBuf>) {
+    let Some(home) = std::env::var_os("HOME") else {
+        return;
+    };
+
+    let home = PathBuf::from(home);
+    for dir in [
+        home.join(".npm-global/bin"),
+        home.join(".local/bin"),
+        home.join(".cargo/bin"),
+        home.join(".volta/bin"),
+        home.join(".yarn/bin"),
+        home.join("bin"),
+    ] {
+        push_unique_dir(dirs, dir);
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn append_platform_cli_dirs(dirs: &mut Vec<PathBuf>) {
     for dir in [
@@ -624,6 +642,7 @@ fn append_platform_cli_dirs(dirs: &mut Vec<PathBuf>) {
     ] {
         push_unique_dir(dirs, PathBuf::from(dir));
     }
+    append_home_cli_dirs(dirs);
 }
 
 #[cfg(target_os = "windows")]
@@ -634,7 +653,9 @@ fn append_platform_cli_dirs(dirs: &mut Vec<PathBuf>) {
 }
 
 #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
-fn append_platform_cli_dirs(_dirs: &mut Vec<PathBuf>) {}
+fn append_platform_cli_dirs(dirs: &mut Vec<PathBuf>) {
+    append_home_cli_dirs(dirs);
+}
 
 fn collect_runtime_search_dirs() -> Vec<PathBuf> {
     let mut dirs = collect_path_dirs();
