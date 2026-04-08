@@ -236,44 +236,44 @@ export function SettingsPage() {
   const sideNavLayoutMode = useSideNavLayoutStore((state) => state.mode);
   const setSideNavLayoutMode = useSideNavLayoutStore((state) => state.setMode);
   const [activeTab, setActiveTab] = useState<'general' | 'network' | 'about'>('general');
+  const [availableTerminals, setAvailableTerminals] = useState<string[]>(['system']);
+
+  useEffect(() => {
+    invoke<string[]>('get_available_terminals')
+      .then(setAvailableTerminals)
+      .catch(err => console.error('获取可用终端失败:', err));
+  }, []);
 
   const terminalOptions = useMemo(() => {
     const common = [{ value: 'system', label: t('settings.general.terminalSystem', '系统默认') }];
-    if (isMacOS) {
-      return [
-        ...common,
-        { value: 'Terminal', label: 'Terminal.app' },
-        { value: 'iTerm2', label: 'iTerm2' },
-        { value: 'Warp', label: 'Warp' },
-        { value: 'Ghostty', label: 'Ghostty' },
-        { value: 'WezTerm', label: 'WezTerm' },
-        { value: 'Kitty', label: 'Kitty' },
-        { value: 'Alacritty', label: 'Alacritty' },
-      ];
-    }
-    if (isWindows) {
-      return [
-        ...common,
-        { value: 'cmd', label: 'Command Prompt (cmd)' },
-        { value: 'PowerShell', label: 'PowerShell' },
-        { value: 'pwsh', label: 'PowerShell Core (pwsh)' },
-        { value: 'wt', label: 'Windows Terminal (wt)' },
-      ];
-    }
-    if (isLinux) {
-      return [
-        ...common,
-        { value: 'x-terminal-emulator', label: 'x-terminal-emulator' },
-        { value: 'gnome-terminal', label: 'gnome-terminal' },
-        { value: 'konsole', label: 'konsole' },
-        { value: 'xfce4-terminal', label: 'xfce4-terminal' },
-        { value: 'xterm', label: 'xterm' },
-        { value: 'alacritty', label: 'Alacritty' },
-        { value: 'kitty', label: 'Kitty' },
-      ];
-    }
-    return common;
-  }, [isMacOS, isWindows, isLinux, t]);
+    const allOptions = isMacOS ? [
+      { value: 'Terminal', label: 'Terminal.app' },
+      { value: 'iTerm2', label: 'iTerm2' },
+      { value: 'Warp', label: 'Warp' },
+      { value: 'Ghostty', label: 'Ghostty' },
+      { value: 'WezTerm', label: 'WezTerm' },
+      { value: 'Kitty', label: 'Kitty' },
+      { value: 'Alacritty', label: 'Alacritty' },
+    ] : isWindows ? [
+      { value: 'cmd', label: 'Command Prompt (cmd)' },
+      { value: 'PowerShell', label: 'PowerShell' },
+      { value: 'pwsh', label: 'PowerShell Core (pwsh)' },
+      { value: 'wt', label: 'Windows Terminal (wt)' },
+    ] : isLinux ? [
+      { value: 'x-terminal-emulator', label: 'x-terminal-emulator' },
+      { value: 'gnome-terminal', label: 'gnome-terminal' },
+      { value: 'konsole', label: 'konsole' },
+      { value: 'xfce4-terminal', label: 'xfce4-terminal' },
+      { value: 'xterm', label: 'xterm' },
+      { value: 'alacritty', label: 'Alacritty' },
+      { value: 'kitty', label: 'Kitty' },
+    ] : [];
+
+    return [
+      ...common,
+      ...allOptions.filter(opt => availableTerminals.includes(opt.value))
+    ];
+  }, [isMacOS, isWindows, isLinux, availableTerminals, t]);
 
   const orderedPlatformIds = usePlatformLayoutStore((state) => state.orderedPlatformIds);
   const platformSettingsOrder = useMemo<Record<PlatformId, number>>(() => {

@@ -501,6 +501,104 @@ pub fn save_network_config(
     Ok(needs_restart)
 }
 
+/// 获取系统可用的终端列表
+#[tauri::command]
+pub async fn get_available_terminals() -> Result<Vec<String>, String> {
+    let mut available = Vec::new();
+    available.push("system".to_string());
+
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let terminals = [
+            ("Terminal", vec![
+                "/System/Applications/Utilities/Terminal.app".to_string(),
+                "/Applications/Utilities/Terminal.app".to_string()
+            ]),
+            ("iTerm2", vec![
+                "/Applications/iTerm.app".to_string(),
+                "/Applications/iTerm 2.app".to_string(),
+                format!("{}/Applications/iTerm.app", home)
+            ]),
+            ("Warp", vec![
+                "/Applications/Warp.app".to_string(),
+                format!("{}/Applications/Warp.app", home)
+            ]),
+            ("Ghostty", vec![
+                "/Applications/Ghostty.app".to_string(),
+                format!("{}/Applications/Ghostty.app", home)
+            ]),
+            ("WezTerm", vec![
+                "/Applications/WezTerm.app".to_string(),
+                format!("{}/Applications/WezTerm.app", home)
+            ]),
+            ("Kitty", vec![
+                "/Applications/Kitty.app".to_string(),
+                format!("{}/Applications/Kitty.app", home)
+            ]),
+            ("Alacritty", vec![
+                "/Applications/Alacritty.app".to_string(),
+                format!("{}/Applications/Alacritty.app", home)
+            ]),
+        ];
+        for (name, paths) in terminals {
+            for path in paths {
+                if !path.is_empty() && std::path::Path::new(&path).exists() {
+                    available.push(name.to_string());
+                    break;
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows 下检查可执行文件是否在 PATH 中
+        let terminals = ["cmd", "powershell", "pwsh", "wt"];
+        for name in terminals {
+            if is_command_available(name) {
+                available.push(name.to_string());
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let terminals = [
+            "x-terminal-emulator",
+            "gnome-terminal",
+            "konsole",
+            "xfce4-terminal",
+            "xterm",
+            "alacritty",
+            "kitty",
+        ];
+        for name in terminals {
+            if is_command_available(name) {
+                available.push(name.to_string());
+            }
+        }
+    }
+
+    Ok(available)
+}
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+fn is_command_available(cmd: &str) -> bool {
+    #[cfg(target_os = "windows")]
+    let check_cmd = "where";
+    #[cfg(target_os = "linux")]
+    let check_cmd = "which";
+
+    std::process::Command::new(check_cmd)
+        .arg(cmd)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
 /// 获取通用设置配置
 #[tauri::command]
 pub fn get_general_config(app: tauri::AppHandle) -> Result<GeneralConfig, String> {

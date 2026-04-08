@@ -2227,7 +2227,11 @@
       "unsupportedDescPlatform": "Gemini Cli 多开实例仅支持 macOS、Windows 和 Linux。",
       "launchDialogTitle": "启动实例",
       "launchHint": "可复制命令手动执行，或点击下方按钮直接在终端执行。",
-      "runInTerminal": "终端执行"
+      "runInTerminal": "终端执行",
+      "workingDir": "工作目录",
+      "workingDirPlaceholder": "默认当前路径",
+      "workingDirDesc": "启动时将首先切换到此目录",
+      "pickWorkingDir": "选择工作目录"
     },
     "switch": {
       "success": "切号成功"
