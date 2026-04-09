@@ -1,0 +1,140 @@
+﻿Total missing translations: 891
+[
+  { path: 'common.saving', value: 'Saving...' },
+  { path: 'common.loading', value: 'Loading...' },
+  { path: 'common.editable', value: 'Editable' },
+  {
+    path: 'common.topRightAd.ariaLabel',
+    value: 'Global top-right ad slot'
+  },
+  { path: 'common.topRightAd.badge', value: 'AD' },
+  { path: 'common.topRightAd.title', value: 'Top-right ad slot' },
+  {
+    path: 'common.topRightAd.desc',
+    value: 'This area is fixed at the top-right across all pages for campaigns or brand ads.'
+  },
+  {
+    path: 'common.shared.columns.addOnPromptCredits',
+    value: 'Add-on prompt credits'
+  },
+  { path: 'common.shared.columns.credits', value: 'Credits' },
+  { path: 'common.shared.columns.email', value: 'Email' },
+  {
+    path: 'common.shared.columns.promptCredits',
+    value: 'User Prompt credits'
+  },
+  { path: 'common.shared.columns.createdAt', value: 'Created Time' },
+  { path: 'common.shared.filter.all', value: 'All ({{count}})' },
+  {
+    path: 'common.shared.filter.enterprise',
+    value: 'ENTERPRISE ({{count}})'
+  },
+  { path: 'common.shared.filter.free', value: 'FREE ({{count}})' },
+  { path: 'common.shared.filter.pro', value: 'PRO ({{count}})' },
+  {
+    path: 'common.shared.filter.business',
+    value: 'BUSINESS ({{count}})'
+  },
+  {
+    path: 'common.shared.filter.individual',
+    value: 'INDIVIDUAL ({{count}})'
+  },
+  { path: 'common.shared.filterLabel', value: 'Filter' },
+  { path: 'common.shared.import.importing', value: 'Importing...' },
+  {
+    path: 'common.shared.import.progress.overallLine',
+    value: 'Overall progress {{percent}}% ({{completedPlatforms}}/{{totalPlatforms}} platforms, {{processedAccounts}}/{{totalAccounts}} accounts processed)'
+  },
+  {
+    path: 'common.shared.import.progress.currentPlatformLine',
+    value: 'Importing: {{platform}} ({{count}} accounts)'
+  },
+  {
+    path: 'common.shared.import.progress.currentStatusLine',
+    value: 'Current platform status: {{status}}'
+  },
+  {
+    path: 'common.shared.import.progress.platformDetailsTitle',
+    value: 'Platform details'
+  },
+  {
+    path: 'common.shared.import.progress.statusProcessing',
+    value: 'Processing...'
+  },
+  {
+    path: 'common.shared.import.progress.statusRunning',
+    value: 'Importing...'
+  },
+  {
+    path: 'common.shared.import.progress.statusPending',
+    value: 'Pending import'
+  },
+  {
+    path: 'common.shared.instances.unsupported.title',
+    value: 'Unsupported on this system'
+  },
+  {
+    path: 'common.shared.instances.quota.chat',
+    value: 'Chat messages'
+  },
+  {
+    path: 'common.shared.instances.quota.inline',
+    value: 'Inline Suggestions'
+  },
+  {
+    path: 'common.shared.instances.subtitle',
+    value: 'Independent configs per instance for parallel multi-account runs.'
+  },
+  { path: 'common.shared.instances.title', value: 'Multi-Instance' },
+  {
+    path: 'common.shared.noMatch.desc',
+    value: 'Try adjusting your search or filters'
+  },
+  {
+    path: 'common.shared.oauth.hint',
+    value: 'Once authorized, this window will update automatically'
+  },
+  {
+    path: 'common.shared.oauth.meta',
+    value: 'Expires in: {{expires}}s; Poll interval: {{interval}}s'
+  },
+  {
+    path: 'common.shared.oauth.retry',
+    value: 'Regenerate authorization info'
+  },
+  {
+    path: 'common.shared.oauth.timeoutRetry',
+    value: 'Refresh authorization link'
+  },
+  {
+    path: 'common.shared.oauth.manualCallbackLabel',
+    value: 'Manual callback URL'
+  },
+  {
+    path: 'common.shared.oauth.manualCallbackPlaceholder',
+    value: 'Paste the full callback URL, e.g. http://localhost:1455/auth/callback?code=...&state=...'
+  },
+  {
+    path: 'common.shared.token.empty',
+    value: 'Please enter a token or JSON'
+  },
+  { path: 'common.shared.token.importing', value: 'Importing...' },
+  {
+    path: 'common.shared.token.placeholder',
+    value: 'Example: ghu_xxx / sk-ws-xxx / {"access_token":"eyJ...","refresh_token":"rt_..."} / [{...}]'
+  },
+  { path: 'common.shared.addModal.token', value: 'Token / JSON' },
+  { path: 'common.shared.quota.hourly', value: 'Inline Suggestions' },
+  { path: 'common.shared.quota.weekly', value: 'Chat messages' },
+  {
+    path: 'common.shared.subtitle',
+    value: 'Monitor quota status for all accounts in real time.'
+  },
+  { path: 'common.shared.time.lessThanMinute', value: '<1m' },
+  { path: 'common.shared.time.relativeDays', value: '{{days}}d' },
+  {
+    path: 'common.shared.time.relativeDaysHours',
+    value: '{{days}}d {{hours}}h'
+  },
+  { path: 'common.shared.time.relativeHours', value: '{{hours}}h' }
+]

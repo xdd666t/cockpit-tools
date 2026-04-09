@@ -262,6 +262,7 @@ export function SettingsPage() {
     { value: 'cs', label: 'Čeština' },
     { value: 'vi', label: 'Tiếng Việt' },
     { value: 'ar', label: 'العربية' },
+    { value: 'id', label: 'Bahasa Indonesia' },
   ];
   
   // General Settings States
