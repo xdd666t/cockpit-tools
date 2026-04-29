@@ -7,6 +7,15 @@ All notable changes to Cockpit Tools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
+## [0.22.15] - 2026-04-29
+
+### Changed
+- **Codex Local API Service now listens on local and LAN interfaces**: the gateway binds to all IPv4 interfaces while keeping the app's own base URL on `127.0.0.1`, so LAN clients can connect through the host machine's LAN IP without a separate Windows `portproxy` rule.
+- **Codex Local API Service now accepts larger Codex client payloads**: the request read limit increases from 8 MB to 32 MB to accommodate larger code-context requests before they are forwarded upstream.
+- **Codex API Key account handling is now save-only from the add-account modal**: API Key imports refresh the account list after saving, remove the separate add-and-switch action, and show empty quota/subscription states instead of linking out to OpenAI usage.
+- **Codex plan detection now recognizes current PRO tier aliases**: `pro-5x` and `codex-pro-5x` map to PRO Lite, while `pro-20x` and `codex-pro-20x` map to PRO Max.
+
+---
 ## [0.22.14] - 2026-04-28
 
 ### Added

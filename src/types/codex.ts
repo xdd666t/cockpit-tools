@@ -387,8 +387,22 @@ export function isCodexExplicitFreePlanType(planType?: string): boolean {
 
 function normalizeCodexAuthFilePlanType(value?: string): 'prolite' | 'promax' | undefined {
   const normalized = (value || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
-  if (normalized === 'prolite' || normalized === 'pro-lite') return 'prolite';
-  if (normalized === 'promax' || normalized === 'pro-max') return 'promax';
+  if (
+    normalized === 'prolite' ||
+    normalized === 'pro-lite' ||
+    normalized === 'pro-5x' ||
+    normalized === 'codex-pro-5x'
+  ) {
+    return 'prolite';
+  }
+  if (
+    normalized === 'promax' ||
+    normalized === 'pro-max' ||
+    normalized === 'pro-20x' ||
+    normalized === 'codex-pro-20x'
+  ) {
+    return 'promax';
+  }
   return undefined;
 }
 

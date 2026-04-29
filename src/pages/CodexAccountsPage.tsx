@@ -186,7 +186,6 @@ function inferCodexAccountProviderMode(account: CodexAccount): CodexApiProviderM
   }
   return 'custom';
 }
-const CODEX_USAGE_URL = 'https://platform.openai.com/usage';
 const CODEX_OVERVIEW_LAYOUT_MODE_KEY = 'agtools.codex.accounts.overview_layout_mode';
 const CODEX_LOCAL_ACCESS_EXPANDED_KEY = 'agtools.codex.local_access_entry_expanded.v1';
 const DEFAULT_CODEX_API_PROVIDER_ID = CODEX_API_PROVIDER_CUSTOM_ID;
@@ -1886,7 +1885,7 @@ export function CodexAccountsPage() {
     }
   }, []);
 
-  const handleApiKeyLogin = async (switchAfterAdd = false) => {
+  const handleApiKeyLogin = async () => {
     const validation = validateApiKeyCredentialInputs(apiKeyInput, apiBaseUrlInput);
     if (!validation.ok) {
       page.setAddStatus('error');
@@ -1923,27 +1922,18 @@ export function CodexAccountsPage() {
           console.warn('[CodexModelProviders] 添加账号后写入供应商失败', providerErr);
         }
       }
-      if (switchAfterAdd) {
-        await switchAccount(account.id);
-      } else {
-        await fetchAccounts();
-        await fetchCurrentAccount();
-      }
+      await fetchAccounts();
+      await fetchCurrentAccount();
       await emitAccountsChanged({
         platformId: 'codex',
         reason: 'import',
       });
       page.setAddStatus('success');
       page.setAddMessage(
-        switchAfterAdd
-          ? t('codex.api.addAndSwitchSuccess', '添加并切换成功: {{email}}').replace(
-            '{{email}}',
-            maskAccountText(account.email),
-          )
-          : t('codex.import.successMsg', '导入成功: {{email}}').replace(
-            '{{email}}',
-            maskAccountText(account.email),
-          ),
+        t('codex.import.successMsg', '导入成功: {{email}}').replace(
+          '{{email}}',
+          maskAccountText(account.email),
+        ),
       );
       setApiKeyInput('');
       setApiBaseUrlInput('');
@@ -1989,17 +1979,6 @@ export function CodexAccountsPage() {
       page.setAddMessage(t('common.shared.token.importFailedMsg', '导入失败: {{error}}').replace('{{error}}', String(e).replace(/^Error:\s*/, '')));
     }
   };
-
-  const handleOpenCodexUsage = useCallback(async () => {
-    try {
-      await openUrl(CODEX_USAGE_URL);
-    } catch (e) {
-      setMessage({
-        text: t('codex.usage.openFailed', { error: String(e) }),
-        tone: 'error',
-      });
-    }
-  }, [setMessage, t]);
 
   const clearInlineRename = useCallback(() => {
     setEditingApiKeyNameId(null);
@@ -3374,10 +3353,7 @@ export function CodexAccountsPage() {
           <div className="codex-quota-section">
             {isApiKeyAccount ? (
               <div className="quota-empty">
-                <button className="btn btn-secondary btn-sm" onClick={() => void handleOpenCodexUsage()}>
-                  <ExternalLink size={14} />
-                  {t('codex.usage.open', '查看 OpenAI 用量')}
-                </button>
+                <span>{t('common.shared.quota.noData', '暂无配额数据')}</span>
               </div>
             ) : (
               <>
@@ -3500,7 +3476,7 @@ export function CodexAccountsPage() {
           : t('codex.localAccess.statusDisabled', '已停用');
     const localAccessSummaryMeta = t('codex.localAccess.summaryMeta', {
       count: localAccessState?.memberCount ?? 0,
-      defaultValue: '{{count}} 个账号 · 仅本地访问',
+      defaultValue: '{{count}} 个账号 · 本机/局域网',
     });
     const localAccessEmptyMessage = t('codex.localAccess.emptyMembers', '当前集合暂无账号');
 
@@ -3520,7 +3496,7 @@ export function CodexAccountsPage() {
               <div className="folder-inline-info">
                 <span className="folder-inline-name">{t('codex.localAccess.title', 'API 服务')}</span>
                 <span className="folder-inline-count">
-                  {t('codex.localAccess.memberOnlyLocal', '仅本地访问')}
+                  {t('codex.localAccess.memberOnlyLocal', '本机/局域网')}
                 </span>
               </div>
             </>
@@ -3544,7 +3520,7 @@ export function CodexAccountsPage() {
                   <span className="codex-local-access-summary-text">{localAccessSummaryMeta}</span>
                 </div>
                 <span className="folder-inline-count">
-                  {t('codex.localAccess.memberOnlyLocal', '仅本地访问')}
+                  {t('codex.localAccess.memberOnlyLocal', '本机/局域网')}
                 </span>
               </div>
             </button>
@@ -3725,7 +3701,7 @@ export function CodexAccountsPage() {
 
             <div className="card-footer codex-local-access-footer">
               <span className="card-date">
-                {t('codex.localAccess.footerHint', '仅监听 127.0.0.1')}
+                {t('codex.localAccess.footerHint', '监听本机与局域网')}
               </span>
               <div className="card-actions">
                 <button
@@ -4012,10 +3988,7 @@ export function CodexAccountsPage() {
           </td>
           <td>
             {isApiKeyAccount ? (
-              <button className="btn btn-secondary btn-sm" onClick={() => void handleOpenCodexUsage()}>
-                <ExternalLink size={14} />
-                {t('codex.usage.open', '查看 OpenAI 用量')}
-              </button>
+              <span className="codex-subscription-table-empty">-</span>
             ) : (
               <>
                 <div className="quota-grid">
@@ -4636,20 +4609,12 @@ export function CodexAccountsPage() {
               </div>
               <div className="api-key-add-actions">
                 <button
-                  className="btn btn-secondary"
-                  onClick={() => void handleApiKeyLogin(false)}
+                  className="btn btn-primary"
+                  onClick={() => void handleApiKeyLogin()}
                   disabled={importing || addStatus === 'loading' || !apiKeyInput.trim()}
                 >
                   {addStatus === 'loading' ? <RefreshCw size={16} className="loading-spinner" /> : <KeyRound size={16} />}
                   {t('common.shared.addAccount', '添加账号')}
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => void handleApiKeyLogin(true)}
-                  disabled={importing || addStatus === 'loading' || !apiKeyInput.trim()}
-                >
-                  {addStatus === 'loading' ? <RefreshCw size={16} className="loading-spinner" /> : <Play size={16} />}
-                  {t('codex.api.actions.addAndSwitch', '添加并切换')}
                 </button>
               </div>
             </div>)}

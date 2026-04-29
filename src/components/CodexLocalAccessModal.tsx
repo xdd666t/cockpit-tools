@@ -801,7 +801,7 @@ export function CodexLocalAccessModal({
                       : t('codex.localAccess.statusDisabled', '已停用')}
                   </span>
                   <span className="codex-local-access-subtle-badge">
-                    {t('codex.localAccess.memberOnlyLocal', '仅监听 127.0.0.1')}
+                    {t('codex.localAccess.memberOnlyLocal', '本机/局域网')}
                   </span>
                 </div>
                 <div className="codex-local-access-header-tools">

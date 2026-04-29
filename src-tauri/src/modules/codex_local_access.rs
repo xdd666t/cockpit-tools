@@ -24,7 +24,9 @@ use tokio::time::{timeout, Duration};
 
 const CODEX_LOCAL_ACCESS_FILE: &str = "codex_local_access.json";
 const CODEX_LOCAL_ACCESS_STATS_FILE: &str = "codex_local_access_stats.json";
-const MAX_HTTP_REQUEST_BYTES: usize = 8 * 1024 * 1024;
+const CODEX_LOCAL_ACCESS_BIND_HOST: &str = "0.0.0.0";
+const CODEX_LOCAL_ACCESS_URL_HOST: &str = "127.0.0.1";
+const MAX_HTTP_REQUEST_BYTES: usize = 32 * 1024 * 1024;
 const REQUEST_READ_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_REQUEST_RETRY_WAIT: Duration = Duration::from_secs(3);
 const MAX_REQUEST_RETRY_ATTEMPTS: usize = 1;
@@ -2041,11 +2043,11 @@ fn recompute_time_windows(stats: &mut CodexLocalAccessStats, now: i64) {
 }
 
 fn build_api_port_url(port: u16) -> String {
-    format!("http://127.0.0.1:{port}{CHAT_COMPLETIONS_PATH}")
+    format!("http://{CODEX_LOCAL_ACCESS_URL_HOST}:{port}{CHAT_COMPLETIONS_PATH}")
 }
 
 fn build_base_url(port: u16) -> String {
-    format!("http://127.0.0.1:{port}/v1")
+    format!("http://{CODEX_LOCAL_ACCESS_URL_HOST}:{port}/v1")
 }
 
 fn build_runtime_account(base_url: String, api_key: String) -> CodexAccount {
@@ -2072,7 +2074,7 @@ fn generate_local_api_key() -> String {
 }
 
 fn allocate_random_local_port() -> Result<u16, String> {
-    let listener = StdTcpListener::bind(("127.0.0.1", 0))
+    let listener = StdTcpListener::bind((CODEX_LOCAL_ACCESS_BIND_HOST, 0))
         .map_err(|e| format!("分配本地接入端口失败: {}", e))?;
     listener
         .local_addr()
@@ -2242,7 +2244,7 @@ fn ensure_local_port_available(port: u16, current_port: Option<u16>) -> Result<(
     if current_port == Some(port) {
         return Ok(());
     }
-    let listener = StdTcpListener::bind(("127.0.0.1", port))
+    let listener = StdTcpListener::bind((CODEX_LOCAL_ACCESS_BIND_HOST, port))
         .map_err(|e| format!("端口 {} 不可用: {}", port, e))?;
     drop(listener);
     Ok(())
@@ -2439,7 +2441,7 @@ async fn ensure_gateway_matches_runtime() -> Result<(), String> {
 
     stop_gateway().await;
 
-    let listener = match TcpListener::bind(("127.0.0.1", collection.port)).await {
+    let listener = match TcpListener::bind((CODEX_LOCAL_ACCESS_BIND_HOST, collection.port)).await {
         Ok(listener) => listener,
         Err(error) => {
             let message = format_gateway_bind_error(collection.port, &error);
