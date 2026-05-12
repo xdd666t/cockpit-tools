@@ -99,6 +99,11 @@ pub fn run() {
             // 存储全局 AppHandle
             let _ = APP_HANDLE.set(app.handle().clone());
 
+            // 启动时清理 WebKit LocalStorage WAL，防止无限膨胀
+            std::thread::spawn(|| {
+                modules::webkit_cache_maintenance::checkpoint_webkit_localstorage();
+            });
+
             // 初始化 Updater 插件
             #[cfg(desktop)]
             {
