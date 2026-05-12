@@ -2114,7 +2114,8 @@
         "collapse": "Réduire",
         "repairVisibility": "Réparer la visibilité",
         "restoreSessions": "Restaurer les sessions",
-        "copySessionId": "Copier l'ID de session"
+        "copySessionId": "Copier l'ID de session",
+        "copyToInstance": "Copier vers instance"
       },
       "confirm": {
         "title": "Déplacer vers la corbeille",
@@ -2147,6 +2148,15 @@
         "emptyTitle": "La corbeille est vide",
         "emptyDesc": "Les sessions déplacées dans la corbeille apparaîtront ici.",
         "restoreAction": "Restaurer les sessions sélectionnées"
+      },
+      "targetModal": {
+        "title": "Copier vers instance",
+        "hint": "Copie les sessions sélectionnées vers l’instance cible. Les sessions avec le même ID déjà présentes sont ignorées. Les instances cibles en cours d’exécution peuvent nécessiter un redémarrage avant d’apparaître.",
+        "targetInstance": "Instance cible",
+        "pickTarget": "Sélectionnez une instance cible",
+        "selectedCount": "{{count}} session(s) sélectionnée(s)",
+        "existingCount": "{{count}} déjà dans la cible",
+        "confirm": "Copier les sessions"
       }
     },
     "api": {

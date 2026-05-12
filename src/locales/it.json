@@ -2114,7 +2114,8 @@
         "collapse": "Comprimi",
         "repairVisibility": "Ripara visibilità",
         "restoreSessions": "Ripristina sessioni",
-        "copySessionId": "Copia ID sessione"
+        "copySessionId": "Copia ID sessione",
+        "copyToInstance": "Copia in istanza"
       },
       "confirm": {
         "title": "Sposta nel cestino",
@@ -2147,6 +2148,15 @@
         "emptyTitle": "Il cestino è vuoto",
         "emptyDesc": "Le sessioni spostate nel cestino appariranno qui.",
         "restoreAction": "Ripristina le sessioni selezionate"
+      },
+      "targetModal": {
+        "title": "Copia in istanza",
+        "hint": "Copia le sessioni selezionate nell’istanza di destinazione. Le sessioni con lo stesso ID già presenti vengono ignorate. Le istanze di destinazione in esecuzione potrebbero richiedere un riavvio prima di comparire.",
+        "targetInstance": "Istanza destinazione",
+        "pickTarget": "Seleziona un’istanza destinazione",
+        "selectedCount": "{{count}} sessioni selezionate",
+        "existingCount": "{{count}} già nella destinazione",
+        "confirm": "Copia sessioni"
       }
     },
     "api": {

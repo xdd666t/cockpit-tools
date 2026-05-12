@@ -2114,7 +2114,8 @@
         "collapse": "Sbalit",
         "repairVisibility": "Opravit viditelnost",
         "restoreSessions": "Obnovit relace",
-        "copySessionId": "Kopírovat ID relace"
+        "copySessionId": "Kopírovat ID relace",
+        "copyToInstance": "Kopírovat do instance"
       },
       "confirm": {
         "title": "Přesunout do koše",
@@ -2147,6 +2148,15 @@
         "emptyTitle": "Koš je prázdný",
         "emptyDesc": "Relace přesunuté do koše se zobrazí zde.",
         "restoreAction": "Obnovit vybrané relace"
+      },
+      "targetModal": {
+        "title": "Kopírovat do instance",
+        "hint": "Zkopíruje vybrané relace do cílové instance. Relace se stejným ID, které už tam jsou, se přeskočí. Běžící cílové instance mohou vyžadovat restart, než se zobrazí.",
+        "targetInstance": "Cílová instance",
+        "pickTarget": "Vyberte cílovou instanci",
+        "selectedCount": "Vybráno relací: {{count}}",
+        "existingCount": "V cíli už existuje: {{count}}",
+        "confirm": "Kopírovat relace"
       }
     },
     "api": {

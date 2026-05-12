@@ -2251,7 +2251,8 @@
         "collapse": "Ciutkan",
         "repairVisibility": "Perbaiki visibilitas",
         "restoreSessions": "Pulihkan sesi",
-        "copySessionId": "Salin ID sesi"
+        "copySessionId": "Salin ID sesi",
+        "copyToInstance": "Salin ke instans"
       },
       "confirm": {
         "title": "Pindahkan ke Sampah",
@@ -2284,6 +2285,15 @@
         "emptyTitle": "Trash kosong",
         "emptyDesc": "Sesi yang dipindahkan ke Trash akan muncul di sini.",
         "restoreAction": "Pulihkan sesi terpilih"
+      },
+      "targetModal": {
+        "title": "Salin ke instans",
+        "hint": "Menyalin sesi yang dipilih ke instans tujuan. Sesi dengan ID yang sama yang sudah ada di sana akan dilewati. Instans tujuan yang sedang berjalan mungkin perlu dimulai ulang sebelum muncul.",
+        "targetInstance": "Instans tujuan",
+        "pickTarget": "Pilih instans tujuan",
+        "selectedCount": "{{count}} sesi dipilih",
+        "existingCount": "{{count}} sudah ada di tujuan",
+        "confirm": "Salin sesi"
       }
     },
     "modelProviders": {

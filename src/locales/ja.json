@@ -2114,7 +2114,8 @@
         "collapse": "折りたたむ",
         "repairVisibility": "表示情報を修復",
         "restoreSessions": "セッションを復元",
-        "copySessionId": "セッション ID をコピー"
+        "copySessionId": "セッション ID をコピー",
+        "copyToInstance": "インスタンスへコピー"
       },
       "confirm": {
         "title": "ゴミ箱へ移動",
@@ -2147,6 +2148,15 @@
         "emptyTitle": "ゴミ箱は空です",
         "emptyDesc": "ゴミ箱へ移動したセッションはここに表示されます。",
         "restoreAction": "選択したセッションを復元"
+      },
+      "targetModal": {
+        "title": "インスタンスへコピー",
+        "hint": "選択したセッションを対象インスタンスへコピーします。同じ ID のセッションが既にある場合はスキップされます。実行中の対象インスタンスでは、表示に再起動が必要な場合があります。",
+        "targetInstance": "対象インスタンス",
+        "pickTarget": "対象インスタンスを選択",
+        "selectedCount": "{{count}} 件のセッションを選択中",
+        "existingCount": "対象に既に {{count}} 件あります",
+        "confirm": "セッションをコピー"
       }
     },
     "api": {

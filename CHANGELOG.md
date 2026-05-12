@@ -7,6 +7,17 @@ All notable changes to Cockpit Tools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
+## [0.23.2] - 2026-05-12
+
+### Added
+- **Codex instances now support Windows launch and process detection**: Windows can resolve Codex paths, identify managed instance processes by app user-data directory, and open Codex CLI sessions through PowerShell, Windows Terminal, or cmd.
+- **Codex session management can copy selected sessions into a target instance**: selected sessions can be restored into one Codex instance, existing session IDs are skipped, target files are backed up, and running targets are called out when a restart may be needed.
+
+### Fixed
+- **Codex API Key sessions no longer disappear when switching between different API providers**: API Key accounts now write a single runtime provider into `config.toml` with the selected base URL and Responses wire API, and built-in OAuth switching removes that runtime provider state.
+- **WebKit LocalStorage WAL files no longer grow without a startup checkpoint on macOS**: the app now checkpoints WebKit LocalStorage SQLite databases in the background on startup to prevent large WAL files from accumulating over time.
+
+---
 ## [0.23.1] - 2026-05-12
 
 ### Changed

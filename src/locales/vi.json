@@ -2114,7 +2114,8 @@
         "collapse": "Thu gọn",
         "repairVisibility": "Sửa hiển thị",
         "restoreSessions": "Khôi phục phiên",
-        "copySessionId": "Sao chép ID phiên"
+        "copySessionId": "Sao chép ID phiên",
+        "copyToInstance": "Sao chép sang phiên bản"
       },
       "confirm": {
         "title": "Chuyển vào thùng rác",
@@ -2147,6 +2148,15 @@
         "emptyTitle": "Thùng rác trống",
         "emptyDesc": "Các phiên đã chuyển vào thùng rác sẽ xuất hiện ở đây.",
         "restoreAction": "Khôi phục các phiên đã chọn"
+      },
+      "targetModal": {
+        "title": "Sao chép sang phiên bản",
+        "hint": "Sao chép các phiên đã chọn sang phiên bản đích. Phiên có cùng ID đã tồn tại ở đó sẽ được bỏ qua. Phiên bản đích đang chạy có thể cần khởi động lại trước khi hiển thị.",
+        "targetInstance": "Phiên bản đích",
+        "pickTarget": "Chọn phiên bản đích",
+        "selectedCount": "Đã chọn {{count}} phiên",
+        "existingCount": "{{count}} đã có ở đích",
+        "confirm": "Sao chép phiên"
       }
     },
     "api": {

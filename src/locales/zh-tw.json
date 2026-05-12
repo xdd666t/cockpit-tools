@@ -2205,7 +2205,8 @@
         "collapse": "收起",
         "repairVisibility": "修復可見性",
         "restoreSessions": "還原工作階段",
-        "copySessionId": "複製會話 ID"
+        "copySessionId": "複製會話 ID",
+        "copyToInstance": "複製到實例"
       },
       "confirm": {
         "title": "移到垃圾桶",
@@ -2238,6 +2239,15 @@
         "emptyTitle": "回收桶是空的",
         "emptyDesc": "移到回收桶的工作階段會顯示在這裡。",
         "restoreAction": "還原所選工作階段"
+      },
+      "targetModal": {
+        "title": "複製到實例",
+        "hint": "會將所選工作階段補到目標實例，已存在相同 ID 的工作階段會自動略過；目標實例執行中時可能需要重新啟動後才會顯示。",
+        "targetInstance": "目標實例",
+        "pickTarget": "請選擇目標實例",
+        "selectedCount": "已選擇 {{count}} 個工作階段",
+        "existingCount": "目標已存在 {{count}} 個",
+        "confirm": "複製工作階段"
       }
     },
     "modelProviders": {

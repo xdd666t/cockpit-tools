@@ -2114,7 +2114,8 @@
         "collapse": "Einklappen",
         "repairVisibility": "Sichtbarkeit reparieren",
         "restoreSessions": "Sitzungen wiederherstellen",
-        "copySessionId": "Sitzungs-ID kopieren"
+        "copySessionId": "Sitzungs-ID kopieren",
+        "copyToInstance": "In Instanz kopieren"
       },
       "confirm": {
         "title": "In den Papierkorb verschieben",
@@ -2147,6 +2148,15 @@
         "emptyTitle": "Papierkorb ist leer",
         "emptyDesc": "In den Papierkorb verschobene Sitzungen erscheinen hier.",
         "restoreAction": "Ausgewählte Sitzungen wiederherstellen"
+      },
+      "targetModal": {
+        "title": "In Instanz kopieren",
+        "hint": "Kopiert die ausgewählten Sitzungen in die Zielinstanz. Sitzungen mit derselben ID, die dort bereits vorhanden sind, werden übersprungen. Laufende Zielinstanzen müssen eventuell neu gestartet werden, bevor sie erscheinen.",
+        "targetInstance": "Zielinstanz",
+        "pickTarget": "Zielinstanz auswählen",
+        "selectedCount": "{{count}} Sitzung(en) ausgewählt",
+        "existingCount": "{{count}} bereits im Ziel",
+        "confirm": "Sitzungen kopieren"
       }
     },
     "api": {

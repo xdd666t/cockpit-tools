@@ -2114,7 +2114,8 @@
         "collapse": "Recolher",
         "repairVisibility": "Reparar visibilidade",
         "restoreSessions": "Restaurar sessões",
-        "copySessionId": "Copiar ID da sessão"
+        "copySessionId": "Copiar ID da sessão",
+        "copyToInstance": "Copiar para instância"
       },
       "confirm": {
         "title": "Mover para a lixeira",
@@ -2147,6 +2148,15 @@
         "emptyTitle": "A lixeira está vazia",
         "emptyDesc": "As sessões movidas para a lixeira aparecerão aqui.",
         "restoreAction": "Restaurar sessões selecionadas"
+      },
+      "targetModal": {
+        "title": "Copiar para instância",
+        "hint": "Copia as sessões selecionadas para a instância de destino. Sessões com o mesmo ID que já existem lá são ignoradas. Instâncias de destino em execução podem precisar reiniciar antes de aparecerem.",
+        "targetInstance": "Instância destino",
+        "pickTarget": "Selecione uma instância destino",
+        "selectedCount": "{{count}} sessão(ões) selecionada(s)",
+        "existingCount": "{{count}} já existe(m) no destino",
+        "confirm": "Copiar sessões"
       }
     },
     "api": {

@@ -2114,7 +2114,8 @@
         "collapse": "Contraer",
         "repairVisibility": "Reparar visibilidad",
         "restoreSessions": "Restaurar sesiones",
-        "copySessionId": "Copiar ID de sesión"
+        "copySessionId": "Copiar ID de sesión",
+        "copyToInstance": "Copiar a instancia"
       },
       "confirm": {
         "title": "Mover a la papelera",
@@ -2147,6 +2148,15 @@
         "emptyTitle": "La papelera está vacía",
         "emptyDesc": "Las sesiones movidas a la papelera aparecerán aquí.",
         "restoreAction": "Restaurar sesiones seleccionadas"
+      },
+      "targetModal": {
+        "title": "Copiar a instancia",
+        "hint": "Copia las sesiones seleccionadas a la instancia de destino. Se omiten las sesiones con el mismo ID que ya existen allí. Puede que las instancias de destino en ejecución deban reiniciarse para que aparezcan.",
+        "targetInstance": "Instancia destino",
+        "pickTarget": "Selecciona una instancia destino",
+        "selectedCount": "{{count}} sesiones seleccionadas",
+        "existingCount": "{{count}} ya existen en destino",
+        "confirm": "Copiar sesiones"
       }
     },
     "api": {

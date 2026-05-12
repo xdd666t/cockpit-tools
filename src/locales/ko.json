@@ -2114,7 +2114,8 @@
         "collapse": "접기",
         "repairVisibility": "표시 정보 복구",
         "restoreSessions": "세션 복원",
-        "copySessionId": "세션 ID 복사"
+        "copySessionId": "세션 ID 복사",
+        "copyToInstance": "인스턴스에 복사"
       },
       "confirm": {
         "title": "휴지통으로 이동",
@@ -2147,6 +2148,15 @@
         "emptyTitle": "휴지통이 비어 있습니다",
         "emptyDesc": "휴지통으로 이동한 세션이 여기에 표시됩니다.",
         "restoreAction": "선택한 세션 복원"
+      },
+      "targetModal": {
+        "title": "인스턴스에 복사",
+        "hint": "선택한 세션을 대상 인스턴스로 복사합니다. 같은 ID의 세션이 이미 있으면 건너뜁니다. 실행 중인 대상 인스턴스는 표시되기 전에 다시 시작해야 할 수 있습니다.",
+        "targetInstance": "대상 인스턴스",
+        "pickTarget": "대상 인스턴스 선택",
+        "selectedCount": "{{count}}개 세션 선택됨",
+        "existingCount": "대상에 이미 {{count}}개 있음",
+        "confirm": "세션 복사"
       }
     },
     "api": {

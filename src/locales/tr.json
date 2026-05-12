@@ -2114,7 +2114,8 @@
         "collapse": "Daralt",
         "repairVisibility": "Görünürlüğü düzelt",
         "restoreSessions": "Oturumları geri yükle",
-        "copySessionId": "Oturum kimliğini kopyala"
+        "copySessionId": "Oturum kimliğini kopyala",
+        "copyToInstance": "Örneğe kopyala"
       },
       "confirm": {
         "title": "Çöp kutusuna taşı",
@@ -2147,6 +2148,15 @@
         "emptyTitle": "Çöp kutusu boş",
         "emptyDesc": "Çöp kutusuna taşınan oturumlar burada görünür.",
         "restoreAction": "Seçili oturumları geri yükle"
+      },
+      "targetModal": {
+        "title": "Örneğe kopyala",
+        "hint": "Seçili oturumları hedef örneğe kopyalar. Orada aynı ID ile zaten bulunan oturumlar atlanır. Çalışan hedef örneklerin görünmesi için yeniden başlatılması gerekebilir.",
+        "targetInstance": "Hedef örnek",
+        "pickTarget": "Bir hedef örnek seçin",
+        "selectedCount": "{{count}} oturum seçildi",
+        "existingCount": "Hedefte zaten {{count}} var",
+        "confirm": "Oturumları kopyala"
       }
     },
     "api": {

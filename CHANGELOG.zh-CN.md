@@ -7,6 +7,17 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
 ---
+## [0.23.2] - 2026-05-12
+
+### 新增
+- **Codex 实例现支持 Windows 启动与进程识别**：Windows 可解析 Codex 路径，按应用用户数据目录识别托管实例进程，并通过 PowerShell、Windows Terminal 或 cmd 打开 Codex CLI 会话。
+- **Codex 会话管理现支持把选中会话复制到目标实例**：可将选中会话恢复到指定 Codex 实例，自动跳过目标中已有的同 ID 会话，写入前备份目标文件，并在目标实例运行中时提示可能需要重启后显示。
+
+### 修复
+- **Codex API Key 在不同 API 供应商之间切号后会话不再消失**：API Key 账号现统一向 `config.toml` 写入单一运行时 provider，保留所选 base URL 与 Responses wire API；切回内置 OAuth 时会移除该运行时 provider 状态。
+- **macOS 上 WebKit LocalStorage WAL 文件不再缺少启动 checkpoint 而持续膨胀**：应用启动时会在后台对 WebKit LocalStorage SQLite 数据库执行 checkpoint，避免 WAL 文件随时间持续堆积。
+
+---
 ## [0.23.1] - 2026-05-12
 
 ### 变更

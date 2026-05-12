@@ -2114,7 +2114,8 @@
         "collapse": "Zwiń",
         "repairVisibility": "Napraw widoczność",
         "restoreSessions": "Przywróć sesje",
-        "copySessionId": "Kopiuj ID sesji"
+        "copySessionId": "Kopiuj ID sesji",
+        "copyToInstance": "Kopiuj do instancji"
       },
       "confirm": {
         "title": "Przenieś do kosza",
@@ -2147,6 +2148,15 @@
         "emptyTitle": "Kosz jest pusty",
         "emptyDesc": "Sesje przeniesione do kosza pojawią się tutaj.",
         "restoreAction": "Przywróć wybrane sesje"
+      },
+      "targetModal": {
+        "title": "Kopiuj do instancji",
+        "hint": "Kopiuje wybrane sesje do instancji docelowej. Sesje z tym samym ID, które już tam istnieją, zostaną pominięte. Działające instancje docelowe mogą wymagać restartu, zanim się pojawią.",
+        "targetInstance": "Instancja docelowa",
+        "pickTarget": "Wybierz instancję docelową",
+        "selectedCount": "Wybrano sesji: {{count}}",
+        "existingCount": "Już w celu: {{count}}",
+        "confirm": "Kopiuj sesje"
       }
     },
     "api": {
