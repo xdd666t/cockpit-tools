@@ -1098,9 +1098,9 @@
   justify-content: center;
   gap: 3px;
   padding: 0 7px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-primary) 92%, var(--bg-secondary));
+  background: color-mix(in srgb, var(--bg-secondary) 84%, var(--bg-card));
   color: var(--text-secondary);
   font-size: 11px;
   font-weight: 600;
@@ -1117,9 +1117,9 @@
 
 .codex-speed-trigger:hover:not(:disabled),
 .codex-speed-trigger.open {
-  border-color: var(--accent-color);
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
   color: var(--text-primary);
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
 }
 
@@ -1153,12 +1153,13 @@
 }
 
 .codex-speed-menu {
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--bg-primary);
+  background: color-mix(in srgb, var(--bg-card) 90%, var(--bg-secondary));
+  backdrop-filter: blur(12px);
   box-shadow:
-    0 10px 24px rgba(15, 23, 42, 0.13),
-    0 1px 0 rgba(255, 255, 255, 0.74) inset;
+    0 12px 28px rgba(15, 23, 42, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.72) inset;
   padding: 6px;
   overflow: hidden;
 }
@@ -1175,6 +1176,11 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.codex-speed-menu.compact {
+  padding: 5px;
+  border-radius: 12px;
 }
 
 .codex-speed-option {
@@ -1196,17 +1202,24 @@
     background 0.16s ease;
 }
 
+.codex-speed-menu.compact .codex-speed-option {
+  min-height: 44px;
+  padding: 5px 7px;
+  border-radius: 9px;
+  gap: 6px;
+}
+
 .codex-speed-option:hover {
-  background: color-mix(in srgb, var(--accent-color) 5%, var(--bg-secondary));
+  background: color-mix(in srgb, var(--primary) 6%, var(--bg-secondary));
 }
 
 .codex-speed-option.active {
-  border-color: color-mix(in srgb, var(--accent-color) 18%, transparent);
-  background: color-mix(in srgb, var(--accent-color) 8%, var(--bg-primary));
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--border));
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-secondary));
 }
 
 .codex-speed-option.active svg {
-  color: var(--accent-color);
+  color: var(--primary);
 }
 
 .codex-speed-option-text {
@@ -1219,6 +1232,22 @@
 .codex-speed-option-label {
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.15;
+}
+
+.codex-speed-menu.compact .codex-speed-option-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.codex-speed-menu.compact .codex-speed-option.active svg {
+  width: 13px;
+  height: 13px;
+}
+
+.codex-speed-menu.compact .codex-speed-option-desc {
+  font-size: 11px;
   line-height: 1.15;
 }
 

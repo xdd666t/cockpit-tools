@@ -10,13 +10,14 @@ use base64::{engine::general_purpose, Engine as _};
 use futures_util::StreamExt;
 use rand::{distributions::Alphanumeric, Rng};
 use reqwest::header::{HeaderName, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
-use reqwest::{Client, Method, StatusCode};
+use reqwest::{Client, Method, NoProxy, Proxy, StatusCode, Url};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
-use std::net::TcpListener as StdTcpListener;
+use std::net::{Ipv4Addr, TcpListener as StdTcpListener};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -71,7 +72,7 @@ const IMAGES_GENERATIONS_PATH: &str = "/v1/images/generations";
 const IMAGES_EDITS_PATH: &str = "/v1/images/edits";
 static GATEWAY_RUNTIME: OnceLock<TokioMutex<GatewayRuntime>> = OnceLock::new();
 static GATEWAY_ROUND_ROBIN_CURSOR: AtomicUsize = AtomicUsize::new(0);
-static UPSTREAM_HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
+static UPSTREAM_HTTP_CLIENT: OnceLock<Mutex<Option<CachedUpstreamHttpClient>>> = OnceLock::new();
 
 #[derive(Default)]
 struct GatewayRuntime {
@@ -145,6 +146,18 @@ struct CachedPreparedAccount {
     cached_at_ms: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UpstreamHttpClientSignature {
+    proxy_url: Option<String>,
+    no_proxy: Option<String>,
+}
+
+#[derive(Clone)]
+struct CachedUpstreamHttpClient {
+    signature: UpstreamHttpClientSignature,
+    client: Client,
+}
+
 #[derive(Debug)]
 struct ProxyDispatchSuccess {
     upstream: reqwest::Response,
@@ -211,8 +224,96 @@ fn gateway_runtime() -> &'static TokioMutex<GatewayRuntime> {
     GATEWAY_RUNTIME.get_or_init(|| TokioMutex::new(GatewayRuntime::default()))
 }
 
-fn upstream_http_client() -> &'static Client {
-    UPSTREAM_HTTP_CLIENT.get_or_init(Client::new)
+fn upstream_http_client_cache() -> &'static Mutex<Option<CachedUpstreamHttpClient>> {
+    UPSTREAM_HTTP_CLIENT.get_or_init(|| Mutex::new(None))
+}
+
+fn current_upstream_http_client_signature() -> UpstreamHttpClientSignature {
+    let config = crate::modules::config::get_user_config();
+    if !config.global_proxy_enabled {
+        return UpstreamHttpClientSignature {
+            proxy_url: None,
+            no_proxy: None,
+        };
+    }
+
+    let proxy_url = config.global_proxy_url.trim();
+    if proxy_url.is_empty() {
+        return UpstreamHttpClientSignature {
+            proxy_url: None,
+            no_proxy: None,
+        };
+    }
+
+    let no_proxy = config.global_proxy_no_proxy.trim();
+    UpstreamHttpClientSignature {
+        proxy_url: Some(proxy_url.to_string()),
+        no_proxy: (!no_proxy.is_empty()).then(|| no_proxy.to_string()),
+    }
+}
+
+fn redact_proxy_url_for_log(proxy_url: &str) -> String {
+    match Url::parse(proxy_url) {
+        Ok(mut url) => {
+            if !url.username().is_empty() {
+                let _ = url.set_username("redacted");
+            }
+            if url.password().is_some() {
+                let _ = url.set_password(Some("redacted"));
+            }
+            url.to_string()
+        }
+        Err(_) => "<invalid>".to_string(),
+    }
+}
+
+fn build_upstream_http_client(signature: &UpstreamHttpClientSignature) -> Result<Client, String> {
+    let mut builder = Client::builder();
+
+    if let Some(proxy_url) = signature.proxy_url.as_deref() {
+        let mut proxy =
+            Proxy::all(proxy_url).map_err(|e| format!("Codex 本地接入代理地址无效: {}", e))?;
+        if let Some(no_proxy) = signature.no_proxy.as_deref() {
+            proxy = proxy.no_proxy(NoProxy::from_string(no_proxy));
+        }
+        builder = builder.proxy(proxy);
+    }
+
+    builder
+        .build()
+        .map_err(|e| format!("创建 Codex 上游 HTTP 客户端失败: {}", e))
+}
+
+fn log_upstream_http_client_signature(signature: &UpstreamHttpClientSignature) {
+    match signature.proxy_url.as_deref() {
+        Some(proxy_url) => logger::log_info(&format!(
+            "[CodexLocalAccess] 上游 HTTP 客户端已应用全局代理 proxy_url={} no_proxy={}",
+            redact_proxy_url_for_log(proxy_url),
+            signature.no_proxy.as_deref().unwrap_or("<empty>")
+        )),
+        None => logger::log_info("[CodexLocalAccess] 上游 HTTP 客户端使用系统代理配置"),
+    }
+}
+
+fn upstream_http_client() -> Result<Client, String> {
+    let signature = current_upstream_http_client_signature();
+    let mut cache = upstream_http_client_cache()
+        .lock()
+        .map_err(|_| "Codex 上游 HTTP 客户端缓存已损坏".to_string())?;
+
+    if let Some(cached) = cache.as_ref() {
+        if cached.signature == signature {
+            return Ok(cached.client.clone());
+        }
+    }
+
+    let client = build_upstream_http_client(&signature)?;
+    log_upstream_http_client_signature(&signature);
+    *cache = Some(CachedUpstreamHttpClient {
+        signature,
+        client: client.clone(),
+    });
+    Ok(client)
 }
 
 fn local_access_file_path() -> Result<PathBuf, String> {
@@ -2723,6 +2824,221 @@ fn build_base_url(port: u16) -> String {
     format!("http://{CODEX_LOCAL_ACCESS_URL_HOST}:{port}/v1")
 }
 
+fn build_lan_base_url(port: u16) -> Option<String> {
+    resolve_primary_lan_ipv4().map(|addr| format!("http://{addr}:{port}/v1"))
+}
+
+#[derive(Debug)]
+struct LanIpv4Candidate {
+    interface_name: String,
+    addr: Ipv4Addr,
+}
+
+fn resolve_primary_lan_ipv4() -> Option<Ipv4Addr> {
+    let mut candidates = collect_private_lan_ipv4_candidates();
+    candidates.sort_by_key(|candidate| {
+        (
+            lan_interface_score(&candidate.interface_name),
+            lan_addr_score(candidate.addr),
+            candidate.addr.octets(),
+        )
+    });
+    candidates
+        .into_iter()
+        .next()
+        .map(|candidate| candidate.addr)
+}
+
+fn is_lan_ipv4(addr: Ipv4Addr) -> bool {
+    addr.is_private()
+}
+
+fn lan_interface_score(interface_name: &str) -> u8 {
+    let name = interface_name.to_ascii_lowercase();
+    if name.starts_with("en")
+        || name.starts_with("eth")
+        || name.starts_with("wlan")
+        || name.starts_with("wi-fi")
+        || name.starts_with("wifi")
+        || name.starts_with("ethernet")
+        || name.contains("wireless")
+    {
+        return 0;
+    }
+    if name.starts_with("lo")
+        || name.starts_with("utun")
+        || name.starts_with("tun")
+        || name.starts_with("tap")
+        || name.starts_with("awdl")
+        || name.starts_with("llw")
+        || name.starts_with("bridge")
+        || name.starts_with("br-")
+        || name.starts_with("docker")
+        || name.starts_with("veth")
+        || name.starts_with("virbr")
+        || name.starts_with("vmnet")
+        || name.starts_with("vbox")
+        || name.starts_with("tailscale")
+        || name.starts_with("wg")
+    {
+        return 2;
+    }
+    1
+}
+
+fn lan_addr_score(addr: Ipv4Addr) -> u8 {
+    let octets = addr.octets();
+    if octets[0] == 192 && octets[1] == 168 {
+        return 0;
+    }
+    if octets[0] == 10 {
+        return 1;
+    }
+    2
+}
+
+#[cfg(target_os = "macos")]
+fn collect_private_lan_ipv4_candidates() -> Vec<LanIpv4Candidate> {
+    let output = Command::new("ifconfig").arg("-a").output();
+    match output {
+        Ok(output) => parse_ifconfig_ipv4_candidates(&String::from_utf8_lossy(&output.stdout)),
+        Err(_) => Vec::new(),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn collect_private_lan_ipv4_candidates() -> Vec<LanIpv4Candidate> {
+    let output = Command::new("ip")
+        .args(["-o", "-4", "addr", "show", "scope", "global"])
+        .output();
+    match output {
+        Ok(output) => parse_linux_ip_addr_candidates(&String::from_utf8_lossy(&output.stdout)),
+        Err(_) => Vec::new(),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn collect_private_lan_ipv4_candidates() -> Vec<LanIpv4Candidate> {
+    let mut command = Command::new("ipconfig");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    match command.output() {
+        Ok(output) => parse_windows_ipconfig_candidates(&String::from_utf8_lossy(&output.stdout)),
+        Err(_) => Vec::new(),
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+fn collect_private_lan_ipv4_candidates() -> Vec<LanIpv4Candidate> {
+    Vec::new()
+}
+
+#[cfg(target_os = "macos")]
+fn parse_ifconfig_ipv4_candidates(output: &str) -> Vec<LanIpv4Candidate> {
+    let mut candidates = Vec::new();
+    let mut current_interface = String::new();
+    for line in output.lines() {
+        if !line
+            .chars()
+            .next()
+            .map(|item| item.is_whitespace())
+            .unwrap_or(false)
+        {
+            current_interface = line
+                .split(':')
+                .next()
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            continue;
+        }
+        let mut parts = line.split_whitespace();
+        while let Some(part) = parts.next() {
+            if part != "inet" {
+                continue;
+            }
+            let Some(raw_addr) = parts.next() else {
+                continue;
+            };
+            if let Ok(addr) = raw_addr.parse::<Ipv4Addr>() {
+                if is_lan_ipv4(addr) {
+                    candidates.push(LanIpv4Candidate {
+                        interface_name: current_interface.clone(),
+                        addr,
+                    });
+                }
+            }
+        }
+    }
+    candidates
+}
+
+#[cfg(target_os = "linux")]
+fn parse_linux_ip_addr_candidates(output: &str) -> Vec<LanIpv4Candidate> {
+    let mut candidates = Vec::new();
+    for line in output.lines() {
+        let mut parts = line.split_whitespace();
+        let _index = parts.next();
+        let Some(interface_name) = parts.next() else {
+            continue;
+        };
+        while let Some(part) = parts.next() {
+            if part != "inet" {
+                continue;
+            }
+            let Some(raw_addr) = parts.next() else {
+                continue;
+            };
+            let addr_text = raw_addr.split('/').next().unwrap_or_default();
+            if let Ok(addr) = addr_text.parse::<Ipv4Addr>() {
+                if is_lan_ipv4(addr) {
+                    candidates.push(LanIpv4Candidate {
+                        interface_name: interface_name.trim_end_matches(':').to_string(),
+                        addr,
+                    });
+                }
+            }
+        }
+    }
+    candidates
+}
+
+#[cfg(target_os = "windows")]
+fn parse_windows_ipconfig_candidates(output: &str) -> Vec<LanIpv4Candidate> {
+    let mut candidates = Vec::new();
+    let mut current_interface = String::new();
+    for line in output.lines() {
+        let trimmed = line.trim();
+        let is_indented = line
+            .chars()
+            .next()
+            .map(|item| item.is_whitespace())
+            .unwrap_or(false);
+        if trimmed.ends_with(':') && !is_indented {
+            current_interface = trimmed.trim_end_matches(':').to_string();
+            continue;
+        }
+        if !trimmed.contains("IPv4") {
+            continue;
+        }
+        let Some(raw_addr) = trimmed.rsplit(':').next() else {
+            continue;
+        };
+        if let Ok(addr) = raw_addr.trim().parse::<Ipv4Addr>() {
+            if is_lan_ipv4(addr) {
+                candidates.push(LanIpv4Candidate {
+                    interface_name: current_interface.clone(),
+                    addr,
+                });
+            }
+        }
+    }
+    candidates
+}
+
 fn build_runtime_account(base_url: String, api_key: String) -> CodexAccount {
     let mut runtime_account = CodexAccount::new_api_key(
         "codex_local_access_runtime".to_string(),
@@ -3325,6 +3641,9 @@ fn build_state_snapshot(runtime: &GatewayRuntime) -> CodexLocalAccessState {
         .as_ref()
         .map(|item| build_api_port_url(item.port));
     let base_url = collection.as_ref().map(|item| build_base_url(item.port));
+    let lan_base_url = collection
+        .as_ref()
+        .and_then(|item| build_lan_base_url(item.port));
     let model_ids = supported_codex_model_ids();
     let mut stats = runtime.stats.clone();
     stats.events.clear();
@@ -3334,6 +3653,7 @@ fn build_state_snapshot(runtime: &GatewayRuntime) -> CodexLocalAccessState {
         running: runtime.running,
         api_port_url,
         base_url,
+        lan_base_url,
         model_ids,
         last_error: runtime.last_error.clone(),
         member_count,
@@ -5077,7 +5397,7 @@ async fn send_upstream_request(
     let method =
         Method::from_bytes(method.as_bytes()).map_err(|e| format!("不支持的请求方法: {}", e))?;
     let url = format!("{}{}", UPSTREAM_CODEX_BASE_URL, target);
-    let client = upstream_http_client();
+    let client = upstream_http_client()?;
     for retry_attempt in 0..=UPSTREAM_SEND_RETRY_ATTEMPTS {
         let mut request = client.request(method.clone(), &url);
 

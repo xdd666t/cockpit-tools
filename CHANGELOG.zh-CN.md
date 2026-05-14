@@ -7,6 +7,19 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
 ---
+## [0.23.4] - 2026-05-14
+
+### 新增
+- **Codex 本地 API 服务现会在可用时提供局域网地址**：账号总览和 API 服务弹框可在本机地址与检测到的内网地址之间切换，并复制所选地址供同一局域网内其他设备使用。
+
+### 变更
+- **Codex 本地 API 服务上游请求现跟随应用全局代理设置**：网关会在代理设置变化时重建上游 HTTP 客户端，支持 `no_proxy`，并可使用 SOCKS 代理地址。
+
+### 修复
+- **Codex API Key provider 状态现与非 OAuth 本地网关行为一致**：API Key provider 写入时不再声明 OpenAI 授权或 websocket 要求；切回内置 OpenAI 时会移除受管 API Key provider 配置，同时保留无关的手动 provider。
+- **Codex 会话可见性修复现可恢复更多隐藏本地会话**：SQLite 修复会把已有首条用户消息的 thread 标记为用户可见，补齐缺失的 `thread_source`，并继续兼容只有 provider 字段的旧数据库结构。
+
+---
 ## [0.23.3] - 2026-05-13
 
 ### 新增

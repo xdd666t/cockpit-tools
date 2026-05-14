@@ -643,6 +643,39 @@
   color: var(--text-secondary);
 }
 
+.codex-local-access-modal .codex-local-access-address-select {
+  width: 58px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.codex-local-access-modal .codex-local-access-address-select .single-select-dropdown-trigger {
+  min-height: 24px;
+  gap: 2px;
+  padding: 0 2px 0 6px;
+  border-radius: 8px;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+  box-shadow: none;
+}
+
+.codex-local-access-modal .codex-local-access-address-select .single-select-dropdown-value {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.codex-local-access-modal .codex-local-access-address-select .single-select-dropdown-arrow {
+  width: 14px;
+  height: 14px;
+  background: transparent;
+}
+
+.codex-local-access-modal .codex-local-access-address-select .single-select-dropdown-arrow svg {
+  width: 12px;
+  height: 12px;
+}
+
 .codex-local-access-view-only-badge {
   margin-right: auto;
   padding: 3px 8px;

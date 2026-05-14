@@ -124,8 +124,10 @@ import {
   SingleSelectFilterDropdown,
   type SingleSelectFilterOption,
 } from "../components/SingleSelectFilterDropdown";
+import { SingleSelectDropdown } from "../components/SingleSelectDropdown";
 import type { CodexAccount, CodexAppSpeed } from "../types/codex";
 import type {
+  CodexLocalAccessAddressKind,
   CodexLocalAccessRoutingStrategy,
   CodexLocalAccessState,
 } from "../types/codexLocalAccess";
@@ -239,6 +241,8 @@ const CODEX_OVERVIEW_LAYOUT_MODE_KEY =
   "agtools.codex.accounts.overview_layout_mode";
 const CODEX_LOCAL_ACCESS_EXPANDED_KEY =
   "agtools.codex.local_access_entry_expanded.v1";
+const CODEX_LOCAL_ACCESS_ADDRESS_KIND_KEY =
+  "agtools.codex.local_access_address_kind.v1";
 const CODEX_CUSTOM_SORT_ORDER_KEY =
   "agtools.codex.accounts.custom_sort_order.v1";
 const DEFAULT_CODEX_API_PROVIDER_ID = COCKPIT_API_PROVIDER_ID;
@@ -253,6 +257,32 @@ const GROUP_FILTER_FIELD = "group_filter";
 const ACTIVE_GROUP_ID_FIELD = "active_group_id";
 
 type CodexOverviewLayoutMode = "compact" | "list" | "grid";
+
+function normalizeLocalAccessAddressKind(
+  value: string | null | undefined,
+): CodexLocalAccessAddressKind {
+  return value === "lan" ? "lan" : "local";
+}
+
+function readStoredLocalAccessAddressKind(): CodexLocalAccessAddressKind {
+  try {
+    return normalizeLocalAccessAddressKind(
+      localStorage.getItem(CODEX_LOCAL_ACCESS_ADDRESS_KIND_KEY),
+    );
+  } catch {
+    return "local";
+  }
+}
+
+function persistLocalAccessAddressKind(
+  value: CodexLocalAccessAddressKind,
+): void {
+  try {
+    localStorage.setItem(CODEX_LOCAL_ACCESS_ADDRESS_KIND_KEY, value);
+  } catch {
+    // ignore storage write failures
+  }
+}
 type CodexLaunchCredentialKind = "api-key" | "api-service" | "account";
 type CodexLaunchCredentialType = "api" | "account";
 type CodexApiSwitchNoticeContext = {
@@ -549,6 +579,10 @@ export function CodexAccountsPage() {
     "baseUrl" | "apiKey" | null
   >(null);
   const [localAccessKeyVisible, setLocalAccessKeyVisible] = useState(false);
+  const [localAccessAddressKind, setLocalAccessAddressKind] =
+    useState<CodexLocalAccessAddressKind>(() =>
+      readStoredLocalAccessAddressKind(),
+    );
   const [localAccessEntryVisible, setLocalAccessEntryVisible] = useState(true);
   const [localAccessLaunchCurrent, setLocalAccessLaunchCurrent] =
     useState(false);
@@ -3822,15 +3856,52 @@ export function CodexAccountsPage() {
     localAccessStarting ||
     localAccessRefreshing ||
     localAccessPortKilling;
+  const selectedLocalAccessAddressKind: CodexLocalAccessAddressKind =
+    localAccessAddressKind === "lan" && localAccessState?.lanBaseUrl
+      ? "lan"
+      : "local";
+  const localAccessAddressOptions = useMemo(
+    () => [
+      {
+        value: "local",
+        label: t("codex.localAccess.addressLocal", "本机"),
+      },
+      ...(localAccessState?.lanBaseUrl
+        ? [
+            {
+              value: "lan",
+              label: t("codex.localAccess.addressLan", "局域网"),
+            },
+          ]
+        : []),
+    ],
+    [localAccessState?.lanBaseUrl, t],
+  );
+  const handleLocalAccessAddressKindChange = useCallback((value: string) => {
+    const next = normalizeLocalAccessAddressKind(value);
+    setLocalAccessAddressKind(next);
+    persistLocalAccessAddressKind(next);
+  }, []);
 
   const resolveLocalAccessBaseUrl = useCallback(() => {
+    if (
+      selectedLocalAccessAddressKind === "lan" &&
+      localAccessState?.lanBaseUrl
+    ) {
+      return localAccessState.lanBaseUrl;
+    }
     if (!localAccessCollection)
       return localAccessState?.baseUrl || CODEX_LOCAL_ACCESS_FALLBACK_BASE_URL;
     return (
       localAccessState?.baseUrl ||
       `http://127.0.0.1:${localAccessCollection.port}/v1`
     );
-  }, [localAccessCollection, localAccessState?.baseUrl]);
+  }, [
+    localAccessCollection,
+    localAccessState?.baseUrl,
+    localAccessState?.lanBaseUrl,
+    selectedLocalAccessAddressKind,
+  ]);
 
   const handleCopyLocalAccessValue = useCallback(
     async (field: "baseUrl" | "apiKey", value: string) => {
@@ -5587,9 +5658,18 @@ export function CodexAccountsPage() {
           <>
             <div className="codex-local-access-meta">
               <div className="codex-local-access-row">
-                <span className="codex-local-access-label">
-                  {t("codex.localAccess.baseUrl", "地址")}
-                </span>
+                <div className="codex-local-access-label codex-local-access-address-select">
+                  <SingleSelectDropdown
+                    value={selectedLocalAccessAddressKind}
+                    options={localAccessAddressOptions}
+                    onChange={handleLocalAccessAddressKindChange}
+                    menuClassName="codex-local-access-address-menu"
+                    menuWidth={92}
+                    menuMaxHeight={120}
+                    disabled={localAccessAddressOptions.length < 2}
+                    ariaLabel={t("codex.localAccess.addressKind", "地址类型")}
+                  />
+                </div>
                 <code className="codex-local-access-code" title={baseUrl}>
                   {baseUrl || "-"}
                 </code>
@@ -5823,6 +5903,7 @@ export function CodexAccountsPage() {
                 value={apiServiceAppSpeed}
                 onChange={handleApiServiceAppSpeedChange}
                 busy={savingAppSpeedId === CODEX_API_SERVICE_BIND_ID}
+                compact
                 preferredPlacement="top"
                 ariaLabel={t("codex.speed.title", "速度")}
               />
@@ -9516,6 +9597,9 @@ export function CodexAccountsPage() {
             isOpen={showLocalAccessModal}
             mode={localAccessModalMode}
             state={localAccessState}
+            addressKind={selectedLocalAccessAddressKind}
+            addressOptions={localAccessAddressOptions}
+            onAddressKindChange={handleLocalAccessAddressKindChange}
             accounts={accounts}
             accountGroups={codexGroups}
             initialSelectedIds={localAccessModalSelectedIds}

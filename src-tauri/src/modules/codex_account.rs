@@ -39,6 +39,7 @@ const CODEX_COCKPIT_API_BASE_URL: &str = "https://chongcodex.cn/v1";
 const CODEX_COCKPIT_API_PROVIDER_ID: &str = "cockpit_api";
 const CODEX_OPENAI_PROVIDER_ID: &str = "openai";
 const CODEX_RUNTIME_MODEL_PROVIDER_ID: &str = "codex_local_access";
+const CODEX_LEGACY_API_KEY_OPENAI_PROVIDER_ID: &str = "openai_api_key";
 const CODEX_DEFAULT_RUNTIME_PROVIDER_NAME: &str = "OpenAI Official";
 const CODEX_PROVIDER_WIRE_API: &str = "responses";
 const CODEX_CONTEXT_WINDOW_1M_VALUE: i64 = 1_000_000;
@@ -825,7 +826,7 @@ fn write_api_provider_to_config_toml(
     match provider_config.mode {
         CodexApiProviderMode::OpenaiBuiltin => {
             let _ = doc.remove(CODEX_CONFIG_MODEL_PROVIDER_KEY);
-            remove_runtime_model_provider_from_doc(&mut doc);
+            remove_managed_api_key_model_providers_from_doc(&mut doc);
             match normalized.as_deref() {
                 Some(base_url) => {
                     doc[CODEX_CONFIG_OPENAI_BASE_URL_KEY] = value(base_url);
@@ -864,7 +865,8 @@ fn write_api_provider_to_config_toml(
             provider_table["name"] = value(provider_name);
             provider_table["base_url"] = value(base_url);
             provider_table["wire_api"] = value(CODEX_PROVIDER_WIRE_API);
-            provider_table["requires_openai_auth"] = value(true);
+            provider_table["requires_openai_auth"] = value(false);
+            provider_table["supports_websockets"] = value(false);
         }
     }
 
@@ -876,12 +878,34 @@ fn write_api_provider_to_config_toml(
         .map_err(|e| format!("写入 config.toml 失败: {}", e))
 }
 
-fn remove_runtime_model_provider_from_doc(doc: &mut Document) {
+fn collect_managed_api_key_provider_ids() -> HashSet<String> {
+    let mut ids = HashSet::from([
+        CODEX_RUNTIME_MODEL_PROVIDER_ID.to_string(),
+        CODEX_COCKPIT_API_PROVIDER_ID.to_string(),
+        CODEX_LEGACY_API_KEY_OPENAI_PROVIDER_ID.to_string(),
+    ]);
+
+    for account in list_accounts() {
+        if !account.is_api_key_auth() {
+            continue;
+        }
+        if let Some(provider_id) = normalize_optional_ref(account.api_provider_id.as_deref()) {
+            ids.insert(provider_id);
+        }
+    }
+
+    ids
+}
+
+fn remove_managed_api_key_model_providers_from_doc(doc: &mut Document) {
+    let managed_provider_ids = collect_managed_api_key_provider_ids();
     let should_remove_model_providers = doc
         .get_mut(CODEX_CONFIG_MODEL_PROVIDERS_KEY)
         .and_then(|item| item.as_table_mut())
         .map(|model_providers| {
-            let _ = model_providers.remove(CODEX_RUNTIME_MODEL_PROVIDER_ID);
+            for provider_id in &managed_provider_ids {
+                let _ = model_providers.remove(provider_id.as_str());
+            }
             model_providers.is_empty()
         })
         .unwrap_or(false);
@@ -928,7 +952,8 @@ fn write_api_key_provider_to_config_toml(
     provider_table["name"] = value(provider_name);
     provider_table["base_url"] = value(base_url);
     provider_table["wire_api"] = value(CODEX_PROVIDER_WIRE_API);
-    provider_table["requires_openai_auth"] = value(true);
+    provider_table["requires_openai_auth"] = value(false);
+    provider_table["supports_websockets"] = value(false);
 
     if let Some(parent) = config_path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("创建 config.toml 目录失败: {}", e))?;
@@ -4396,7 +4421,7 @@ mod tests {
         let config_path = base_dir.join("config.toml");
         let content = fs::read_to_string(&config_path).expect("read config");
         assert!(content.contains("openai_base_url = \"https://api.example.com\""));
-        assert!(!content.contains("model_provider"));
+        assert!(!content.contains("model_provider = "));
         assert!(!content.contains("codex_local_access"));
         assert_eq!(
             read_api_provider_from_config_toml(&base_dir),
@@ -4431,8 +4456,8 @@ mod tests {
     }
 
     #[test]
-    fn config_toml_cleans_runtime_provider_for_builtin_openai() {
-        let base_dir = make_temp_dir("codex-config-clean-runtime-provider-test");
+    fn config_toml_cleans_managed_api_key_providers_for_builtin_openai() {
+        let base_dir = make_temp_dir("codex-config-clean-managed-provider-test");
         let config_path = base_dir.join("config.toml");
         fs::write(
             &config_path,
@@ -4445,9 +4470,27 @@ name = "OpenAI Official"
 base_url = "https://api.openai.com/v1"
 wire_api = "responses"
 requires_openai_auth = true
+
+[model_providers.cockpit_api]
+name = "Cockpit Api"
+base_url = "https://chongcodex.cn/v1"
+wire_api = "responses"
+requires_openai_auth = false
+
+[model_providers.openai_api_key]
+name = "OpenAI Official"
+base_url = "https://api.openai.com/v1"
+wire_api = "responses"
+requires_openai_auth = false
+
+[model_providers.user_manual_provider_not_managed]
+name = "Manual"
+base_url = "https://manual.example.com/v1"
+wire_api = "responses"
+requires_openai_auth = false
 "#,
         )
-        .expect("write runtime config");
+        .expect("write managed provider config");
         let provider_config = resolve_api_provider_config(
             None,
             Some(CodexApiProviderMode::OpenaiBuiltin),
@@ -4459,8 +4502,11 @@ requires_openai_auth = true
         write_api_provider_to_config_toml(&base_dir, &provider_config).expect("write config");
 
         let content = fs::read_to_string(&config_path).expect("read config");
-        assert!(!content.contains("model_provider"));
+        assert!(!content.contains("model_provider = "));
         assert!(!content.contains("codex_local_access"));
+        assert!(!content.contains("[model_providers.cockpit_api]"));
+        assert!(!content.contains("[model_providers.openai_api_key]"));
+        assert!(content.contains("[model_providers.user_manual_provider_not_managed]"));
         assert!(!content.contains("openai_base_url"));
         assert!(content.contains("model_context_window = 1000000"));
         assert_eq!(
@@ -4497,7 +4543,8 @@ requires_openai_auth = true
         assert!(content.contains("name = \"Relay\""));
         assert!(content.contains("base_url = \"https://relay.example.com/v1\""));
         assert!(content.contains("wire_api = \"responses\""));
-        assert!(content.contains("requires_openai_auth = true"));
+        assert!(content.contains("requires_openai_auth = false"));
+        assert!(content.contains("supports_websockets = false"));
         assert!(!content.contains("openai_base_url"));
         assert_eq!(
             read_api_provider_from_config_toml(&base_dir),
@@ -4532,7 +4579,8 @@ requires_openai_auth = true
         assert!(content.contains("name = \"OpenAI Official\""));
         assert!(content.contains("base_url = \"https://api.openai.com/v1\""));
         assert!(content.contains("wire_api = \"responses\""));
-        assert!(content.contains("requires_openai_auth = true"));
+        assert!(content.contains("requires_openai_auth = false"));
+        assert!(content.contains("supports_websockets = false"));
         assert!(!content.contains("openai_base_url"));
         assert_eq!(
             read_api_provider_from_config_toml(&base_dir),
@@ -4568,7 +4616,8 @@ requires_openai_auth = true
         assert!(content.contains("name = \"Relay\""));
         assert!(content.contains("base_url = \"https://relay.example.com/v1\""));
         assert!(content.contains("wire_api = \"responses\""));
-        assert!(content.contains("requires_openai_auth = true"));
+        assert!(content.contains("requires_openai_auth = false"));
+        assert!(content.contains("supports_websockets = false"));
         assert!(!content.contains("openai_base_url"));
         assert_eq!(
             read_api_provider_from_config_toml(&base_dir),

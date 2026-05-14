@@ -32,6 +32,8 @@ interface CodexSpeedSelectProps {
 
 const SPEED_MENU_WIDTH = 206;
 const SPEED_MENU_HEIGHT = 122;
+const SPEED_MENU_COMPACT_WIDTH = 180;
+const SPEED_MENU_COMPACT_HEIGHT = 104;
 const SPEED_MENU_GAP = 5;
 const SPEED_MENU_MARGIN = 8;
 const SPEED_MENU_Z_INDEX = 10030;
@@ -39,23 +41,26 @@ const SPEED_MENU_Z_INDEX = 10030;
 function resolveSpeedMenuPosition(
   trigger: HTMLElement | null,
   preferredPlacement: SpeedMenuPlacement,
+  compact: boolean,
 ): SpeedMenuPosition | null {
   if (!trigger) return null;
   const rect = trigger.getBoundingClientRect();
-  const width = Math.max(SPEED_MENU_WIDTH, rect.width);
+  const menuWidth = compact ? SPEED_MENU_COMPACT_WIDTH : SPEED_MENU_WIDTH;
+  const menuHeight = compact ? SPEED_MENU_COMPACT_HEIGHT : SPEED_MENU_HEIGHT;
+  const width = Math.max(menuWidth, rect.width);
   let placement = preferredPlacement;
   let top =
     preferredPlacement === "top"
-      ? rect.top - SPEED_MENU_HEIGHT - SPEED_MENU_GAP
+      ? rect.top - menuHeight - SPEED_MENU_GAP
       : rect.bottom + SPEED_MENU_GAP;
 
   if (top < SPEED_MENU_MARGIN) {
     placement = "bottom";
     top = rect.bottom + SPEED_MENU_GAP;
   }
-  if (top + SPEED_MENU_HEIGHT > window.innerHeight - SPEED_MENU_MARGIN) {
+  if (top + menuHeight > window.innerHeight - SPEED_MENU_MARGIN) {
     placement = "top";
-    top = rect.top - SPEED_MENU_HEIGHT - SPEED_MENU_GAP;
+    top = rect.top - menuHeight - SPEED_MENU_GAP;
   }
 
   const maxLeft = Math.max(
@@ -114,8 +119,8 @@ export function CodexSpeedSelect({
   }`;
 
   const updatePosition = useCallback(() => {
-    setPosition(resolveSpeedMenuPosition(triggerRef.current, preferredPlacement));
-  }, [preferredPlacement]);
+    setPosition(resolveSpeedMenuPosition(triggerRef.current, preferredPlacement, compact));
+  }, [compact, preferredPlacement]);
 
   useEffect(() => {
     if (!open) return;
@@ -182,7 +187,9 @@ export function CodexSpeedSelect({
         ? createPortal(
             <div
               ref={menuRef}
-              className={`codex-speed-menu placement-${position.placement}`}
+              className={`codex-speed-menu placement-${position.placement} ${
+                compact ? "compact" : ""
+              }`}
               style={{
                 position: "fixed",
                 top: `${position.top}px`,
@@ -191,9 +198,11 @@ export function CodexSpeedSelect({
                 zIndex: SPEED_MENU_Z_INDEX,
               }}
             >
-              <div className="codex-speed-menu-title">
-                {t("codex.speed.title", "速度")}
-              </div>
+              {!compact && (
+                <div className="codex-speed-menu-title">
+                  {t("codex.speed.title", "速度")}
+                </div>
+              )}
               <div className="codex-speed-menu-options">
                 {options.map((option) => (
                   <button

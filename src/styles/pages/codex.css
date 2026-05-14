@@ -270,6 +270,65 @@
   color: var(--text-secondary);
 }
 
+.codex-local-access-address-select {
+  width: 58px;
+}
+
+.codex-local-access-address-select .single-select-dropdown-trigger {
+  min-height: 24px;
+  gap: 2px;
+  padding: 0 2px 0 6px;
+  border-color: transparent;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+  box-shadow: none;
+}
+
+.codex-local-access-address-select .single-select-dropdown-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0;
+}
+
+.codex-local-access-address-select .single-select-dropdown-arrow {
+  width: 14px;
+  height: 14px;
+  background: transparent;
+}
+
+.codex-local-access-address-select .single-select-dropdown-arrow svg {
+  width: 12px;
+  height: 12px;
+}
+
+.codex-local-access-address-menu.single-select-dropdown-menu {
+  padding: 5px;
+  border-radius: 12px;
+}
+
+.codex-local-access-address-menu .single-select-dropdown-item {
+  min-height: 28px;
+  padding: 0 7px;
+  border-radius: 9px;
+}
+
+.codex-local-access-address-menu .single-select-dropdown-item-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.codex-local-access-address-menu .single-select-dropdown-item-check {
+  width: 15px;
+  height: 15px;
+}
+
+.codex-local-access-address-menu .single-select-dropdown-item-check svg {
+  width: 13px;
+  height: 13px;
+}
+
 .codex-local-access-code {
   flex: 1;
   min-width: 0;

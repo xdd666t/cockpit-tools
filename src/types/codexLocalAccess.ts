@@ -1,3 +1,5 @@
+export type CodexLocalAccessAddressKind = 'local' | 'lan';
+
 export type CodexLocalAccessRoutingStrategy =
   | 'auto'
   | 'quota_high_first'
@@ -58,6 +60,7 @@ export interface CodexLocalAccessState {
   running: boolean;
   apiPortUrl: string | null;
   baseUrl: string | null;
+  lanBaseUrl: string | null;
   modelIds: string[];
   lastError: string | null;
   memberCount: number;

@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import type { CodexAccount } from '../types/codex';
 import type { CodexAccountGroup } from '../services/codexAccountGroupService';
 import type {
+  CodexLocalAccessAddressKind,
   CodexLocalAccessRoutingStrategy,
   CodexLocalAccessState,
   CodexLocalAccessStatsWindow,
@@ -55,6 +56,9 @@ interface CodexLocalAccessModalProps {
   isOpen: boolean;
   mode: 'panel' | 'members';
   state: CodexLocalAccessState | null;
+  addressKind: CodexLocalAccessAddressKind;
+  addressOptions: Array<{ value: string; label: string }>;
+  onAddressKindChange: (value: string) => void;
   accounts: CodexAccount[];
   accountGroups: CodexAccountGroup[];
   initialSelectedIds: string[];
@@ -142,6 +146,9 @@ export function CodexLocalAccessModal({
   isOpen,
   mode,
   state,
+  addressKind,
+  addressOptions,
+  onAddressKindChange,
   accounts,
   accountGroups,
   initialSelectedIds,
@@ -181,6 +188,8 @@ export function CodexLocalAccessModal({
   const collection = state?.collection ?? null;
   const apiPortUrl = state?.apiPortUrl ?? '';
   const baseUrl = state?.baseUrl ?? '';
+  const displayBaseUrl =
+    addressKind === 'lan' && state?.lanBaseUrl ? state.lanBaseUrl : baseUrl;
   const modelIds = state?.modelIds ?? [];
   const stats = state?.stats;
   const statsRangeOptions = useMemo(
@@ -1075,22 +1084,31 @@ export function CodexLocalAccessModal({
                   <div className="codex-local-access-config-grid">
                     <div className="codex-local-access-config-card codex-local-access-config-card-base">
                       <div className="codex-local-access-config-head">
-                        <span className="codex-local-access-config-label">
-                          {t('codex.localAccess.baseUrl', '地址')}
-                        </span>
+                        <div className="codex-local-access-config-label codex-local-access-address-select">
+                          <SingleSelectDropdown
+                            value={addressKind}
+                            options={addressOptions}
+                            onChange={onAddressKindChange}
+                            menuClassName="codex-local-access-address-menu"
+                            menuWidth={92}
+                            menuMaxHeight={120}
+                            disabled={addressOptions.length < 2}
+                            ariaLabel={t('codex.localAccess.addressKind', '地址类型')}
+                          />
+                        </div>
                         <div className="codex-local-access-config-actions">
                           <button
                             type="button"
                             className="folder-icon-btn"
-                            onClick={() => void handleCopy('baseUrl', baseUrl)}
+                            onClick={() => void handleCopy('baseUrl', displayBaseUrl)}
                             title={t('common.copy', '复制')}
                           >
                             {copiedField === 'baseUrl' ? <Check size={14} /> : <Copy size={14} />}
                           </button>
                         </div>
                       </div>
-                      <code className="codex-local-access-code" title={baseUrl}>
-                        {baseUrl}
+                      <code className="codex-local-access-code" title={displayBaseUrl}>
+                        {displayBaseUrl}
                       </code>
                     </div>
 
