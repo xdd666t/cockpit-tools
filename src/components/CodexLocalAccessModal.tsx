@@ -49,6 +49,7 @@ import {
   type MultiSelectFilterOption,
 } from './MultiSelectFilterDropdown';
 import { SingleSelectDropdown } from './SingleSelectDropdown';
+import { useEscClose } from '../hooks/useEscClose';
 import './GroupAccountPickerModal.css';
 import './CodexLocalAccessModal.css';
 
@@ -169,6 +170,7 @@ export function CodexLocalAccessModal({
   portCleanupBusy,
 }: CodexLocalAccessModalProps) {
   const { t } = useTranslation();
+  useEscClose(isOpen, onClose);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filterTypes, setFilterTypes] = useState<string[]>([]);

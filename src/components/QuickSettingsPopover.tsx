@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { Settings, RefreshCw, FolderOpen, Zap, X } from 'lucide-react';
+import { useEscClose } from '../hooks/useEscClose';
 import * as accountService from '../services/accountService';
 import * as codexService from '../services/codexService';
 import { getAccountGroups, type AccountGroup } from '../services/accountGroupService';
@@ -698,19 +699,7 @@ export function QuickSettingsPopover({ type }: QuickSettingsPopoverProps) {
     };
   }, []);
 
-  // Close on Escape
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsOpen(false);
-    };
-
-    document.addEventListener('keydown', handleEsc);
-    return () => {
-      document.removeEventListener('keydown', handleEsc);
-    };
-  }, [isOpen]);
+  useEscClose(isOpen, () => setIsOpen(false));
 
   // 外部触发：按平台类型打开设置弹框
   useEffect(() => {

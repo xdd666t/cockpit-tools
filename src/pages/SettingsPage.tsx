@@ -47,6 +47,7 @@ import {
 } from '../utils/currentAccountRefresh';
 import { ALL_PLATFORM_IDS, PlatformId } from '../types/platform';
 import { SettingsAccountTransferSection } from '../components/SettingsAccountTransferSection';
+import { useEscClose } from '../hooks/useEscClose';
 import './settings/Settings.css';
 import { 
   Github, User, Rocket, Save, FolderOpen,
@@ -1723,6 +1724,8 @@ export function SettingsPage() {
   const handleCloseReleaseHistory = () => {
     setReleaseHistoryOpen(false);
   };
+
+  useEscClose(releaseHistoryOpen, handleCloseReleaseHistory);
 
   const handleDownloadReleaseVersion = async (version: string) => {
     const targetVersion = String(version || '').trim();
