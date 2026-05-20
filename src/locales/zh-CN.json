@@ -1409,7 +1409,7 @@
     "batchDeleteConfirm": "确定要删除选中的 {{count}} 个账号吗？",
     "switched": "已切换至 {{email}}",
     "switchFailed": "切换失败：{{error}}",
-    "antigravityLegacyUnsupported": "暂不支持 Antigravity 2.0.0 及以上版本，请选择 Antigravity IDE",
+    "antigravityLegacyUnsupported": "暂不支持 Antigravity 2.0.0 及以上版本，请选择小于Antigravity 2.0.0版本或者使用Antigravity IDE",
     "importSuccess": "成功导入 {{count}} 个账号",
     "importLocalSuccess": "成功导入账号: {{email}}",
     "importFailed": "导入失败: {{error}}",

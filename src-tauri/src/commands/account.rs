@@ -56,7 +56,7 @@ fn ensure_legacy_antigravity_switch_supported() -> Result<(), String> {
     match compare_versions(&info.version, "2.0.0") {
         Some(std::cmp::Ordering::Less) => Ok(()),
         Some(_) => Err(
-            "ANTIGRAVITY_LEGACY_UNSUPPORTED:暂不支持 Antigravity 2.0.0 及以上版本，请选择 Antigravity IDE"
+            "ANTIGRAVITY_LEGACY_UNSUPPORTED:暂不支持 Antigravity 2.0.0 及以上版本，请选择小于Antigravity 2.0.0版本或者使用Antigravity IDE"
                 .to_string(),
         ),
         None => Err(format!(

@@ -1363,7 +1363,7 @@
     "batchDeleteConfirm": "選択した {{count}} 個のアカウントを削除してもよろしいですか？",
     "switched": "{{email}} に切り替えました",
     "switchFailed": "切り替えに失敗しました: {{error}}",
-    "antigravityLegacyUnsupported": "ここでは Antigravity 2.0.0 以降はサポートしていません。Antigravity IDE を選択してください。",
+    "antigravityLegacyUnsupported": "ここでは Antigravity 2.0.0 以降はサポートしていません。Antigravity 2.0.0 未満のバージョンを選ぶか、Antigravity IDE を使用してください。",
     "importSuccess": "{{count}} 個のアカウントをインポートしました",
     "importLocalSuccess": "アカウントをインポートしました: {{email}}",
     "importFailed": "インポートに失敗しました: {{error}}",

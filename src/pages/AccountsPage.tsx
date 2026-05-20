@@ -243,7 +243,7 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
     if (raw.startsWith('ANTIGRAVITY_LEGACY_UNSUPPORTED:')) {
       return t(
         'messages.antigravityLegacyUnsupported',
-        '暂不支持 Antigravity 2.0.0 及以上版本，请选择 Antigravity IDE'
+        '暂不支持 Antigravity 2.0.0 及以上版本，请选择小于Antigravity 2.0.0版本或者使用Antigravity IDE'
       )
     }
     return raw

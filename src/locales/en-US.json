@@ -1409,7 +1409,7 @@
     "batchDeleteConfirm": "Are you sure you want to delete {{count}} selected accounts?",
     "switched": "Switched to {{email}}",
     "switchFailed": "Switch failed: {{error}}",
-    "antigravityLegacyUnsupported": "Antigravity 2.0.0 and later is not supported here. Select Antigravity IDE.",
+    "antigravityLegacyUnsupported": "Antigravity 2.0.0 and later is not supported here. Choose an Antigravity version below 2.0.0, or use Antigravity IDE.",
     "importSuccess": "Successfully imported {{count}} accounts",
     "importLocalSuccess": "Successfully imported account: {{email}}",
     "importFailed": "Import failed: {{error}}",

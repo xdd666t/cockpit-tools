@@ -1363,7 +1363,7 @@
     "batchDeleteConfirm": "Opravdu chcete smazat {{count}} vybraných účtů?",
     "switched": "Přepnuto na {{email}}",
     "switchFailed": "Přepnutí selhalo: {{error}}",
-    "antigravityLegacyUnsupported": "Antigravity 2.0.0 a novější zde není podporováno. Vyberte Antigravity IDE.",
+    "antigravityLegacyUnsupported": "Antigravity 2.0.0 a novější zde není podporováno. Vyberte verzi Antigravity nižší než 2.0.0, nebo použijte Antigravity IDE.",
     "importSuccess": "Úspěšně importováno {{count}} účtů",
     "importLocalSuccess": "Úspěšně importován účet: {{email}}",
     "importFailed": "Import selhal: {{error}}",

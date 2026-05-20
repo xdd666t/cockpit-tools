@@ -1363,7 +1363,7 @@
     "batchDeleteConfirm": "Bạn có chắc chắn muốn xóa {{count}} tài khoản đã chọn không?",
     "switched": "Đã chuyển sang {{email}}",
     "switchFailed": "Chuyển đổi thất bại: {{error}}",
-    "antigravityLegacyUnsupported": "Antigravity 2.0.0 trở lên không được hỗ trợ tại đây. Hãy chọn Antigravity IDE.",
+    "antigravityLegacyUnsupported": "Antigravity 2.0.0 trở lên không được hỗ trợ tại đây. Hãy chọn phiên bản Antigravity thấp hơn 2.0.0 hoặc dùng Antigravity IDE.",
     "importSuccess": "Nhập thành công {{count}} tài khoản",
     "importLocalSuccess": "Nhập thành công tài khoản: {{email}}",
     "importFailed": "Nhập thất bại: {{error}}",

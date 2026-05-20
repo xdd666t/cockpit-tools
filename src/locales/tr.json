@@ -1363,7 +1363,7 @@
     "batchDeleteConfirm": "Seçilen {{count}} hesabı silmek istediğinizden emin misiniz?",
     "switched": "{{email}} hesabına geçildi",
     "switchFailed": "Geçiş hatası: {{error}}",
-    "antigravityLegacyUnsupported": "Antigravity 2.0.0 ve sonrası burada desteklenmiyor. Antigravity IDE seçin.",
+    "antigravityLegacyUnsupported": "Antigravity 2.0.0 ve sonrası burada desteklenmiyor. Antigravity 2.0.0 altı bir sürüm seçin veya Antigravity IDE'yi kullanın.",
     "importSuccess": "{{count}} hesap başarıyla içe aktarıldı",
     "importLocalSuccess": "Hesap başarıyla içe aktarıldı: {{email}}",
     "importFailed": "İçe aktarma hatası: {{error}}",

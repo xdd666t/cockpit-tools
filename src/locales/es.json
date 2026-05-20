@@ -1363,7 +1363,7 @@
     "batchDeleteConfirm": "¿Estás seguro de que quieres eliminar las {{count}} cuentas seleccionadas?",
     "switched": "Cambiado a {{email}}",
     "switchFailed": "Fallo al cambiar: {{error}}",
-    "antigravityLegacyUnsupported": "Antigravity 2.0.0 y versiones posteriores no son compatibles aquí. Selecciona Antigravity IDE.",
+    "antigravityLegacyUnsupported": "Antigravity 2.0.0 y versiones posteriores no son compatibles aquí. Elige una versión de Antigravity anterior a 2.0.0 o usa Antigravity IDE.",
     "importSuccess": "Importadas con éxito {{count}} cuentas",
     "importLocalSuccess": "Cuenta importada con éxito: {{email}}",
     "importFailed": "Fallo al importar: {{error}}",

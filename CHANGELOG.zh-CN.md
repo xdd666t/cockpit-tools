@@ -7,6 +7,20 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
 ---
+## [0.24.1] - 2026-05-21
+
+### 新增
+- **Antigravity 主页面现显示所选目标的已安装版本**：版本徽标会跟随当前 Antigravity 或 Antigravity IDE 目标，便于确认正在管理的本地客户端版本。
+
+### 变更
+- **Antigravity 现作为一个分组管理 Antigravity 与 Antigravity IDE 两个目标**：平台管理会保持 Antigravity 分组在首位，分组切换器会决定总览操作、版本读取与切号使用的目标。
+- **Antigravity 旧版切号现按安装版本门禁执行**：低于 `2.0.0` 的 Antigravity 继续使用旧版落盘与启动路径；Antigravity `2.0.0` 及以上版本会阻断切号，并引导使用 Antigravity IDE。
+- **Codex 本地 API 服务代理配置改为专用 API 代理地址**：服务会校验填写的代理地址，仅将其用于 API 上游请求；地址为空时直连上游。
+
+### 修复
+- **Antigravity IDE 路径与版本检测现适配官方重命名后的安装结构**：macOS、Windows 与 Linux 检测会区分旧版 Antigravity 和 Antigravity IDE，并解析正确的应用元数据与可执行文件候选路径。
+
+---
 ## [0.24.0] - 2026-05-20
 
 ### 变更

@@ -1409,7 +1409,7 @@
     "batchDeleteConfirm": "هل أنت متأكد من حذف {{count}} حسابات مختارة؟",
     "switched": "تم التبديل إلى {{email}}",
     "switchFailed": "فشل التبديل: {{error}}",
-    "antigravityLegacyUnsupported": "لا يدعم هذا الموضع Antigravity 2.0.0 والإصدارات الأحدث. اختر Antigravity IDE.",
+    "antigravityLegacyUnsupported": "لا يدعم هذا الموضع Antigravity 2.0.0 والإصدارات الأحدث. اختر إصدار Antigravity أقل من 2.0.0، أو استخدم Antigravity IDE.",
     "importSuccess": "تم استيراد {{count}} حسابات بنجاح",
     "importLocalSuccess": "تم استيراد الحساب بنجاح: {{email}}",
     "importFailed": "فشل الاستيراد: {{error}}",

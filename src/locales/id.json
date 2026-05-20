@@ -1409,7 +1409,7 @@
     "batchDeleteConfirm": "Yakin ingin menghapus {{count}} akun yang dipilih?",
     "switched": "Beralih ke {{email}}",
     "switchFailed": "Penggantian gagal: {{error}}",
-    "antigravityLegacyUnsupported": "Antigravity 2.0.0 dan yang lebih baru tidak didukung di sini. Pilih Antigravity IDE.",
+    "antigravityLegacyUnsupported": "Antigravity 2.0.0 dan yang lebih baru tidak didukung di sini. Pilih versi Antigravity di bawah 2.0.0, atau gunakan Antigravity IDE.",
     "importSuccess": "Berhasil mengimpor {{count}} akun",
     "importLocalSuccess": "Berhasil mengimpor akun: {{email}}",
     "importFailed": "Impor gagal: {{error}}",

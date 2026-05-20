@@ -1363,7 +1363,7 @@
     "batchDeleteConfirm": "確定要刪除選中的 {{count}} 個帳號嗎？",
     "switched": "已切換至 {{email}}",
     "switchFailed": "切換失敗：{{error}}",
-    "antigravityLegacyUnsupported": "暫不支援 Antigravity 2.0.0 及以上版本，請選擇 Antigravity IDE",
+    "antigravityLegacyUnsupported": "暫不支援 Antigravity 2.0.0 及以上版本，請選擇小於 Antigravity 2.0.0 的版本，或使用 Antigravity IDE",
     "importSuccess": "成功匯入 {{count}} 個帳號",
     "importLocalSuccess": "成功匯入帳號: {{email}}",
     "importFailed": "匯入失敗: {{error}}",

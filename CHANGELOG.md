@@ -7,6 +7,20 @@ All notable changes to Cockpit Tools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
+## [0.24.1] - 2026-05-21
+
+### Added
+- **Antigravity overview now shows the installed version for the selected target**: the version badge follows the active Antigravity or Antigravity IDE target so users can confirm which local client is being managed.
+
+### Changed
+- **Antigravity is now managed as one group with separate Antigravity and Antigravity IDE targets**: Platform Management keeps the Antigravity group first, and the group switcher controls which target is used for overview actions, version lookup, and account switching.
+- **Legacy Antigravity switching is now gated by the installed version**: Antigravity versions below `2.0.0` continue to use the legacy disk and launch paths, while Antigravity `2.0.0` and later are blocked with guidance to use Antigravity IDE.
+- **Codex Local API Service proxy configuration now uses a dedicated API proxy URL**: the service validates the configured proxy address, applies it only to API upstream traffic, and uses direct upstream access when the address is empty.
+
+### Fixed
+- **Antigravity IDE path and version detection now follows the renamed official install layout**: macOS, Windows, and Linux detection distinguish legacy Antigravity from Antigravity IDE and resolve the correct app metadata and executable candidates.
+
+---
 ## [0.24.0] - 2026-05-20
 
 ### Changed

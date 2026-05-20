@@ -1363,7 +1363,7 @@
     "batchDeleteConfirm": "Вы уверены, что хотите удалить {{count}} выбранных аккаунтов?",
     "switched": "Переключено на {{email}}",
     "switchFailed": "Ошибка переключения: {{error}}",
-    "antigravityLegacyUnsupported": "Antigravity 2.0.0 и новее здесь не поддерживаются. Выберите Antigravity IDE.",
+    "antigravityLegacyUnsupported": "Antigravity 2.0.0 и новее здесь не поддерживаются. Выберите версию Antigravity ниже 2.0.0 или используйте Antigravity IDE.",
     "importSuccess": "Успешно импортировано {{count}} аккаунтов",
     "importLocalSuccess": "Аккаунт успешно импортирован: {{email}}",
     "importFailed": "Ошибка импорта: {{error}}",
