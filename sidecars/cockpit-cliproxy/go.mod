@@ -4,8 +4,10 @@ go 1.26.0
 
 require (
 	github.com/gin-gonic/gin v1.10.1
-	github.com/router-for-me/CLIProxyAPI/v7 v7.0.0
+	github.com/router-for-me/CLIProxyAPI/v7 v7.0.2
 )
+
+replace github.com/router-for-me/CLIProxyAPI/v7 => ./cdk/CLIProxyAPI
 
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect

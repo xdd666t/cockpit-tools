@@ -3,7 +3,7 @@ use crate::models::codex::{
     CodexQuota, CodexTokens,
 };
 use crate::models::codex_local_access::{
-    CodexLocalAccessCustomRoutingRule, CodexLocalAccessModelAlias,
+    CodexLocalAccessCustomRoutingRule, CodexLocalAccessModelAlias, CodexLocalAccessModelPricing,
     CodexLocalAccessPortCleanupResult, CodexLocalAccessRequestKind,
     CodexLocalAccessRoutingStrategy, CodexLocalAccessScope, CodexLocalAccessState,
     CodexLocalAccessTestResult, CodexLocalAccessUsageEventPage,
@@ -1008,6 +1008,13 @@ pub async fn codex_local_access_update_model_rules(
     excluded_models: Vec<String>,
 ) -> Result<CodexLocalAccessState, String> {
     codex_local_access::update_local_access_model_rules(model_aliases, excluded_models).await
+}
+
+#[tauri::command]
+pub async fn codex_local_access_update_model_pricings(
+    model_pricings: Vec<CodexLocalAccessModelPricing>,
+) -> Result<CodexLocalAccessState, String> {
+    codex_local_access::update_local_access_model_pricings(model_pricings).await
 }
 
 #[tauri::command]
