@@ -627,8 +627,10 @@ pub async fn codex_delete_instance(instance_id: String) -> Result<(), String> {
     modules::codex_instance::delete_instance(&instance_id)
 }
 
-#[tauri::command]
-pub async fn codex_start_instance(instance_id: String) -> Result<CodexInstanceProfileView, String> {
+async fn codex_start_instance_internal(
+    instance_id: String,
+    skip_default_bind_account_injection: bool,
+) -> Result<CodexInstanceProfileView, String> {
     if instance_id == DEFAULT_INSTANCE_ID {
         let default_dir = modules::codex_instance::get_default_codex_home()?;
         let previous_credential_kind = read_launch_credential_kind_for_dir(&default_dir);
@@ -644,7 +646,14 @@ pub async fn codex_start_instance(instance_id: String) -> Result<CodexInstancePr
             default_settings.app_speed.clone(),
         )?;
         if let Some(ref account_id) = default_bind_account_id {
-            inject_bound_account_to_profile(&default_dir, account_id).await?;
+            if skip_default_bind_account_injection {
+                modules::logger::log_info(&format!(
+                    "[Codex Start] skip default bind-account injection because upstream already prepared profile: account_id={}",
+                    account_id
+                ));
+            } else {
+                inject_bound_account_to_profile(&default_dir, account_id).await?;
+            }
         }
         let launch_credential_change = build_launch_credential_change(
             previous_credential_kind,
@@ -729,6 +738,16 @@ pub async fn codex_start_instance(instance_id: String) -> Result<CodexInstancePr
         CodexInstanceProfileView::from_profile(updated, running, initialized)
             .with_launch_credential_change(launch_credential_change),
     )
+}
+
+pub(crate) async fn codex_start_default_with_prepared_profile(
+) -> Result<CodexInstanceProfileView, String> {
+    codex_start_instance_internal(DEFAULT_INSTANCE_ID.to_string(), true).await
+}
+
+#[tauri::command]
+pub async fn codex_start_instance(instance_id: String) -> Result<CodexInstanceProfileView, String> {
+    codex_start_instance_internal(instance_id, false).await
 }
 
 #[tauri::command]
