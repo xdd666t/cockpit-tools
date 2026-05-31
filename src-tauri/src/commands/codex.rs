@@ -237,8 +237,7 @@ pub async fn switch_codex_account(
         if process::is_codex_running() {
             logger::log_info("检测到 Codex 正在运行，将按默认实例 PID 逻辑重启");
         }
-        match crate::commands::codex_instance::codex_start_instance("__default__".to_string()).await
-        {
+        match crate::commands::codex_instance::codex_start_default_with_prepared_profile().await {
             Ok(_) => {}
             Err(e) => {
                 logger::log_warn(&format!("Codex 启动失败: {}", e));
@@ -1078,8 +1077,7 @@ pub async fn codex_local_access_activate(app: AppHandle) -> Result<CodexLocalAcc
         if process::is_codex_running() {
             logger::log_info("检测到 Codex 正在运行，将按默认实例 PID 逻辑重启");
         }
-        match crate::commands::codex_instance::codex_start_instance("__default__".to_string()).await
-        {
+        match crate::commands::codex_instance::codex_start_default_with_prepared_profile().await {
             Ok(_) => {}
             Err(e) => {
                 logger::log_warn(&format!("Codex 启动失败: {}", e));
