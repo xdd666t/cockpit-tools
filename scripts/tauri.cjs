@@ -17,21 +17,34 @@ function run(command, args, options = {}) {
     throw result.error;
   }
 
-  if (typeof result.status === 'number') {
-    process.exit(result.status);
+  if (result.status !== 0) {
+    process.exit(typeof result.status === 'number' ? result.status : 1);
+  }
+}
+
+function runFinal(command, args, options = {}) {
+  const result = spawnSync(command, args, {
+    cwd: repoRoot,
+    stdio: 'inherit',
+    shell: false,
+    ...options,
+  });
+
+  if (result.error) {
+    throw result.error;
   }
 
-  process.exit(1);
+  process.exit(typeof result.status === 'number' ? result.status : 1);
 }
 
 function runTauriDirect() {
   run('npm.cmd', ['run', 'sync-version'], { shell: process.platform === 'win32' });
-  run('npx.cmd', ['tauri', ...process.argv.slice(2)], { shell: process.platform === 'win32' });
+  runFinal('npx.cmd', ['tauri', ...process.argv.slice(2)], { shell: process.platform === 'win32' });
 }
 
 if (process.platform !== 'win32') {
   run('npm', ['run', 'sync-version']);
-  run('npx', ['tauri', ...process.argv.slice(2)]);
+  runFinal('npx', ['tauri', ...process.argv.slice(2)]);
 }
 
 const vcvars64Path = 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat';
@@ -70,7 +83,7 @@ const scriptBody = [
 fs.writeFileSync(tempScriptPath, scriptBody);
 
 try {
-  run('cmd.exe', ['/d', '/c', tempScriptPath]);
+  runFinal('cmd.exe', ['/d', '/c', tempScriptPath]);
 } finally {
   fs.rmSync(tempScriptPath, { force: true });
 }
