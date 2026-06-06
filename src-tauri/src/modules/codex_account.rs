@@ -32,6 +32,7 @@ const CODEX_CONFIG_FILE_NAME: &str = "config.toml";
 const CODEX_CONFIG_OPENAI_BASE_URL_KEY: &str = "openai_base_url";
 const CODEX_CONFIG_MODEL_PROVIDER_KEY: &str = "model_provider";
 const CODEX_CONFIG_MODEL_PROVIDERS_KEY: &str = "model_providers";
+const CODEX_CONFIG_MODEL_CATALOG_JSON_KEY: &str = "model_catalog_json";
 const CODEX_CONFIG_EXPERIMENTAL_BEARER_TOKEN_KEY: &str = "experimental_bearer_token";
 const CODEX_CONFIG_MODEL_CONTEXT_WINDOW_KEY: &str = "model_context_window";
 const CODEX_CONFIG_MODEL_AUTO_COMPACT_TOKEN_LIMIT_KEY: &str = "model_auto_compact_token_limit";
@@ -877,6 +878,7 @@ fn write_api_provider_to_config_toml(
 
     match provider_config.mode {
         CodexApiProviderMode::OpenaiBuiltin => {
+            let _ = doc.remove(CODEX_CONFIG_MODEL_CATALOG_JSON_KEY);
             let _ = doc.remove(CODEX_CONFIG_MODEL_PROVIDER_KEY);
             remove_managed_api_key_model_providers_from_doc(&mut doc);
             #[cfg(target_os = "windows")]
@@ -894,6 +896,7 @@ fn write_api_provider_to_config_toml(
             }
         }
         CodexApiProviderMode::Custom => {
+            let _ = doc.remove(CODEX_CONFIG_MODEL_CATALOG_JSON_KEY);
             let _ = doc.remove(CODEX_CONFIG_OPENAI_BASE_URL_KEY);
             let provider_id = provider_config
                 .provider_id
@@ -1028,6 +1031,7 @@ fn write_api_key_provider_to_config_toml(
     };
 
     let _ = doc.remove(CODEX_CONFIG_OPENAI_BASE_URL_KEY);
+    let _ = doc.remove(CODEX_CONFIG_MODEL_CATALOG_JSON_KEY);
     doc[CODEX_CONFIG_MODEL_PROVIDER_KEY] = value(CODEX_RUNTIME_MODEL_PROVIDER_ID);
     remove_managed_api_key_model_providers_from_doc(&mut doc);
     if doc.get(CODEX_CONFIG_MODEL_PROVIDERS_KEY).is_none() {
@@ -5995,6 +5999,7 @@ mod tests {
             &config_path,
             r#"model_provider = "codex_local_access"
 openai_base_url = "https://legacy.example.com/v1"
+model_catalog_json = "cockpit-provider-model-catalog.json"
 model_context_window = 1000000
 
 [model_providers.codex_local_access]
@@ -6041,6 +6046,7 @@ requires_openai_auth = false
         assert!(!content.contains("[model_providers.cockpit_api]"));
         assert!(!content.contains("[model_providers.openai_api_key]"));
         assert!(content.contains("[model_providers.user_manual_provider_not_managed]"));
+        assert!(!content.contains("model_catalog_json"));
         assert!(!content.contains("openai_base_url"));
         assert!(content.contains("model_context_window = 1000000"));
         assert_eq!(
@@ -6282,6 +6288,7 @@ requires_openai_auth = false
             &config_path,
             r#"model_provider = "mimo"
 openai_base_url = "https://legacy.example.com/v1"
+model_catalog_json = "cockpit-provider-model-catalog.json"
 model_context_window = 1000000
 
 [model_providers.mimo]
@@ -6314,6 +6321,7 @@ requires_openai_auth = true
         assert!(content.contains("[model_providers.codex_local_access]"));
         assert!(content.contains("[model_providers.mimo]"));
         assert!(content.contains("[model_providers.relay]"));
+        assert!(!content.contains("model_catalog_json"));
         assert!(!content.contains("openai_base_url"));
         assert!(content.contains("model_context_window = 1000000"));
 
