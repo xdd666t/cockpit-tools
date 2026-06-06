@@ -527,9 +527,10 @@ export function SettingsWebdavSyncSection() {
             <div className="row-title">{t('settings.webdav.urlTitle', '服务地址')}</div>
             <div className="row-desc">{t('settings.webdav.urlDesc', '坚果云默认地址：https://dav.jianguoyun.com/dav/')}</div>
           </div>
-          <div className="row-control row-control--grow">
+          <div className="row-control row-control--grow" style={{ maxWidth: '240px' }}>
             <input
               className="settings-select settings-select--input-mode settings-webdav-input"
+              style={{ width: '100%' }}
               value={url}
               disabled={settingsLoading || busy}
               onChange={(event) => setUrl(event.target.value)}
