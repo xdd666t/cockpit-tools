@@ -2704,18 +2704,16 @@ fn detect_codex_store_app_user_model_id() -> Option<String> {
 }
 
 #[cfg(target_os = "windows")]
-fn powershell_single_quoted_array(values: &[String]) -> String {
-    if values.is_empty() {
-        return "@()".to_string();
+fn powershell_argument_list_clause(values: &[String]) -> String {
+    let arguments = values
+        .iter()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| format!("'{}'", escape_powershell_single_quoted(value)))
+        .collect::<Vec<_>>();
+    if arguments.is_empty() {
+        return String::new();
     }
-    format!(
-        "@({})",
-        values
-            .iter()
-            .map(|value| format!("'{}'", escape_powershell_single_quoted(value)))
-            .collect::<Vec<_>>()
-            .join(", ")
-    )
+    format!(" -ArgumentList @({})", arguments.join(", "))
 }
 
 #[cfg(target_os = "windows")]
@@ -2749,12 +2747,12 @@ fn launch_codex_via_store_app_user_model_id(
         .map(|(key, value)| format!("$env:{}='{}'", key, escape_powershell_single_quoted(&value)))
         .collect::<Vec<_>>()
         .join("\n");
-    let argument_list = powershell_single_quoted_array(extra_args);
+    let argument_list = powershell_argument_list_clause(extra_args);
     let script = format!(
         r#"{env_lines}
 $appId='{escaped}';
 $target='shell:AppsFolder\' + $appId
-Start-Process -FilePath $target -ArgumentList {argument_list} -ErrorAction Stop | Out-Null"#
+Start-Process -FilePath $target{argument_list} -ErrorAction Stop | Out-Null"#
     );
 
     let output = powershell_output(&["-Command", &script])
@@ -2799,11 +2797,11 @@ fn launch_codex_via_powershell_exec_path(
         .map(|(key, value)| format!("$env:{}='{}'", key, escape_powershell_single_quoted(&value)))
         .collect::<Vec<_>>()
         .join("\n");
-    let argument_list = powershell_single_quoted_array(extra_args);
+    let argument_list = powershell_argument_list_clause(extra_args);
     let script = format!(
         r#"{env_lines}
 $exe='{exe}';
-Start-Process -FilePath $exe -ArgumentList {argument_list} -ErrorAction Stop | Out-Null"#,
+Start-Process -FilePath $exe{argument_list} -ErrorAction Stop | Out-Null"#,
         exe = escape_powershell_single_quoted(launch_path),
     );
 
