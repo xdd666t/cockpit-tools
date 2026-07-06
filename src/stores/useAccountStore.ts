@@ -5,7 +5,7 @@ import * as accountService from '../services/accountService';
 import { emitAccountsChanged, emitCurrentAccountChanged } from '../utils/accountSyncEvents';
 import {
   AntigravityRuntimeTarget,
-  getAntigravityRuntimeTarget,
+  DEFAULT_ANTIGRAVITY_RUNTIME_TARGET,
   normalizeAntigravityRuntimeTarget,
 } from '../utils/antigravityRuntimeTarget';
 
@@ -116,52 +116,35 @@ function toPersistedAccountSnapshot(account: Account): Account {
 // 防抖状态（在 store 外部维护，避免触发 re-render）
 let fetchAccountsPromise: Promise<void> | null = null;
 let fetchAccountsLastTime = 0;
-const fetchCurrentPromiseByTarget: Partial<Record<AntigravityRuntimeTarget, Promise<void>>> = {};
-const fetchCurrentLastTimeByTarget: Partial<Record<AntigravityRuntimeTarget, number>> = {};
+const fetchCurrentPromises: Partial<Record<AntigravityRuntimeTarget, Promise<void>>> = {};
+const fetchCurrentLastTimes: Partial<Record<AntigravityRuntimeTarget, number>> = {};
 let allowNextEmptyAccountList = false;
-let allowNextEmptyCurrentAccount = false;
+const allowNextEmptyCurrentAccountByTarget: Partial<Record<AntigravityRuntimeTarget, boolean>> = {};
 const DEBOUNCE_MS = 500;
 
-type CurrentAccountsByTarget = Partial<Record<AntigravityRuntimeTarget, Account | null>>;
+type CurrentAccountsByTarget = Record<AntigravityRuntimeTarget, Account | null>;
+
+function buildEmptyCurrentAccountsByTarget(): CurrentAccountsByTarget {
+    return {
+        antigravity: null,
+        antigravity_ide: null,
+    };
+}
 
 function resolveRuntimeTarget(runtimeTarget?: AntigravityRuntimeTarget): AntigravityRuntimeTarget {
-  return normalizeAntigravityRuntimeTarget(runtimeTarget ?? getAntigravityRuntimeTarget());
+    return normalizeAntigravityRuntimeTarget(runtimeTarget ?? DEFAULT_ANTIGRAVITY_RUNTIME_TARGET);
 }
 
 function updateCurrentAccountsByTarget(
-  currentAccountsByTarget: CurrentAccountsByTarget | undefined,
-  target: AntigravityRuntimeTarget,
-  account: Account | null,
+    current: CurrentAccountsByTarget | undefined,
+    runtimeTarget: AntigravityRuntimeTarget,
+    account: Account | null,
 ): CurrentAccountsByTarget {
-  return {
-    ...(currentAccountsByTarget ?? {}),
-    [target]: account,
-  };
-}
-
-function replaceCurrentAccountSnapshot(
-  currentAccountsByTarget: CurrentAccountsByTarget | undefined,
-  accountId: string,
-  account: Account,
-): CurrentAccountsByTarget {
-  const next: CurrentAccountsByTarget = { ...(currentAccountsByTarget ?? {}) };
-  for (const target of ['antigravity', 'antigravity_ide'] as const) {
-    if (next[target]?.id === accountId) {
-      next[target] = account;
-    }
-  }
-  return next;
-}
-
-function toPersistedCurrentAccountsByTarget(
-  currentAccountsByTarget: CurrentAccountsByTarget | undefined,
-): CurrentAccountsByTarget {
-  const next: CurrentAccountsByTarget = {};
-  for (const target of ['antigravity', 'antigravity_ide'] as const) {
-    const account = currentAccountsByTarget?.[target];
-    next[target] = account ? toPersistedAccountSnapshot(account) : account ?? null;
-  }
-  return next;
+    return {
+        ...buildEmptyCurrentAccountsByTarget(),
+        ...(current ?? {}),
+        [runtimeTarget]: account,
+    };
 }
 
 interface AccountState {
@@ -190,7 +173,7 @@ export const useAccountStore = create<AccountState>()(
     (set, get) => ({
       accounts: [],
       currentAccount: null,
-      currentAccountsByTarget: {},
+      currentAccountsByTarget: buildEmptyCurrentAccountsByTarget(),
       loading: false,
       error: null,
 
@@ -229,33 +212,33 @@ export const useAccountStore = create<AccountState>()(
           return fetchAccountsPromise;
       },
 
-      fetchCurrentAccount: async (runtimeTarget?: AntigravityRuntimeTarget) => {
+      fetchCurrentAccount: async (runtimeTarget) => {
           const target = resolveRuntimeTarget(runtimeTarget);
           const now = Date.now();
-          const fetchCurrentPromise = fetchCurrentPromiseByTarget[target] ?? null;
-          const fetchCurrentLastTime = fetchCurrentLastTimeByTarget[target] ?? 0;
           
           // 防抖：复用正在进行的请求
-          if (fetchCurrentPromise && now - fetchCurrentLastTime < DEBOUNCE_MS) {
-              return fetchCurrentPromise;
+          if (
+              fetchCurrentPromises[target] &&
+              now - (fetchCurrentLastTimes[target] ?? 0) < DEBOUNCE_MS
+          ) {
+              return fetchCurrentPromises[target];
           }
           
-          fetchCurrentLastTimeByTarget[target] = now;
+          fetchCurrentLastTimes[target] = now;
           
-          const request = (async () => {
+          fetchCurrentPromises[target] = (async () => {
               try {
                   const account = await accountService.getCurrentAccount(target);
-                  const currentForTarget = get().currentAccountsByTarget?.[target] ?? null;
                   if (
                       !account &&
-                      currentForTarget &&
+                      get().currentAccountsByTarget[target] &&
                       get().accounts.length > 0 &&
-                      !allowNextEmptyCurrentAccount
+                      !allowNextEmptyCurrentAccountByTarget[target]
                   ) {
-                      console.warn('[AccountStore] 忽略异常空当前账号，保留本地缓存当前账号');
+                      console.warn(`[AccountStore] 忽略异常空当前账号，保留本地缓存当前账号: ${target}`);
                       return;
                   }
-                  allowNextEmptyCurrentAccount = false;
+                  allowNextEmptyCurrentAccountByTarget[target] = false;
                   set((state) => ({
                       currentAccount: account,
                       currentAccountsByTarget: updateCurrentAccountsByTarget(
@@ -267,15 +250,14 @@ export const useAccountStore = create<AccountState>()(
               } catch (e) {
                   console.error('Failed to fetch current account:', e);
               } finally {
-                  allowNextEmptyCurrentAccount = false;
+                  allowNextEmptyCurrentAccountByTarget[target] = false;
                   setTimeout(() => {
-                      fetchCurrentPromiseByTarget[target] = undefined;
+                      fetchCurrentPromises[target] = undefined;
                   }, 100);
               }
           })();
           
-          fetchCurrentPromiseByTarget[target] = request;
-          return request;
+          return fetchCurrentPromises[target];
       },
 
     addAccount: async (email: string, refreshToken: string) => {
@@ -289,76 +271,94 @@ export const useAccountStore = create<AccountState>()(
     },
 
     deleteAccount: async (accountId: string) => {
-        const target = resolveRuntimeTarget();
-        const previousCurrentAccountId =
-            get().currentAccountsByTarget?.[target]?.id ?? get().currentAccount?.id ?? null;
+        const previousCurrentAccounts = get().currentAccountsByTarget;
         allowNextEmptyAccountList = get().accounts.length <= 1;
-        allowNextEmptyCurrentAccount = previousCurrentAccountId === accountId;
+        allowNextEmptyCurrentAccountByTarget.antigravity =
+            previousCurrentAccounts.antigravity?.id === accountId;
+        allowNextEmptyCurrentAccountByTarget.antigravity_ide =
+            previousCurrentAccounts.antigravity_ide?.id === accountId;
         try {
             await accountService.deleteAccount(accountId);
             await get().fetchAccounts();
-            await get().fetchCurrentAccount(target);
+            await Promise.allSettled([
+                get().fetchCurrentAccount('antigravity'),
+                get().fetchCurrentAccount('antigravity_ide'),
+            ]);
         } finally {
             allowNextEmptyAccountList = false;
-            allowNextEmptyCurrentAccount = false;
+            allowNextEmptyCurrentAccountByTarget.antigravity = false;
+            allowNextEmptyCurrentAccountByTarget.antigravity_ide = false;
         }
         await emitAccountsChanged({
             platformId: 'antigravity',
             reason: 'delete',
         });
-        const nextCurrentAccountId = get().currentAccountsByTarget?.[target]?.id ?? null;
-        if (previousCurrentAccountId !== nextCurrentAccountId) {
-            await emitCurrentAccountChanged({
-                platformId: target,
-                accountId: nextCurrentAccountId,
-                reason: 'delete',
-            });
+        for (const target of ['antigravity', 'antigravity_ide'] as const) {
+            const previousCurrentAccountId = previousCurrentAccounts[target]?.id ?? null;
+            const nextCurrentAccountId = get().currentAccountsByTarget[target]?.id ?? null;
+            if (previousCurrentAccountId !== nextCurrentAccountId) {
+                await emitCurrentAccountChanged({
+                    platformId: target,
+                    accountId: nextCurrentAccountId,
+                    reason: 'delete',
+                });
+            }
         }
     },
 
     deleteAccounts: async (accountIds: string[]) => {
-        const target = resolveRuntimeTarget();
-        const previousCurrentAccountId =
-            get().currentAccountsByTarget?.[target]?.id ?? get().currentAccount?.id ?? null;
+        const previousCurrentAccounts = get().currentAccountsByTarget;
         const deleteIdSet = new Set(accountIds);
         allowNextEmptyAccountList = get().accounts.every((account) => deleteIdSet.has(account.id));
-        allowNextEmptyCurrentAccount = previousCurrentAccountId
-            ? deleteIdSet.has(previousCurrentAccountId)
-            : false;
+        allowNextEmptyCurrentAccountByTarget.antigravity =
+            previousCurrentAccounts.antigravity?.id
+                ? deleteIdSet.has(previousCurrentAccounts.antigravity.id)
+                : false;
+        allowNextEmptyCurrentAccountByTarget.antigravity_ide =
+            previousCurrentAccounts.antigravity_ide?.id
+                ? deleteIdSet.has(previousCurrentAccounts.antigravity_ide.id)
+                : false;
         try {
             await accountService.deleteAccounts(accountIds);
             await get().fetchAccounts();
-            await get().fetchCurrentAccount(target);
+            await Promise.allSettled([
+                get().fetchCurrentAccount('antigravity'),
+                get().fetchCurrentAccount('antigravity_ide'),
+            ]);
         } finally {
             allowNextEmptyAccountList = false;
-            allowNextEmptyCurrentAccount = false;
+            allowNextEmptyCurrentAccountByTarget.antigravity = false;
+            allowNextEmptyCurrentAccountByTarget.antigravity_ide = false;
         }
         await emitAccountsChanged({
             platformId: 'antigravity',
             reason: 'delete',
         });
-        const nextCurrentAccountId = get().currentAccountsByTarget?.[target]?.id ?? null;
-        if (previousCurrentAccountId !== nextCurrentAccountId) {
-            await emitCurrentAccountChanged({
-                platformId: target,
-                accountId: nextCurrentAccountId,
-                reason: 'delete',
-            });
+        for (const target of ['antigravity', 'antigravity_ide'] as const) {
+            const previousCurrentAccountId = previousCurrentAccounts[target]?.id ?? null;
+            const nextCurrentAccountId = get().currentAccountsByTarget[target]?.id ?? null;
+            if (previousCurrentAccountId !== nextCurrentAccountId) {
+                await emitCurrentAccountChanged({
+                    platformId: target,
+                    accountId: nextCurrentAccountId,
+                    reason: 'delete',
+                });
+            }
         }
     },
 
-    setCurrentAccount: async (accountId: string, runtimeTarget?: AntigravityRuntimeTarget) => {
+    setCurrentAccount: async (accountId: string, runtimeTarget) => {
         const target = resolveRuntimeTarget(runtimeTarget);
         await accountService.setCurrentAccount(accountId, target);
         await get().fetchCurrentAccount(target);
         await emitCurrentAccountChanged({
             platformId: target,
-            accountId: get().currentAccountsByTarget?.[target]?.id ?? accountId,
+            accountId: get().currentAccountsByTarget[target]?.id ?? accountId,
             reason: 'switch',
         });
     },
 
-    refreshQuota: async (accountId: string, runtimeTarget?: AntigravityRuntimeTarget) => {
+    refreshQuota: async (accountId: string, runtimeTarget) => {
         const target = resolveRuntimeTarget(runtimeTarget);
         try {
             const updatedAccount = await accountService.fetchAccountQuota(accountId);
@@ -367,14 +367,29 @@ export const useAccountStore = create<AccountState>()(
                 accounts: state.accounts.map((acc) =>
                     acc.id === accountId ? updatedAccount : acc
                 ),
-                currentAccount:
-                    state.currentAccount?.id === accountId ? updatedAccount : state.currentAccount,
-                currentAccountsByTarget: replaceCurrentAccountSnapshot(
-                    state.currentAccountsByTarget,
-                    accountId,
-                    updatedAccount,
-                ),
             }));
+            
+            set((state) => {
+                let nextByTarget = state.currentAccountsByTarget;
+                for (const currentTarget of ['antigravity', 'antigravity_ide'] as const) {
+                    if (nextByTarget[currentTarget]?.id === accountId) {
+                        nextByTarget = updateCurrentAccountsByTarget(
+                            nextByTarget,
+                            currentTarget,
+                            updatedAccount,
+                        );
+                    }
+                }
+                return {
+                    currentAccount:
+                        nextByTarget[target]?.id === accountId
+                            ? updatedAccount
+                            : state.currentAccount?.id === accountId
+                              ? updatedAccount
+                              : state.currentAccount,
+                    currentAccountsByTarget: nextByTarget,
+                };
+            });
 
             // 如果后端返回了配额错误信息，需要抛出异常让 UI 捕获并显示为失败（红叉）
             if (updatedAccount.quota_error) {
@@ -402,7 +417,10 @@ export const useAccountStore = create<AccountState>()(
     refreshAllQuotas: async () => {
         const stats = await accountService.refreshAllQuotas();
         await get().fetchAccounts();
-        await get().fetchCurrentAccount();
+        await Promise.allSettled([
+            get().fetchCurrentAccount('antigravity'),
+            get().fetchCurrentAccount('antigravity_ide'),
+        ]);
         return stats;
     },
 
@@ -423,8 +441,7 @@ export const useAccountStore = create<AccountState>()(
 
     switchAccount: async (accountId: string, runtimeTarget?: AntigravityRuntimeTarget) => {
         const target = resolveRuntimeTarget(runtimeTarget);
-        const previousCurrentAccountId =
-            get().currentAccountsByTarget?.[target]?.id ?? get().currentAccount?.id ?? null;
+        const previousCurrentAccountId = get().currentAccountsByTarget[target]?.id ?? null;
         try {
             const account = await accountService.switchAccount(accountId, target);
             set((state) => ({
@@ -445,7 +462,7 @@ export const useAccountStore = create<AccountState>()(
         } catch (error) {
             await get().fetchAccounts();
             await get().fetchCurrentAccount(target);
-            const nextCurrentAccountId = get().currentAccountsByTarget?.[target]?.id ?? null;
+            const nextCurrentAccountId = get().currentAccountsByTarget[target]?.id ?? null;
             if (previousCurrentAccountId !== nextCurrentAccountId) {
                 await emitCurrentAccountChanged({
                     platformId: target,
@@ -458,9 +475,8 @@ export const useAccountStore = create<AccountState>()(
     },
 
     syncCurrentFromClient: async () => {
-        const target = resolveRuntimeTarget();
-        const previousCurrentAccountId =
-            get().currentAccountsByTarget?.[target]?.id ?? get().currentAccount?.id ?? null;
+        const target = DEFAULT_ANTIGRAVITY_RUNTIME_TARGET;
+        const previousCurrentAccountId = get().currentAccountsByTarget[target]?.id ?? null;
         try {
             const account = await accountService.getCurrentAccount(target);
             set((state) => ({
@@ -498,21 +514,14 @@ export const useAccountStore = create<AccountState>()(
       currentAccount: state.currentAccount
         ? toPersistedAccountSnapshot(state.currentAccount)
         : null,
-      currentAccountsByTarget: toPersistedCurrentAccountsByTarget(state.currentAccountsByTarget),
+      currentAccountsByTarget: Object.fromEntries(
+        Object.entries(state.currentAccountsByTarget).map(([target, account]) => [
+          target,
+          account ? toPersistedAccountSnapshot(account) : null,
+        ]),
+      ) as CurrentAccountsByTarget,
     }),
     onRehydrateStorage: () => (state) => {
-      if (
-        state &&
-        state.currentAccount &&
-        Object.keys(state.currentAccountsByTarget ?? {}).length === 0
-      ) {
-        const target = resolveRuntimeTarget();
-        useAccountStore.setState({
-          currentAccountsByTarget: {
-            [target]: state.currentAccount,
-          },
-        });
-      }
       // Migrate from old ACCOUNTS_CACHE_KEY if the new state is empty
       if (state && state.accounts.length === 0 && typeof window !== 'undefined') {
         setTimeout(() => {
@@ -531,11 +540,14 @@ export const useAccountStore = create<AccountState>()(
             if (oldCurrentRaw) {
               const oldCurrent = JSON.parse(oldCurrentRaw);
               if (oldCurrent && oldCurrent.id) {
-                const target = resolveRuntimeTarget();
-                useAccountStore.setState({
+                useAccountStore.setState((currentState) => ({
                   currentAccount: oldCurrent,
-                  currentAccountsByTarget: { [target]: oldCurrent },
-                });
+                  currentAccountsByTarget: updateCurrentAccountsByTarget(
+                    currentState.currentAccountsByTarget,
+                    DEFAULT_ANTIGRAVITY_RUNTIME_TARGET,
+                    oldCurrent,
+                  ),
+                }));
                 hasMigrated = true;
               }
             }

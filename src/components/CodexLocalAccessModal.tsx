@@ -2837,6 +2837,7 @@ export function CodexLocalAccessModal({
                 <button
                   className="btn btn-secondary"
                   onClick={onClose}
+                  disabled={actionBusy}
                 >
                   {t("common.cancel")}
                 </button>
@@ -2854,6 +2855,7 @@ export function CodexLocalAccessModal({
               <button
                 className="btn btn-secondary"
                 onClick={onClose}
+                disabled={actionBusy}
               >
                 {t("common.close")}
               </button>
@@ -2891,6 +2893,7 @@ export function CodexLocalAccessModal({
               <button
                 className="modal-close codex-local-access-custom-routing-close"
                 onClick={closeCustomRoutingDialog}
+                disabled={saving}
                 aria-label={t("common.close")}
               >
                 <X size={18} />
@@ -3198,6 +3201,7 @@ export function CodexLocalAccessModal({
               <button
                 className="btn btn-secondary"
                 onClick={closeCustomRoutingDialog}
+                disabled={saving}
               >
                 {t("common.cancel")}
               </button>
@@ -3244,6 +3248,7 @@ export function CodexLocalAccessModal({
               <button
                 className="modal-close codex-local-access-test-dialog-close"
                 onClick={closeTestDialog}
+                disabled={testDialogBusy}
                 aria-label={t("common.close")}
               >
                 <X size={18} />
@@ -3378,6 +3383,7 @@ export function CodexLocalAccessModal({
               <button
                 className="btn btn-secondary"
                 onClick={closeTestDialog}
+                disabled={testDialogBusy}
               >
                 {t("common.close")}
               </button>

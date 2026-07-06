@@ -1,11 +1,10 @@
 import { ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlarmClock, Layers, ShieldCheck } from 'lucide-react';
 import { Page } from '../types/navigation';
 import { ManualHelpIconButton } from './ManualHelpIconButton';
 import { TopCenterPromoBanner } from './TopCenterPromoBanner';
+import { AntigravityInstalledVersionBadge } from './AntigravityInstalledVersionBadge';
 import { PlatformId } from '../types/platform';
-import type { PlatformPackageState } from '../types/platformPackage';
 import {
   findGroupByPlatform,
   resolveGroupChildName,
@@ -14,7 +13,6 @@ import {
 import { getPlatformLabel, renderPlatformIcon } from '../utils/platformMeta';
 import { PlatformGroupSwitcher } from './platform/PlatformGroupSwitcher';
 import { useAntigravityRuntimeTarget } from '../hooks/useAntigravityRuntimeTarget';
-import { PlatformPackageToolbar } from './PlatformPackageToolbar';
 
 interface OverviewTabsHeaderProps {
   active: Page;
@@ -22,10 +20,6 @@ interface OverviewTabsHeaderProps {
   subtitle: string;
   title?: string;
   onOpenManual?: () => void;
-  rightSlot?: ReactNode;
-  hideTabs?: boolean;
-  hidePlatformSwitcher?: boolean;
-  remoteTabsSlotId?: string;
 }
 
 interface TabSpec {
@@ -40,10 +34,6 @@ export function OverviewTabsHeader({
   subtitle,
   title,
   onOpenManual,
-  rightSlot,
-  hideTabs = false,
-  hidePlatformSwitcher = false,
-  remoteTabsSlotId,
 }: OverviewTabsHeaderProps) {
   void subtitle;
   const { t } = useTranslation();
@@ -74,53 +64,13 @@ export function OverviewTabsHeader({
       })),
     [switchablePlatforms, currentGroup, t],
   );
-  const antigravityPackageState = useMemo<PlatformPackageState>(() => ({
-    platformId: currentPlatformId,
-    packageMode: 'bundled',
-    installKind: 'coreNativeBoundary',
-    installStatus: 'installed',
-    runtimeReady: true,
-    installedVersion: null,
-    latestVersion: null,
-    downloadSizeBytes: null,
-    installedSizeBytes: null,
-    lastCheckedAt: null,
-    errorMessage: null,
-    entry: null,
-    adapter: null,
-    ui: null,
-    capabilities: [],
-    contributions: {
-      platforms: [],
-      dataPaths: [],
-      localStorageKeys: [],
-      nativeBoundaries: ['antigravity.native'],
-    },
-    changelog: [],
-  }), [currentPlatformId]);
   const tabs: TabSpec[] = [
     {
       key: 'overview',
       label: t('overview.title'),
       icon: <span className="tab-icon">{renderPlatformIcon(currentPlatformId, 16)}</span>,
     },
-    {
-      key: 'instances',
-      label: t('instances.title', '多开实例'),
-      icon: <Layers className="tab-icon" />,
-    },
-    {
-      key: 'wakeup',
-      label: t('wakeup.title'),
-      icon: <AlarmClock className="tab-icon" />,
-    },
-    {
-      key: 'verification',
-      label: t('wakeup.verification.title'),
-      icon: <ShieldCheck className="tab-icon" />,
-    },
   ];
-  const showTabsRow = !hidePlatformSwitcher || Boolean(remoteTabsSlotId) || !hideTabs;
 
   return (
     <>
@@ -132,48 +82,32 @@ export function OverviewTabsHeader({
           <ManualHelpIconButton className="platform-header-help" onClick={onOpenManual} />
         </div>
         <TopCenterPromoBanner />
-        <div className="page-top-strip-right page-top-strip-right-slot">
-          {rightSlot ?? (
-            <PlatformPackageToolbar
-              platformId={currentPlatformId}
-              fallbackState={antigravityPackageState}
-            />
-          )}
+        <div className="page-top-strip-right">
+          <AntigravityInstalledVersionBadge />
         </div>
       </div>
-      {showTabsRow && (
-        <div className="page-tabs-row page-tabs-center page-tabs-row-with-leading">
-          {!hidePlatformSwitcher && (
-            <div className="page-tabs-leading">
-              <PlatformGroupSwitcher
-                currentPlatformId={currentPlatformId}
-                currentLabel={currentDisplayName}
-                options={switchOptions}
-                currentGroupId={currentGroup?.id ?? null}
-              />
-            </div>
-          )}
-          {remoteTabsSlotId ? (
-            <div
-              id={remoteTabsSlotId}
-              className="page-tabs filter-tabs platform-remote-tabs-slot"
-            />
-          ) : !hideTabs && (
-            <div className="page-tabs filter-tabs">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  className={`filter-tab${active === tab.key ? ' active' : ''}`}
-                  onClick={() => onNavigate?.(tab.key)}
-                >
-                  {tab.icon}
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
+      <div className="page-tabs-row page-tabs-center page-tabs-row-with-leading">
+        <div className="page-tabs-leading">
+          <PlatformGroupSwitcher
+            currentPlatformId={currentPlatformId}
+            currentLabel={currentDisplayName}
+            options={switchOptions}
+            currentGroupId={currentGroup?.id ?? null}
+          />
         </div>
-      )}
+        <div className="page-tabs filter-tabs">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              className={`filter-tab${active === tab.key ? ' active' : ''}`}
+              onClick={() => onNavigate?.(tab.key)}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
     </>
   );
 }

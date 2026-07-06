@@ -17,7 +17,6 @@ import { showFloatingCardWindow } from '../services/floatingCardService';
 import { usePlatformRuntimeSupport } from '../hooks/usePlatformRuntimeSupport';
 import { usePlatformLayoutStore } from '../stores/usePlatformLayoutStore';
 import { SideNavLayoutMode, useSideNavLayoutStore } from '../stores/useSideNavLayoutStore';
-import { useSponsorStore } from '../stores/useSponsorStore';
 import { UnlockFireworksOverlay } from '../components/UnlockFireworksOverlay';
 import {
   AutoSwitchAccountScopeSelector,
@@ -62,7 +61,6 @@ import { useWorkbuddyAccountStore } from '../stores/useWorkbuddyAccountStore';
 import { useQoderAccountStore } from '../stores/useQoderAccountStore';
 import { useTraeAccountStore } from '../stores/useTraeAccountStore';
 import { useZedAccountStore } from '../stores/useZedAccountStore';
-import { usePlatformPackageStore } from '../stores/usePlatformPackageStore';
 import { getGitHubCopilotAccountDisplayEmail } from '../types/githubCopilot';
 import { getWindsurfAccountDisplayEmail } from '../types/windsurf';
 import { getKiroAccountDisplayEmail } from '../types/kiro';
@@ -75,13 +73,6 @@ import { getQoderAccountDisplayEmail } from '../types/qoder';
 import { getTraeAccountDisplayEmail } from '../types/trae';
 import { getZedAccountDisplayEmail } from '../types/zed';
 import { ALL_PLATFORM_IDS, PlatformId } from '../types/platform';
-import {
-  buildStartupPageOptions,
-  DEFAULT_STARTUP_PAGE,
-  LAST_CLOSED_STARTUP_PAGE,
-  normalizeStartupPageValue,
-  type StartupPageValue,
-} from '../utils/startupPage';
 import { SettingsAccountTransferSection } from '../components/SettingsAccountTransferSection';
 import { SettingsWebdavSyncSection } from '../components/SettingsWebdavSyncSection';
 import { useEscClose } from '../hooks/useEscClose';
@@ -109,6 +100,12 @@ interface NetworkConfig {
   global_proxy_no_proxy: string;
 }
 
+interface DiagnosticsConfig {
+  errorReportingEnabled: boolean;
+  errorReportingDebug: boolean;
+  endpointConfigured: boolean;
+}
+
 /** 通用配置类型 */
 interface GeneralConfig {
   language: string;
@@ -130,11 +127,11 @@ interface GeneralConfig {
   minimize_behavior?: 'dock_and_tray' | 'tray_only';
   hide_dock_icon?: boolean;
   tray_icon_style?: 'template' | 'color';
-  startup_page?: string;
   floating_card_show_on_startup?: boolean;
   startup_minimized?: boolean;
   floating_card_always_on_top?: boolean;
   app_auto_launch_enabled?: boolean;
+  token_keeper_enabled?: boolean;
   opencode_app_path: string;
   antigravity_app_path: string;
   codex_app_path: string;
@@ -173,6 +170,7 @@ interface GeneralConfig {
   opencode_auth_overwrite_on_switch: boolean;
   openclaw_auth_overwrite_on_switch: boolean;
   codex_launch_on_switch: boolean;
+  antigravity_launch_on_switch: boolean;
   codex_restart_specified_app_on_switch: boolean;
   codex_local_access_entry_visible: boolean;
   top_right_ad_visible?: boolean;
@@ -355,10 +353,6 @@ export function SettingsPage() {
   }, [isMacOS, isWindows, isLinux, availableTerminals, t]);
 
   const orderedPlatformIds = usePlatformLayoutStore((state) => state.orderedPlatformIds);
-  const sidebarEntryIds = usePlatformLayoutStore((state) => state.sidebarEntryIds);
-  const platformGroups = usePlatformLayoutStore((state) => state.platformGroups);
-  const apiRelaySidebarVisible = usePlatformLayoutStore((state) => state.apiRelaySidebarVisible);
-  const sponsorEntryVisible = useSponsorStore((state) => Boolean(state.state.sponsorModule));
   const platformSettingsOrder = useMemo<Record<PlatformId, number>>(() => {
     const next: Record<PlatformId, number> = { ...FALLBACK_PLATFORM_SETTINGS_ORDER };
     let order = 0;
@@ -369,23 +363,6 @@ export function SettingsPage() {
     }
     return next;
   }, [orderedPlatformIds]);
-
-  const startupPageOptions = useMemo(
-    () => buildStartupPageOptions(
-      {
-        sidebarEntryIds,
-        platformGroups,
-        apiRelayVisible: sponsorEntryVisible && apiRelaySidebarVisible,
-      },
-      t,
-    ),
-    [apiRelaySidebarVisible, platformGroups, sidebarEntryIds, sponsorEntryVisible, t],
-  );
-
-  const startupPageOptionValues = useMemo(
-    () => new Set(startupPageOptions.map((option) => option.value)),
-    [startupPageOptions],
-  );
 
   const languageOptions = [
     { value: 'zh-cn', label: '简体中文' },
@@ -427,11 +404,13 @@ export function SettingsPage() {
   const [minimizeBehavior, setMinimizeBehavior] = useState<'dock_and_tray' | 'tray_only'>('dock_and_tray');
   const [hideDockIcon, setHideDockIcon] = useState(false);
   const [trayIconStyle, setTrayIconStyle] = useState<'template' | 'color'>('template');
-  const [startupPage, setStartupPage] = useState<StartupPageValue>(DEFAULT_STARTUP_PAGE);
   const [floatingCardShowOnStartup, setFloatingCardShowOnStartup] = useState(false);
   const [startupMinimized, setStartupMinimized] = useState(false);
   const [floatingCardAlwaysOnTop, setFloatingCardAlwaysOnTop] = useState(false);
   const [appAutoLaunchEnabled, setAppAutoLaunchEnabled] = useState(false);
+  const [tokenKeeperEnabled, setTokenKeeperEnabled] = useState(true);
+  const [errorReportingEnabled, setErrorReportingEnabled] = useState(true);
+  const [errorReportingSaving, setErrorReportingSaving] = useState(false);
   const [opencodeAppPath, setOpencodeAppPath] = useState('');
   const [antigravityAppPath, setAntigravityAppPath] = useState('');
   const [codexAppPath, setCodexAppPath] = useState('');
@@ -498,6 +477,7 @@ export function SettingsPage() {
   const [opencodeAuthOverwriteOnSwitch, setOpencodeAuthOverwriteOnSwitch] = useState(false);
   const [openclawAuthOverwriteOnSwitch, setOpenclawAuthOverwriteOnSwitch] = useState(false);
   const [codexLaunchOnSwitch, setCodexLaunchOnSwitch] = useState(true);
+  const [antigravityLaunchOnSwitch, setAntigravityLaunchOnSwitch] = useState(true);
   const [codexRestartSpecifiedAppOnSwitch, setCodexRestartSpecifiedAppOnSwitch] = useState(false);
   const [codexLocalAccessEntryVisible, setCodexLocalAccessEntryVisible] = useState(true);
   const [topRightAdVisible, setTopRightAdVisible] = useState(true);
@@ -580,7 +560,6 @@ export function SettingsPage() {
   const [antigravityAccountGroups, setAntigravityAccountGroups] = useState<AccountGroup[]>([]);
   const [codexAccounts, setCodexAccounts] = useState<CodexAccount[]>([]);
   const [codexGroups, setCodexGroups] = useState<CodexAccountGroup[]>([]);
-  const codexRuntimeReady = usePlatformPackageStore((state) => state.canOpenPlatform('codex'));
 
   const antigravityScopeTypeOptions = useMemo(
     () => buildAccountTierFilterOptions(t, buildAccountTierCounts(antigravityAccounts, {})),
@@ -608,15 +587,13 @@ export function SettingsPage() {
   );
   const codexScopeAccounts = useMemo<AutoSwitchScopeAccount[]>(
     () =>
-      codexRuntimeReady
-        ? codexAccounts.map((account) => ({
-            id: account.id,
-            label: account.email,
-            searchableText: account.email,
-            tags: account.tags || [],
-          }))
-        : [],
-    [codexAccounts, codexRuntimeReady],
+      codexAccounts.map((account) => ({
+        id: account.id,
+        label: account.email,
+        searchableText: account.email,
+        tags: account.tags || [],
+      })),
+    [codexAccounts],
   );
 
   useEffect(() => {
@@ -627,8 +604,8 @@ export function SettingsPage() {
           await Promise.all([
             accountService.listAccounts(),
             getAccountGroups(),
-            codexRuntimeReady ? codexService.listCodexAccounts() : Promise.resolve([]),
-            codexRuntimeReady ? getCodexAccountGroups() : Promise.resolve([]),
+            codexService.listCodexAccounts(),
+            getCodexAccountGroups(),
           ]);
         if (!mounted) return;
         setAntigravityAccounts(nextAntigravityAccounts || []);
@@ -652,7 +629,7 @@ export function SettingsPage() {
     return () => {
       mounted = false;
     };
-  }, [activeTab, codexRuntimeReady]);
+  }, [activeTab]);
 
   useEffect(() => {
     getVersion().then(ver => setAppVersion(`v${ver}`));
@@ -777,6 +754,7 @@ export function SettingsPage() {
   useEffect(() => {
     loadGeneralConfig();
     loadNetworkConfig();
+    loadDiagnosticsConfig();
   }, []);
   
   useEffect(() => {
@@ -793,15 +771,6 @@ export function SettingsPage() {
     }
     void applyUiScale(uiScale);
   }, [generalLoaded, uiScale]);
-
-  useEffect(() => {
-    if (!generalLoaded || startupPage === LAST_CLOSED_STARTUP_PAGE) {
-      return;
-    }
-    if (!startupPageOptionValues.has(startupPage)) {
-      setStartupPage(DEFAULT_STARTUP_PAGE);
-    }
-  }, [generalLoaded, startupPage, startupPageOptionValues]);
 
   useEffect(() => {
     if (!generalLoaded) {
@@ -898,11 +867,11 @@ export function SettingsPage() {
           minimizeBehavior,
           hideDockIcon,
           trayIconStyle: isMacOS ? trayIconStyle : undefined,
-          startupPage,
           floatingCardShowOnStartup,
           startupMinimized,
           floatingCardAlwaysOnTop,
           appAutoLaunchEnabled,
+          tokenKeeperEnabled,
           opencodeAppPath,
           antigravityAppPath,
           codexAppPath,
@@ -923,6 +892,7 @@ export function SettingsPage() {
           opencodeAuthOverwriteOnSwitch,
           openclawAuthOverwriteOnSwitch,
           codexLaunchOnSwitch,
+          antigravityLaunchOnSwitch,
           codexRestartSpecifiedAppOnSwitch,
           codexLocalAccessEntryVisible,
           topRightAdVisible,
@@ -1023,12 +993,12 @@ export function SettingsPage() {
     minimizeBehavior,
     hideDockIcon,
     trayIconStyle,
-    startupPage,
     isMacOS,
     floatingCardShowOnStartup,
     startupMinimized,
     floatingCardAlwaysOnTop,
     appAutoLaunchEnabled,
+    tokenKeeperEnabled,
     generalLoaded,
     language,
     defaultTerminal,
@@ -1054,6 +1024,7 @@ export function SettingsPage() {
     opencodeAuthOverwriteOnSwitch,
     openclawAuthOverwriteOnSwitch,
     codexLaunchOnSwitch,
+    antigravityLaunchOnSwitch,
     codexRestartSpecifiedAppOnSwitch,
     codexLocalAccessEntryVisible,
     topRightAdVisible,
@@ -1324,11 +1295,11 @@ export function SettingsPage() {
       setMinimizeBehavior(config.minimize_behavior || 'dock_and_tray');
       setHideDockIcon(Boolean(config.hide_dock_icon));
       setTrayIconStyle(config.tray_icon_style === 'color' ? 'color' : 'template');
-      setStartupPage(normalizeStartupPageValue(config.startup_page));
       setFloatingCardShowOnStartup(config.floating_card_show_on_startup ?? false);
       setStartupMinimized(config.startup_minimized ?? false);
       setFloatingCardAlwaysOnTop(config.floating_card_always_on_top ?? false);
       setAppAutoLaunchEnabled(config.app_auto_launch_enabled ?? false);
+      setTokenKeeperEnabled(config.token_keeper_enabled ?? true);
       setOpencodeAppPath(config.opencode_app_path || '');
       setAntigravityAppPath(config.antigravity_app_path || '');
       setCodexAppPath(config.codex_app_path || '');
@@ -1371,6 +1342,7 @@ export function SettingsPage() {
       setOpencodeAuthOverwriteOnSwitch(config.opencode_auth_overwrite_on_switch ?? false);
       setOpenclawAuthOverwriteOnSwitch(config.openclaw_auth_overwrite_on_switch ?? false);
       setCodexLaunchOnSwitch(config.codex_launch_on_switch ?? true);
+      setAntigravityLaunchOnSwitch(config.antigravity_launch_on_switch ?? true);
       setCodexRestartSpecifiedAppOnSwitch(
         config.codex_restart_specified_app_on_switch ?? false,
       );
@@ -1467,6 +1439,32 @@ export function SettingsPage() {
       setNeedsRestart(false);
     } catch (err) {
       console.error('加载网络配置失败:', err);
+    }
+  };
+
+  const loadDiagnosticsConfig = async () => {
+    try {
+      const config = await invoke<DiagnosticsConfig>('get_diagnostics_config');
+      setErrorReportingEnabled(config.errorReportingEnabled);
+    } catch (err) {
+      console.warn('加载诊断配置失败:', err);
+    }
+  };
+
+  const handleErrorReportingEnabledChange = async (enabled: boolean) => {
+    const previous = errorReportingEnabled;
+    setErrorReportingEnabled(enabled);
+    setErrorReportingSaving(true);
+    try {
+      await invoke('save_diagnostics_config', {
+        errorReportingEnabled: enabled,
+        errorReportingDebug: false,
+      });
+    } catch (err) {
+      setErrorReportingEnabled(previous);
+      console.error('保存诊断配置失败:', err);
+    } finally {
+      setErrorReportingSaving(false);
     }
   };
   
@@ -1862,10 +1860,8 @@ export function SettingsPage() {
       case 'antigravity':
         return antigravityAccounts.map((a) => ({ id: a.id, email: a.email }));
       case 'codex':
-        if (!codexRuntimeReady) return [];
         return codexAccounts.map((a) => ({ id: a.id, email: a.email }));
       case 'claude':
-        if (!usePlatformPackageStore.getState().canOpenPlatform('claude_manager')) return [];
         return getProviderAccounts(useClaudeAccountStore, getClaudeAccountDisplayEmail);
       case 'ghcp':
         return getProviderAccounts(useGitHubCopilotAccountStore, getGitHubCopilotAccountDisplayEmail);
@@ -1878,13 +1874,10 @@ export function SettingsPage() {
       case 'gemini':
         return getProviderAccounts(useGeminiAccountStore, getGeminiAccountDisplayEmail);
       case 'codebuddy':
-        if (!usePlatformPackageStore.getState().canOpenPlatform('codebuddy')) return [];
         return getProviderAccounts(useCodebuddyAccountStore, getCodebuddyAccountDisplayEmail);
       case 'codebuddy_cn':
-        if (!usePlatformPackageStore.getState().canOpenPlatform('codebuddy_cn')) return [];
         return getProviderAccounts(useCodebuddyCnAccountStore, getCodebuddyAccountDisplayEmail);
       case 'workbuddy':
-        if (!usePlatformPackageStore.getState().canOpenPlatform('workbuddy')) return [];
         return getProviderAccounts(useWorkbuddyAccountStore, getWorkbuddyAccountDisplayEmail);
       case 'qoder':
         return getProviderAccounts(useQoderAccountStore, getQoderAccountDisplayEmail);
@@ -2504,26 +2497,6 @@ export function SettingsPage() {
 
               <div className="settings-row">
                 <div className="row-label">
-                  <div className="row-title">{t('settings.general.startupPage', '启动页面')}</div>
-                  <div className="row-desc">
-                    {t('settings.general.startupPageDesc', '设置应用冷启动后默认打开的页面')}
-                  </div>
-                </div>
-                <div className="row-control">
-                  <select
-                    className="settings-select"
-                    value={startupPage}
-                    onChange={(e) => setStartupPage(normalizeStartupPageValue(e.target.value))}
-                  >
-                    {startupPageOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="settings-row">
-                <div className="row-label">
                   <div className="row-title">{t('settings.general.uiScale')}</div>
                   <div className="row-desc">{t('settings.general.uiScaleDesc')}</div>
                 </div>
@@ -2737,6 +2710,55 @@ export function SettingsPage() {
 
               <div className="settings-row">
                 <div className="row-label">
+                  <div className="row-title">
+                    {t('settings.general.tokenKeeper', '后台授权保活')}
+                  </div>
+                  <div className="row-desc">
+                    {t(
+                      'settings.general.tokenKeeperDesc',
+                      '仅在授权快过期时分批刷新账号 Token，降低大量账号场景下的后台请求压力。',
+                    )}
+                  </div>
+                </div>
+                <div className="row-control">
+                  <label className="switch">
+                    <input
+                      type="checkbox"
+                      checked={tokenKeeperEnabled}
+                      onChange={(e) => setTokenKeeperEnabled(e.target.checked)}
+                    />
+                    <span className="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="settings-row">
+                <div className="row-label">
+                  <div className="row-title">
+                    {t('settings.general.errorReporting', '遥测诊断')}
+                  </div>
+                  <div className="row-desc">
+                    {t(
+                      'settings.general.errorReportingDesc',
+                      '默认开启，仅用于排查启动和界面问题；关闭后不会提交遥测事件。上报前会脱敏，不上传账号密码、Token、2FA 秘钥、手机号等敏感信息。',
+                    )}
+                  </div>
+                </div>
+                <div className="row-control">
+                  <label className="switch">
+                    <input
+                      type="checkbox"
+                      checked={errorReportingEnabled}
+                      disabled={errorReportingSaving}
+                      onChange={(e) => void handleErrorReportingEnabledChange(e.target.checked)}
+                    />
+                    <span className="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="settings-row">
+                <div className="row-label">
                   <div className="row-title">{t('settings.general.floatingCardShowNow', '立即显示悬浮卡片')}</div>
                   <div className="row-desc">{t('settings.general.floatingCardShowNowDesc', '关闭后可在这里或托盘菜单中重新打开')}</div>
                 </div>
@@ -2871,12 +2893,39 @@ export function SettingsPage() {
                 </div>
               </div>
 
-              {renderCurrentAccountRefreshRow('antigravity')}
-              {renderAccountLevelRefreshConfig('antigravity')}
+	              {renderCurrentAccountRefreshRow('antigravity')}
+	              {renderAccountLevelRefreshConfig('antigravity')}
 
               <div className="settings-row">
                 <div className="row-label">
-                  <div className="row-title">{t('settings.general.antigravityAppPath', 'Antigravity IDE 启动路径')}</div>
+                  <div className="row-title">
+                    {t(
+                      'settings.general.antigravityLaunchOnSwitch',
+                      '切换时启动 Antigravity',
+                    )}
+                  </div>
+                  <div className="row-desc">
+                    {t(
+                      'settings.general.antigravityLaunchOnSwitchDesc',
+                      '关闭后切号只写入 Antigravity 默认账号数据，不会关闭、启动或重启应用。',
+                    )}
+                  </div>
+                </div>
+                <div className="row-control">
+                  <label className="switch">
+                    <input
+                      type="checkbox"
+                      checked={antigravityLaunchOnSwitch}
+                      onChange={(e) => setAntigravityLaunchOnSwitch(e.target.checked)}
+                    />
+                    <span className="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+	              <div className="settings-row">
+	                <div className="row-label">
+	                  <div className="row-title">{t('settings.general.antigravityAppPath', 'Antigravity IDE 启动路径')}</div>
                   <div className="row-desc">{t('settings.general.codexAppPathDesc', '留空则使用默认路径')}</div>
                 </div>
                 <div className="row-control row-control--grow">

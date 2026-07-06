@@ -89,6 +89,7 @@ import {
 import { OverviewTabsHeader } from '../components/OverviewTabsHeader'
 import styles from '../styles/CompactView.module.css'
 import { FileCorruptedModal, parseFileCorruptedError, type FileCorruptedError } from '../components/FileCorruptedModal'
+import { AccountSelectionToolbar } from '../components/AccountSelectionToolbar'
 import { QuickSettingsPopover } from '../components/QuickSettingsPopover'
 import {
   isPrivacyModeEnabledByDefault,
@@ -114,6 +115,7 @@ import {
   normalizeAccountTag,
   type AccountFilterType,
 } from '../utils/accountFilters'
+import { loadWakeupOfficialLsVersionMode } from '../utils/wakeupOfficialLsVersion'
 import {
   buildValidAccountsFilterOption,
   splitValidityFilterValues,
@@ -143,7 +145,6 @@ import { useAntigravityRuntimeTarget } from '../hooks/useAntigravityRuntimeTarge
 
 interface AccountsPageProps {
   onNavigate?: (page: Page) => void
-  hideHeader?: boolean
 }
 
 type AntigravitySwitchHistoryItem = accountService.AntigravitySwitchHistoryItem
@@ -222,7 +223,7 @@ const ANTIGRAVITY_FILTER_FIELD_ACTIVE_GROUP_ID = 'active_group_id'
 const CLOUD_DEFAULT_FILTER_TYPES: AccountsFilterType[] = ['PRO']
 const CLOUD_DEFAULT_TAG_FILTER: string[] = []
 
-export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPageProps) {
+export function AccountsPage({ onNavigate }: AccountsPageProps) {
   const { t, i18n } = useTranslation()
   const antigravityRuntimeTarget = useAntigravityRuntimeTarget()
   const locale = i18n.language || 'zh-CN'
@@ -294,8 +295,6 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
       }
     }
   }, [storeError])
-
-
 
   const initialFilterPersistenceEnabled = readAccountsOverviewFilterPersistenceEnabled(
     ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
@@ -403,6 +402,7 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
   const [addTab, setAddTab] = useState<'oauth' | 'token' | 'import'>('oauth')
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set())
   const [refreshingAll, setRefreshingAll] = useState(false)
+  const [wakeupRunning, setWakeupRunning] = useState(false)
   const [switching, setSwitching] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [refreshWarnings, setRefreshWarnings] = useState<
@@ -665,82 +665,84 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
     return total.toFixed(2).replace(/\.?0+$/, '')
   }
 
-
-
   const loadPersistedOverviewFilters = useCallback(() => {
-      const savedViewMode = readAccountsOverviewFilterField<unknown>(
-        ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
-        ANTIGRAVITY_FILTER_FIELD_VIEW_MODE,
-        'grid',
-      )
-      if (savedViewMode === 'grid' || savedViewMode === 'list' || savedViewMode === 'compact') {
-        setViewMode(savedViewMode)
-      }
+    const savedViewMode = readAccountsOverviewFilterField<unknown>(
+      ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
+      ANTIGRAVITY_FILTER_FIELD_VIEW_MODE,
+      'grid',
+    )
+    if (savedViewMode === 'grid' || savedViewMode === 'list' || savedViewMode === 'compact') {
+      setViewMode(savedViewMode)
+    }
 
-      const savedFilterTypes = readAccountsOverviewFilterField<unknown>(
-        ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
-        ANTIGRAVITY_FILTER_FIELD_FILTER_TYPES,
-        null,
-      )
-      setFilterTypes(
-        savedFilterTypes !== null
-          ? (readAccountsOverviewFilterStringArray(
-              ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
-              ANTIGRAVITY_FILTER_FIELD_FILTER_TYPES,
-            ) as AccountsFilterType[])
-          : CLOUD_DEFAULT_FILTER_TYPES
-      )
-
-      const savedTagFilter = readAccountsOverviewFilterField<unknown>(
-        ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
-        ANTIGRAVITY_FILTER_FIELD_TAG_FILTER,
-        null,
-      )
-      setTagFilter(
-        savedTagFilter !== null
-          ? readAccountsOverviewFilterStringArray(
-              ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
-              ANTIGRAVITY_FILTER_FIELD_TAG_FILTER,
-            )
-          : CLOUD_DEFAULT_TAG_FILTER
-      )
-
-      setGroupByTag(
-        Boolean(
-          readAccountsOverviewFilterField<unknown>(
+    const savedFilterTypes = readAccountsOverviewFilterField<unknown>(
+      ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
+      ANTIGRAVITY_FILTER_FIELD_FILTER_TYPES,
+      null,
+    )
+    setFilterTypes(
+      savedFilterTypes !== null
+        ? (readAccountsOverviewFilterStringArray(
             ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
-            ANTIGRAVITY_FILTER_FIELD_GROUP_BY_TAG,
-            false,
-          ),
-        )
-      )
+            ANTIGRAVITY_FILTER_FIELD_FILTER_TYPES,
+          ) as AccountsFilterType[])
+        : CLOUD_DEFAULT_FILTER_TYPES
+    )
 
-      const savedActiveGroupId = readAccountsOverviewFilterField<string | null>(
-        ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
-        ANTIGRAVITY_FILTER_FIELD_ACTIVE_GROUP_ID,
-        null,
-      )
-      setActiveGroupId(typeof savedActiveGroupId === 'string' && savedActiveGroupId.trim() ? savedActiveGroupId : null)
-
-      setSortBy(
-        normalizeAntigravitySortBy(
-          readAccountsOverviewFilterField<unknown>(
+    const savedTagFilter = readAccountsOverviewFilterField<unknown>(
+      ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
+      ANTIGRAVITY_FILTER_FIELD_TAG_FILTER,
+      null,
+    )
+    setTagFilter(
+      savedTagFilter !== null
+        ? readAccountsOverviewFilterStringArray(
             ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
-            ANTIGRAVITY_FILTER_FIELD_SORT_BY,
-            DEFAULT_ANTIGRAVITY_SORT_BY,
-          ) as string,
-        )
-      )
+            ANTIGRAVITY_FILTER_FIELD_TAG_FILTER,
+          )
+        : CLOUD_DEFAULT_TAG_FILTER
+    )
 
-      setSortDirection(
-        normalizeAntigravitySortDirection(
-          readAccountsOverviewFilterField<unknown>(
-            ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
-            ANTIGRAVITY_FILTER_FIELD_SORT_DIRECTION,
-            'desc',
-          ) as string | null,
-        )
-      )
+    setGroupByTag(
+      Boolean(
+        readAccountsOverviewFilterField<unknown>(
+          ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
+          ANTIGRAVITY_FILTER_FIELD_GROUP_BY_TAG,
+          false,
+        ),
+      ),
+    )
+
+    const savedActiveGroupId = readAccountsOverviewFilterField<string | null>(
+      ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
+      ANTIGRAVITY_FILTER_FIELD_ACTIVE_GROUP_ID,
+      null,
+    )
+    setActiveGroupId(
+      typeof savedActiveGroupId === 'string' && savedActiveGroupId.trim()
+        ? savedActiveGroupId
+        : null,
+    )
+
+    setSortBy(
+      normalizeAntigravitySortBy(
+        readAccountsOverviewFilterField<unknown>(
+          ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
+          ANTIGRAVITY_FILTER_FIELD_SORT_BY,
+          DEFAULT_ANTIGRAVITY_SORT_BY,
+        ) as string,
+      ),
+    )
+
+    setSortDirection(
+      normalizeAntigravitySortDirection(
+        readAccountsOverviewFilterField<unknown>(
+          ANTIGRAVITY_FILTER_PERSISTENCE_SCOPE,
+          ANTIGRAVITY_FILTER_FIELD_SORT_DIRECTION,
+          'desc',
+        ) as string | null,
+      ),
+    )
   }, [])
 
   const resetOverviewFilters = useCallback(() => {
@@ -779,14 +781,12 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
       }
       setFilterPersistenceEnabled(Boolean(detail.enabled))
     }
-
     window.addEventListener('config-updated', handleConfigUpdated)
     window.addEventListener(PRIVACY_MODE_CHANGED_EVENT, handlePrivacyModeChanged as EventListener)
     window.addEventListener(
       ACCOUNTS_OVERVIEW_FILTER_PERSISTENCE_CHANGED_EVENT,
       handleFilterPersistenceChanged as EventListener,
     )
-
     return () => {
       window.removeEventListener('config-updated', handleConfigUpdated)
       window.removeEventListener(PRIVACY_MODE_CHANGED_EVENT, handlePrivacyModeChanged as EventListener)
@@ -1276,7 +1276,7 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
     return () => {
       if (unlisten) unlisten()
     }
-  }, [antigravityRuntimeTarget, fetchAccounts, fetchCurrentAccount, loadVerificationHistory, refreshQuota])
+  }, [fetchAccounts, fetchCurrentAccount, loadVerificationHistory, refreshQuota])
 
   // Click outside to close color picker
   useEffect(() => {
@@ -1345,7 +1345,7 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
       if (unlistenUrl) unlistenUrl()
       if (unlistenCallback) unlistenCallback()
     }
-  }, [antigravityRuntimeTarget, fetchAccounts, fetchCurrentAccount])
+  }, [fetchAccounts, fetchCurrentAccount])
 
   useEffect(() => {
     if (!showAddModal || addTab !== 'oauth' || oauthUrl) return
@@ -1412,6 +1412,56 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
     } finally {
       await loadVerificationHistory()
       setRefreshingAll(false)
+    }
+  }
+
+  const handleWakeupSelected = async () => {
+    if (selected.size === 0 || wakeupRunning) return
+    setWakeupRunning(true)
+    setMessage(null)
+    const selectedIdSet = new Set(selected)
+    const selectedAccounts = accounts.filter((account) => selectedIdSet.has(account.id))
+    try {
+      const models = await invoke<Array<{ id: string }>>('fetch_available_models')
+      const model = models.find((item) => item.id)?.id
+      if (!model) {
+        throw new Error(t('wakeup.notice.testMissingModel'))
+      }
+      const officialLsVersionMode = loadWakeupOfficialLsVersionMode()
+      const results = await Promise.allSettled(
+        selectedAccounts.map((account) =>
+          invoke('trigger_wakeup', {
+            accountId: account.id,
+            model,
+            prompt: undefined,
+            maxOutputTokens: 0,
+            cancelScopeId: undefined,
+            officialLsVersionMode,
+          }),
+        ),
+      )
+      const failed = results.filter((result) => result.status === 'rejected').length
+      const success = results.length - failed
+      setMessage({
+        text:
+          failed > 0
+            ? t('messages.actionFailed', {
+                action: t('wakeup.runTest'),
+                error: `${success}/${results.length}`,
+              })
+            : t('messages.actionSuccess', { action: t('wakeup.runTest') }),
+        tone: failed > 0 ? 'error' : undefined,
+      })
+    } catch (error) {
+      setMessage({
+        text: t('messages.actionFailed', {
+          action: t('wakeup.runTest'),
+          error: String(error).replace(/^Error:\s*/, ''),
+        }),
+        tone: 'error',
+      })
+    } finally {
+      setWakeupRunning(false)
     }
   }
 
@@ -3336,14 +3386,12 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
   return (
     <>
       <main className="main-content accounts-page">
-        {!hideHeader && (
-          <OverviewTabsHeader
-            active="overview"
-            onNavigate={onNavigate}
-            onOpenManual={() => onNavigate?.('manual')}
-            subtitle={t('overview.subtitle')}
-          />
-        )}
+        <OverviewTabsHeader
+          active="overview"
+          onNavigate={onNavigate}
+          onOpenManual={() => onNavigate?.('manual')}
+          subtitle={t('overview.subtitle')}
+        />
 
         {/* 面包屑：进入分组后显示 */}
         {activeGroup && (
@@ -3577,8 +3625,42 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
             >
               <Upload size={14} />
             </button>
-            {selected.size > 0 && (
+            {!activeGroupId && (
+              <button
+                className="btn btn-secondary icon-only"
+                onClick={() => setShowAccountGroupModal(true)}
+                title={t('accounts.groups.manageTitle')}
+                aria-label={t('accounts.groups.manageTitle')}
+              >
+                <FolderOpen size={14} />
+              </button>
+            )}
+            <QuickSettingsPopover type="antigravity" />
+          </div>
+        </div>
+
+        {filteredAccounts.length > 0 && (
+          <AccountSelectionToolbar
+            selectedCount={selected.size}
+            allSelected={allPaginatedSelected}
+            disabled={paginatedIds.length === 0}
+            onToggleSelectAll={toggleSelectAll}
+            onClearSelection={() => setSelected(new Set())}
+            actions={(
               <>
+                <button
+                  className="btn btn-secondary icon-only"
+                  onClick={() => void handleWakeupSelected()}
+                  disabled={wakeupRunning || selected.size === 0}
+                  title={`${t('wakeup.runTest')} (${selected.size})`}
+                  aria-label={`${t('wakeup.runTest')} (${selected.size})`}
+                >
+                  {wakeupRunning ? (
+                    <RefreshCw size={14} className="loading-spinner" />
+                  ) : (
+                    <Rocket size={14} />
+                  )}
+                </button>
                 <button
                   className="btn btn-secondary icon-only"
                   onClick={() => setShowAddToGroupModal(true)}
@@ -3597,19 +3679,8 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
                 </button>
               </>
             )}
-            {!activeGroupId && (
-              <button
-                className="btn btn-secondary icon-only"
-                onClick={() => setShowAccountGroupModal(true)}
-                title={t('accounts.groups.manageTitle')}
-                aria-label={t('accounts.groups.manageTitle')}
-              >
-                <FolderOpen size={14} />
-              </button>
-            )}
-            <QuickSettingsPopover type="antigravity" />
-          </div>
-        </div>
+          />
+        )}
 
         {message && (
           <div
@@ -4151,6 +4222,7 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
               <button
                 className="modal-close"
                 onClick={() => {
+                  if (deleting) return
                   setDeleteConfirm(null)
                   setDeleteConfirmError(null)
                 }}
@@ -4170,6 +4242,7 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
                   setDeleteConfirm(null)
                   setDeleteConfirmError(null)
                 }}
+                disabled={deleting}
               >
                 {t('common.cancel')}
               </button>
@@ -4195,6 +4268,7 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
               <button
                 className="modal-close"
                 onClick={() => {
+                  if (deletingGroup) return
                   setGroupDeleteConfirm(null)
                   setGroupDeleteError(null)
                 }}
@@ -4218,6 +4292,7 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
                   setGroupDeleteConfirm(null)
                   setGroupDeleteError(null)
                 }}
+                disabled={deletingGroup}
               >
                 {t('common.cancel')}
               </button>
@@ -4243,6 +4318,7 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
               <button
                 className="modal-close"
                 onClick={() => {
+                  if (deletingTag) return
                   setTagDeleteConfirm(null)
                   setTagDeleteConfirmError(null)
                 }}
@@ -4268,6 +4344,7 @@ export function AccountsPage({ onNavigate, hideHeader = false }: AccountsPagePro
                   setTagDeleteConfirm(null)
                   setTagDeleteConfirmError(null)
                 }}
+                disabled={deletingTag}
               >
                 {t('common.cancel')}
               </button>

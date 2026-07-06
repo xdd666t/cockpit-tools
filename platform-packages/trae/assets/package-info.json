@@ -1,7 +1,0 @@
-{
-  "platformId": "trae",
-  "displayName": "Trae",
-  "packageMode": "hotUpdate",
-  "installKind": "sidecarAdapter",
-  "version": "0.26.8"
-}

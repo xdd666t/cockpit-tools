@@ -220,3 +220,49 @@ export function loadMfaHistoryRecords(): MfaRecord[] {
 
   return dedupeMfaRecordsBySecret(merged).slice(0, MAX_HISTORY);
 }
+
+export function upsertSavedMfaRecord(input: {
+  secret: string;
+  accountName?: string | null;
+  remark?: string | null;
+}): MfaRecord[] {
+  const parsed = parseMfaCredentialInput(input.secret);
+  if (!parsed?.secret) {
+    return loadSavedMfaRecords();
+  }
+
+  const now = Date.now();
+  const records = loadSavedMfaRecords();
+  const identity = toMfaSecretIdentity(parsed.secret);
+  const existingIndex = records.findIndex(
+    (record) => toMfaSecretIdentity(record.secret) === identity,
+  );
+  const accountName = input.accountName?.trim() || parsed.accountName || "";
+  const remark = input.remark?.trim() || "";
+
+  if (existingIndex >= 0) {
+    records[existingIndex] = {
+      ...records[existingIndex],
+      secret: parsed.secret,
+      accountName: accountName || records[existingIndex].accountName,
+      remark: remark || records[existingIndex].remark,
+      time: now,
+    };
+  } else {
+    records.unshift({
+      id: createMfaRecordId(),
+      secret: parsed.secret,
+      accountName,
+      remark,
+      time: now,
+    });
+  }
+
+  const nextRecords = dedupeMfaRecordsBySecret(records);
+  try {
+    localStorage.setItem(MFA_STORAGE_KEY_SAVED, JSON.stringify(nextRecords));
+  } catch {
+    // Local 2FA vault sync is best effort.
+  }
+  return nextRecords;
+}

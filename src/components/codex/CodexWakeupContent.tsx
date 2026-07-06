@@ -34,8 +34,8 @@ import {
 import { useEscClose } from '../../hooks/useEscClose';
 import {
   CodexAccount,
-  getCodexAuthMetadata,
   getCodexEffectiveQuotaPercentages,
+  getCodexAuthMetadata,
   isCodexApiKeyAccount,
   isCodexTeamLikePlan,
 } from '../../types/codex';
@@ -58,12 +58,12 @@ import {
   MultiSelectFilterDropdown,
   type MultiSelectFilterOption,
 } from '../MultiSelectFilterDropdown';
-import { SingleSelectFilterDropdown } from '../SingleSelectFilterDropdown';
 import { PaginationControls } from '../PaginationControls';
 import {
   buildPaginationPageSizeStorageKey,
   usePagination,
 } from '../../hooks/usePagination';
+import { SingleSelectFilterDropdown } from '../SingleSelectFilterDropdown';
 import {
   isPrivacyModeEnabledByDefault,
   maskSensitiveValue,
@@ -84,15 +84,6 @@ interface CodexWakeupGeneralConfig {
   vscode_app_path?: string;
   opencode_sync_on_switch?: boolean;
   codex_launch_on_switch?: boolean;
-}
-
-export interface CodexWakeupTestOpenRequest {
-  signal: number;
-  accountIds?: string[];
-  variant?: 'standard' | 'fullQuota';
-  defaultSortBy?: WakeupAccountSortBy;
-  defaultSortDirection?: WakeupAccountSortDirection;
-  notice?: string;
 }
 
 interface CodexWakeupContentProps {
@@ -142,6 +133,15 @@ interface AccountPickerFilters {
 
 type WakeupAccountSortBy = 'default' | 'hourly' | 'weekly' | 'created_at' | 'email';
 type WakeupAccountSortDirection = 'asc' | 'desc';
+
+export interface CodexWakeupTestOpenRequest {
+  signal: number;
+  accountIds?: string[];
+  variant?: 'standard' | 'fullQuota';
+  defaultSortBy?: WakeupAccountSortBy;
+  defaultSortDirection?: WakeupAccountSortDirection;
+  notice?: string;
+}
 
 interface WakeupSingleSelectOption {
   value: string;
@@ -292,9 +292,10 @@ function compareWakeupAccountsBySort(
     );
     if (diff !== 0) return diff;
   } else if (sortBy === 'created_at') {
-    const diff = direction === 'desc'
-      ? right.created_at - left.created_at
-      : left.created_at - right.created_at;
+    const diff =
+      direction === 'desc'
+        ? right.created_at - left.created_at
+        : left.created_at - right.created_at;
     if (diff !== 0) return diff;
   } else if (sortBy === 'email') {
     const leftEmail = (left.email || left.id).toLowerCase();
@@ -303,8 +304,10 @@ function compareWakeupAccountsBySort(
     if (diff !== 0) return direction === 'desc' ? -diff : diff;
   }
 
-  return (orderIndex.get(left.id) ?? Number.MAX_SAFE_INTEGER)
-    - (orderIndex.get(right.id) ?? Number.MAX_SAFE_INTEGER);
+  return (
+    (orderIndex.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+    (orderIndex.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+  );
 }
 
 function createRuntimeConfigDraft(status?: CodexWakeupBatchResult['runtime'] | null): RuntimeConfigDraft {
@@ -932,13 +935,6 @@ export function CodexWakeupContent({
     () => accounts.filter((account) => !isCodexApiKeyAccount(account)),
     [accounts],
   );
-  const wakeupAccountOrderIndex = useMemo(() => {
-    const index = new Map<string, number>();
-    oauthAccounts.forEach((account, order) => {
-      index.set(account.id, order);
-    });
-    return index;
-  }, [oauthAccounts]);
   const modelPresetMap = useMemo(
     () => new Map(state.model_presets.map((preset) => [preset.id, preset])),
     [state.model_presets],
@@ -954,6 +950,10 @@ export function CodexWakeupContent({
   const accountMap = useMemo(
     () => new Map(accounts.map((account) => [account.id, account])),
     [accounts],
+  );
+  const wakeupAccountOrderIndex = useMemo(
+    () => new Map(oauthAccounts.map((account, index) => [account.id, index])),
+    [oauthAccounts],
   );
   const wakeupAccountMetaMap = useMemo(() => {
     const map = new Map<
@@ -1145,8 +1145,8 @@ export function CodexWakeupContent({
   );
 
   useEffect(() => {
-    void loadAll(t('codex.wakeup.loadTimeout', '加载 Codex 唤醒任务超时，请重试。'));
-  }, [loadAll, t]);
+    void loadAll();
+  }, [loadAll]);
 
   useEffect(() => {
     const syncPrivacyMode = () => {
@@ -1530,7 +1530,7 @@ export function CodexWakeupContent({
       const payload = fromRawWakeupProgressPayload(event.payload as never);
       applyProgressPayload(payload);
       if (payload.phase === 'batch_completed') {
-        void loadAll(t('codex.wakeup.loadTimeout', '加载 Codex 唤醒任务超时，请重试。'));
+        void loadAll();
       }
     }).then((fn) => {
       unlisten = fn;
@@ -1541,7 +1541,7 @@ export function CodexWakeupContent({
         unlisten();
       }
     };
-  }, [applyProgressPayload, loadAll, t]);
+  }, [applyProgressPayload, loadAll]);
 
   const previewRuns = useMemo(() => calculatePreviewRuns(taskDraft), [taskDraft]);
   const executionCounts = useMemo(() => {
@@ -1650,7 +1650,13 @@ export function CodexWakeupContent({
           wakeupAccountOrderIndex,
         ),
       ),
-    [filterWakeupAccounts, testAccountFilters, testAccountSortBy, testAccountSortDirection, wakeupAccountOrderIndex],
+    [
+      filterWakeupAccounts,
+      testAccountFilters,
+      testAccountSortBy,
+      testAccountSortDirection,
+      wakeupAccountOrderIndex,
+    ],
   );
   const taskAccountPagination = usePagination({
     items: filteredTaskAccounts,
@@ -1983,10 +1989,11 @@ export function CodexWakeupContent({
   }, [setPresetModalError]);
 
   const closePresetModal = useCallback(() => {
+    if (saving) return;
     setShowPresetModal(false);
     setPresetDraft(createEmptyPresetDraft());
     setPresetModalError(null);
-  }, [setPresetModalError]);
+  }, [saving, setPresetModalError]);
 
   const handleSelectTaskPreset = useCallback(
     (presetId: string) => {
@@ -2144,14 +2151,16 @@ export function CodexWakeupContent({
     handledOpenTestRequestSignalRef.current = openTestRequest.signal;
     const nextVariant = openTestRequest.variant ?? 'standard';
     const oauthAccountIdSet = new Set(oauthAccounts.map((account) => account.id));
-    const nextAccountIds = Array.from(new Set(openTestRequest.accountIds ?? [])).filter((accountId) =>
-      oauthAccountIdSet.has(accountId),
+    const nextAccountIds = Array.from(new Set(openTestRequest.accountIds ?? [])).filter(
+      (accountId) => oauthAccountIdSet.has(accountId),
     );
 
     setTestModalError(null);
     setTestModalVariant(nextVariant);
     setTestAccountFilters(createEmptyAccountPickerFilters());
-    setTestAccountSortBy(openTestRequest.defaultSortBy ?? (nextVariant === 'fullQuota' ? 'hourly' : 'default'));
+    setTestAccountSortBy(
+      openTestRequest.defaultSortBy ?? (nextVariant === 'fullQuota' ? 'hourly' : 'default'),
+    );
     setTestAccountSortDirection(
       openTestRequest.defaultSortDirection ?? (nextVariant === 'fullQuota' ? 'desc' : 'asc'),
     );
@@ -2167,10 +2176,11 @@ export function CodexWakeupContent({
   }, [oauthAccounts, openTestRequest, resolvedModelSelection, setTestModalError]);
 
   const closeTaskModal = useCallback(() => {
+    if (saving) return;
     setShowTaskModal(false);
     setTaskModalError(null);
     setTaskDraft(createEmptyTaskDraftWithRememberedModel());
-  }, [createEmptyTaskDraftWithRememberedModel]);
+  }, [createEmptyTaskDraftWithRememberedModel, saving]);
 
   const cancelRunningTest = useCallback(() => {
     const scopeId = activeTestScopeIdRef.current;
@@ -2804,7 +2814,7 @@ export function CodexWakeupContent({
                 <ChevronLeft size={14} />
               </button>
               <h2>{runtimeGuideTitle}</h2>
-              <button className="modal-close" onClick={closeRuntimeGuideModal}>
+              <button className="modal-close" onClick={closeRuntimeGuideModal} disabled={runtimeGuideRefreshing}>
                 <X />
               </button>
             </div>
@@ -2881,7 +2891,7 @@ export function CodexWakeupContent({
               )}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={closeRuntimeGuideModal}>
+              <button className="btn btn-secondary" onClick={closeRuntimeGuideModal} disabled={runtimeGuideRefreshing}>
                 {t('common.close')}
               </button>
               <button className="btn btn-primary" onClick={() => void handleRefreshRuntimeGuide()} disabled={runtimeGuideRefreshing}>
@@ -2903,12 +2913,13 @@ export function CodexWakeupContent({
                   onClick={closePresetModal}
                   title={t('common.back', '返回')}
                   aria-label={t('common.back', '返回')}
+                  disabled={saving}
                 >
                   <ChevronLeft size={14} />
                 </button>
               )}
               <h2>{t('codex.wakeup.presetManagerTitle')}</h2>
-              <button className="modal-close" onClick={closePresetModal}>
+              <button className="modal-close" onClick={closePresetModal} disabled={saving}>
                 <X />
               </button>
             </div>
@@ -3038,7 +3049,7 @@ export function CodexWakeupContent({
                   {t('common.delete')}
                 </button>
               )}
-              <button className="btn btn-secondary" onClick={closePresetModal}>
+              <button className="btn btn-secondary" onClick={closePresetModal} disabled={saving}>
                 {t('common.close')}
               </button>
               <button className="btn btn-primary" onClick={() => void handleSavePreset()} disabled={saving}>
@@ -3461,7 +3472,7 @@ export function CodexWakeupContent({
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={closeTaskModal}>
+              <button className="btn btn-secondary" onClick={closeTaskModal} disabled={saving}>
                 {t('common.cancel')}
               </button>
               <button className="btn btn-primary" onClick={() => void handleSaveTask()} disabled={saving}>
@@ -3477,11 +3488,7 @@ export function CodexWakeupContent({
           <div className="modal modal-lg wakeup-modal wakeup-test-modal codex-wakeup-modal" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <button className="btn btn-secondary icon-only" onClick={closeTestModal} title={t('common.back', '返回')} aria-label={t('common.back', '返回')}><ChevronLeft size={14} /></button>
-              <h2>
-                {testModalVariant === 'fullQuota'
-                  ? t('codex.wakeup.fullQuotaTestTitle', '唤醒账号')
-                  : t('codex.wakeup.testTitle')}
-              </h2>
+              <h2>{t('codex.wakeup.testTitle')}</h2>
               <button className="modal-close" onClick={closeTestModal}>
                 <X />
               </button>
@@ -3606,7 +3613,7 @@ export function CodexWakeupContent({
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={closeTestModal}>
+              <button className="btn btn-secondary" onClick={closeTestModal} disabled={testing}>
                 {t('common.cancel')}
               </button>
               <button className="btn btn-primary" onClick={() => void handleRunTest()} disabled={testing || !runtime?.available}>
