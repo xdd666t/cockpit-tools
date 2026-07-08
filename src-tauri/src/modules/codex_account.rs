@@ -4432,6 +4432,14 @@ fn write_managed_account_projections(account: &CodexAccount) {
             }
         }
     }
+    if let Err(err) =
+        crate::modules::codex_local_access::sync_sidecar_auth_file_for_account(account)
+    {
+        logger::log_warn(&format!(
+            "Codex Token 写穿 API Service sidecar 认证失败，已忽略: account_id={}, error={}",
+            account.id, err
+        ));
+    }
 }
 
 pub fn is_managed_auth_refresh_due(account: &CodexAccount) -> bool {

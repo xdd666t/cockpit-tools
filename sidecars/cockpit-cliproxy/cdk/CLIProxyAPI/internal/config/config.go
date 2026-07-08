@@ -81,6 +81,9 @@ type Config struct {
 	// When <= 0, the default worker count is used.
 	AuthAutoRefreshWorkers int `yaml:"auth-auto-refresh-workers" json:"auth-auto-refresh-workers"`
 
+	// DisableAuthAutoRefresh disables the core auth auto-refresh loop.
+	DisableAuthAutoRefresh bool `yaml:"disable-auth-auto-refresh" json:"disable-auth-auto-refresh"`
+
 	// RequestRetry defines the retry times when the request failed.
 	RequestRetry int `yaml:"request-retry" json:"request-retry"`
 	// MaxRetryCredentials defines the maximum number of credentials to try for a failed request.

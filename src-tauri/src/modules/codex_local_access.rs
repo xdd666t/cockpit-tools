@@ -1057,6 +1057,12 @@ async fn invalidate_prepared_account(account_id: &str) {
     runtime.prepared_accounts.remove(account_id);
 }
 
+fn invalidate_prepared_account_if_unlocked(account_id: &str) {
+    if let Ok(mut runtime) = gateway_runtime().try_lock() {
+        runtime.prepared_accounts.remove(account_id);
+    }
+}
+
 fn try_get_cached_account_for_routing(account_id: &str) -> Option<CodexAccount> {
     let Ok(mut runtime) = gateway_runtime().try_lock() else {
         return None;
@@ -6851,6 +6857,45 @@ fn sidecar_auth_json_for_account(
     value
 }
 
+pub fn sync_sidecar_auth_file_for_account(account: &CodexAccount) -> Result<(), String> {
+    if account.is_api_key_auth() {
+        return Ok(());
+    }
+
+    let Some(collection) = load_collection_from_disk()? else {
+        return Ok(());
+    };
+    if !effective_sidecar_account_ids(&collection)
+        .iter()
+        .any(|account_id| account_id == &account.id)
+    {
+        return Ok(());
+    }
+
+    let base_dir = local_access_sidecar_dir()?;
+    let auths_dir = sidecar_auths_dir(&base_dir);
+    if !auths_dir.exists() {
+        return Ok(());
+    }
+
+    let proxy_signature = sidecar_effective_proxy_signature(&collection)?;
+    let auth_path = auths_dir.join(sidecar_auth_file_name(&account.id));
+    if !auth_path.exists() {
+        return Ok(());
+    }
+    let auth_json =
+        sidecar_auth_json_for_account(account, &collection, proxy_signature.proxy_url.as_deref());
+    let auth_content = serde_json::to_string_pretty(&auth_json)
+        .map_err(|e| format!("序列化 sidecar Codex OAuth 认证失败: {}", e))?;
+    write_string_atomic(&auth_path, &auth_content)?;
+    invalidate_prepared_account_if_unlocked(&account.id);
+    logger::log_codex_api_info(&format!(
+        "[CodexLocalAccess][sidecar] 已写穿 Cockpit Token Authority 凭证: account_id={}",
+        account.id
+    ));
+    Ok(())
+}
+
 fn sidecar_account_manifest_value(account: &CodexAccount, auth_id: Option<&str>) -> Value {
     json!({
         "id": account.id.clone(),
@@ -7328,6 +7373,7 @@ async fn prepare_sidecar_launch_config_in_dir(
     config.insert("logging-to-file".to_string(), json!(false));
     config.insert("commercial-mode".to_string(), json!(true));
     config.insert("ws-auth".to_string(), json!(true));
+    config.insert("disable-auth-auto-refresh".to_string(), json!(true));
     config.insert(
         "disable-image-generation".to_string(),
         sidecar_disable_image_generation_value(effective_image_generation_mode),
@@ -22694,6 +22740,7 @@ data: {"error":{"code":"server_error","type":"upstream","message":"stream aborte
         .expect("parse sidecar config");
 
         assert_eq!(config.get("disable-image-generation"), Some(&json!("chat")));
+        assert_eq!(config.get("disable-auth-auto-refresh"), Some(&json!(true)));
 
         fs::remove_dir_all(&dir).expect("cleanup temp dir");
     }
