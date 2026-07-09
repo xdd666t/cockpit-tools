@@ -951,6 +951,14 @@ fn account_has_refresh_token(account: &CodexAccount) -> bool {
         .is_some()
 }
 
+fn account_is_access_token_only(account: &CodexAccount) -> bool {
+    !account.is_api_key_auth() && !account_has_refresh_token(account)
+}
+
+fn account_uses_personal_access_token(account: &CodexAccount) -> bool {
+    account_is_access_token_only(account) && account.tokens.access_token.trim().starts_with("at-")
+}
+
 fn prune_prepared_account_cache(runtime: &mut GatewayRuntime, now: i64) {
     let allowed_account_ids = runtime.collection.as_ref().map(|collection| {
         effective_sidecar_account_ids(collection)
@@ -6890,6 +6898,18 @@ fn sidecar_auth_json_for_account(
         "excluded_models": excluded_models,
         "disable_cooling": collection.disable_cooling,
     });
+    if account_is_access_token_only(account) {
+        value["auth_mode"] = json!("personal_access_token");
+        value["openai_auth_mode"] = json!("personal_access_token");
+        value["token_type"] = json!("Bearer");
+    } else {
+        value["auth_mode"] = json!("oauth");
+        value["openai_auth_mode"] = json!("oauth");
+    }
+    if account_uses_personal_access_token(account) {
+        value["personal_access_token"] = json!(account.tokens.access_token.clone());
+        value["at_token"] = json!(account.tokens.access_token.clone());
+    }
     if let Some(expired_at) =
         codex_oauth::jwt_token_expiration_timestamp(&account.tokens.access_token)
     {
@@ -6941,10 +6961,20 @@ pub fn sync_sidecar_auth_file_for_account(account: &CodexAccount) -> Result<(), 
 }
 
 fn sidecar_account_manifest_value(account: &CodexAccount, auth_id: Option<&str>) -> Value {
+    let auth_kind = if account.is_api_key_auth() {
+        "api_key"
+    } else if account_is_access_token_only(account) {
+        "access_token"
+    } else {
+        "oauth"
+    };
     json!({
         "id": account.id.clone(),
         "email": account.email.clone(),
         "authId": auth_id,
+        "authKind": auth_kind,
+        "accessTokenOnly": account_is_access_token_only(account),
+        "chatgptAccountId": account.account_id.as_deref().unwrap_or_default(),
         "upstreamApiKey": account.openai_api_key.as_deref().unwrap_or_default(),
         "planRank": resolve_plan_rank(account),
         "remainingQuota": resolve_remaining_quota(account),
@@ -19787,6 +19817,78 @@ wire_api = "responses"
         assert_eq!(
             auth_json.get("expired").and_then(Value::as_i64),
             Some(4_102_444_800i64)
+        );
+    }
+
+    #[test]
+    fn sidecar_auth_json_marks_personal_access_token_accounts() {
+        let account = CodexAccount::new(
+            "account-at".to_string(),
+            "at@example.com".to_string(),
+            CodexTokens {
+                id_token: String::new(),
+                access_token: "at-cockpit-team-token".to_string(),
+                refresh_token: None,
+            },
+        );
+        let collection = test_local_access_collection(vec![account.id.clone()]);
+
+        let auth_json = sidecar_auth_json_for_account(&account, &collection, None);
+
+        assert_eq!(
+            auth_json.get("auth_mode").and_then(Value::as_str),
+            Some("personal_access_token")
+        );
+        assert_eq!(
+            auth_json.get("openai_auth_mode").and_then(Value::as_str),
+            Some("personal_access_token")
+        );
+        assert_eq!(
+            auth_json.get("token_type").and_then(Value::as_str),
+            Some("Bearer")
+        );
+        assert_eq!(
+            auth_json.get("personal_access_token").and_then(Value::as_str),
+            Some("at-cockpit-team-token")
+        );
+        assert_eq!(
+            auth_json.get("at_token").and_then(Value::as_str),
+            Some("at-cockpit-team-token")
+        );
+        assert_eq!(
+            auth_json.get("refresh_token").and_then(Value::as_str),
+            Some("")
+        );
+    }
+
+    #[test]
+    fn sidecar_account_manifest_marks_access_token_only_auth() {
+        let mut account = CodexAccount::new(
+            "account-at".to_string(),
+            "at@example.com".to_string(),
+            CodexTokens {
+                id_token: String::new(),
+                access_token: "at-cockpit-team-token".to_string(),
+                refresh_token: None,
+            },
+        );
+        account.account_id = Some("chatgpt-account-at".to_string());
+
+        let manifest_value = sidecar_account_manifest_value(&account, Some("account-at.json"));
+
+        assert_eq!(
+            manifest_value.get("authKind").and_then(Value::as_str),
+            Some("access_token")
+        );
+        assert_eq!(
+            manifest_value
+                .get("accessTokenOnly")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        assert_eq!(
+            manifest_value.get("chatgptAccountId").and_then(Value::as_str),
+            Some("chatgpt-account-at")
         );
     }
 
