@@ -135,6 +135,7 @@ interface GeneralConfig {
   floating_card_always_on_top?: boolean;
   app_auto_launch_enabled?: boolean;
   token_keeper_enabled?: boolean;
+  auto_import_from_local_enabled?: boolean;
   opencode_app_path: string;
   antigravity_app_path: string;
   codex_app_path: string;
@@ -437,6 +438,7 @@ export function SettingsPage() {
   const [floatingCardAlwaysOnTop, setFloatingCardAlwaysOnTop] = useState(false);
   const [appAutoLaunchEnabled, setAppAutoLaunchEnabled] = useState(false);
   const [tokenKeeperEnabled, setTokenKeeperEnabled] = useState(true);
+  const [autoImportFromLocalEnabled, setAutoImportFromLocalEnabled] = useState(false);
   const [errorReportingEnabled, setErrorReportingEnabled] = useState(true);
   const [errorReportingSaving, setErrorReportingSaving] = useState(false);
   const [opencodeAppPath, setOpencodeAppPath] = useState('');
@@ -936,6 +938,7 @@ export function SettingsPage() {
           floatingCardAlwaysOnTop,
           appAutoLaunchEnabled,
           tokenKeeperEnabled,
+          autoImportFromLocalEnabled,
           opencodeAppPath,
           antigravityAppPath,
           codexAppPath,
@@ -1085,6 +1088,7 @@ export function SettingsPage() {
     floatingCardAlwaysOnTop,
     appAutoLaunchEnabled,
     tokenKeeperEnabled,
+    autoImportFromLocalEnabled,
     generalLoaded,
     language,
     defaultTerminal,
@@ -1399,6 +1403,7 @@ export function SettingsPage() {
       setFloatingCardAlwaysOnTop(config.floating_card_always_on_top ?? false);
       setAppAutoLaunchEnabled(config.app_auto_launch_enabled ?? false);
       setTokenKeeperEnabled(config.token_keeper_enabled ?? true);
+      setAutoImportFromLocalEnabled(config.auto_import_from_local_enabled ?? false);
       setOpencodeAppPath(config.opencode_app_path || '');
       setAntigravityAppPath(config.antigravity_app_path || '');
       setCodexAppPath(config.codex_app_path || '');
@@ -3178,6 +3183,30 @@ export function SettingsPage() {
                       type="checkbox"
                       checked={tokenKeeperEnabled}
                       onChange={(e) => setTokenKeeperEnabled(e.target.checked)}
+                    />
+                    <span className="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="settings-row">
+                <div className="row-label">
+                  <div className="row-title">
+                    {t('settings.general.autoImportFromLocal', '本机账号自动导入')}
+                  </div>
+                  <div className="row-desc">
+                    {t(
+                      'settings.general.autoImportFromLocalDesc',
+                      '开启后，当你在官方客户端更换登录账号时，Cockpit Tools 会自动将新账号导入到对应平台列表中。',
+                    )}
+                  </div>
+                </div>
+                <div className="row-control">
+                  <label className="switch">
+                    <input
+                      type="checkbox"
+                      checked={autoImportFromLocalEnabled}
+                      onChange={(e) => setAutoImportFromLocalEnabled(e.target.checked)}
                     />
                     <span className="slider"></span>
                   </label>

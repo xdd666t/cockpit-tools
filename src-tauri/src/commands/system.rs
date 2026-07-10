@@ -116,6 +116,8 @@ pub struct GeneralConfig {
     pub app_auto_launch_enabled: bool,
     /// 是否启用后台账号授权保活
     pub token_keeper_enabled: bool,
+    /// 是否启用本机账号变更后自动导入
+    pub auto_import_from_local_enabled: bool,
     /// 是否在应用启动后触发 Antigravity IDE 唤醒
     pub antigravity_startup_wakeup_enabled: bool,
     /// Antigravity IDE 启动后唤醒延时（秒）
@@ -1984,6 +1986,7 @@ pub fn save_network_config(
         floating_card_always_on_top: current.floating_card_always_on_top,
         app_auto_launch_enabled: current.app_auto_launch_enabled,
         token_keeper_enabled: current.token_keeper_enabled,
+        auto_import_from_local_enabled: current.auto_import_from_local_enabled,
         antigravity_startup_wakeup_enabled: current.antigravity_startup_wakeup_enabled,
         antigravity_startup_wakeup_delay_seconds: current.antigravity_startup_wakeup_delay_seconds,
         codex_startup_wakeup_enabled: current.codex_startup_wakeup_enabled,
@@ -2320,6 +2323,7 @@ pub fn get_general_config(app: tauri::AppHandle) -> Result<GeneralConfig, String
         floating_card_always_on_top: user_config.floating_card_always_on_top,
         app_auto_launch_enabled,
         token_keeper_enabled: user_config.token_keeper_enabled,
+        auto_import_from_local_enabled: user_config.auto_import_from_local_enabled,
         antigravity_startup_wakeup_enabled: user_config.antigravity_startup_wakeup_enabled,
         antigravity_startup_wakeup_delay_seconds: sanitize_startup_wakeup_delay_seconds(
             user_config.antigravity_startup_wakeup_delay_seconds,
@@ -2475,6 +2479,7 @@ pub fn save_general_config(
     floating_card_always_on_top: Option<bool>,
     app_auto_launch_enabled: Option<bool>,
     token_keeper_enabled: Option<bool>,
+    auto_import_from_local_enabled: Option<bool>,
     antigravity_startup_wakeup_enabled: Option<bool>,
     antigravity_startup_wakeup_delay_seconds: Option<i32>,
     codex_startup_wakeup_enabled: Option<bool>,
@@ -2661,6 +2666,10 @@ pub fn save_general_config(
         app_auto_launch_enabled.unwrap_or(current.app_auto_launch_enabled);
     let token_keeper_enabled_value = token_keeper_enabled.unwrap_or(current.token_keeper_enabled);
     let token_keeper_enabled_changed = current.token_keeper_enabled != token_keeper_enabled_value;
+    let auto_import_from_local_enabled_value = auto_import_from_local_enabled
+        .unwrap_or(current.auto_import_from_local_enabled);
+    let auto_import_from_local_enabled_changed =
+        current.auto_import_from_local_enabled != auto_import_from_local_enabled_value;
     let antigravity_startup_wakeup_enabled_value =
         antigravity_startup_wakeup_enabled.unwrap_or(current.antigravity_startup_wakeup_enabled);
     let antigravity_startup_wakeup_delay_seconds_value = sanitize_startup_wakeup_delay_seconds(
@@ -2757,6 +2766,7 @@ pub fn save_general_config(
         floating_card_always_on_top: floating_card_always_on_top_value,
         app_auto_launch_enabled: app_auto_launch_enabled_value,
         token_keeper_enabled: token_keeper_enabled_value,
+        auto_import_from_local_enabled: auto_import_from_local_enabled_value,
         antigravity_startup_wakeup_enabled: antigravity_startup_wakeup_enabled_value,
         antigravity_startup_wakeup_delay_seconds: antigravity_startup_wakeup_delay_seconds_value,
         codex_startup_wakeup_enabled: codex_startup_wakeup_enabled_value,
@@ -2935,6 +2945,10 @@ pub fn save_general_config(
             app.clone(),
             token_keeper_enabled_value,
         );
+    }
+
+    if auto_import_from_local_enabled_changed {
+        modules::auto_local_import::notify_config_changed(auto_import_from_local_enabled_value);
     }
 
     if current_app_auto_launch_enabled != app_auto_launch_enabled_value {
