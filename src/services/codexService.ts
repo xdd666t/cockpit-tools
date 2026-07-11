@@ -280,6 +280,11 @@ export async function startCodexOAuthLogin(): Promise<CodexOAuthLoginStartRespon
   return await invoke('codex_oauth_login_start');
 }
 
+/** 在内置无痕 WebView 中打开当前 Codex OAuth 授权地址 */
+export async function openCodexOAuthIncognitoWindow(authUrl: string): Promise<void> {
+  await invoke('codex_oauth_open_incognito_window', { authUrl });
+}
+
 /** 新 OAuth 流程：完成登录 */
 export async function completeCodexOAuthLogin(
   loginId: string,

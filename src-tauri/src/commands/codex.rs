@@ -1178,6 +1178,15 @@ pub async fn codex_oauth_login_start(
     Ok(response)
 }
 
+/// OAuth：在内置无痕 WebView 中打开当前授权地址
+#[tauri::command]
+pub fn codex_oauth_open_incognito_window(
+    app_handle: AppHandle,
+    auth_url: String,
+) -> Result<(), String> {
+    codex_oauth::open_incognito_oauth_window(&app_handle, &auth_url)
+}
+
 /// OAuth：浏览器授权完成后按 loginId 完成登录
 #[tauri::command]
 pub async fn codex_oauth_login_completed(
@@ -1214,7 +1223,10 @@ pub async fn codex_oauth_login_completed(
 
 /// OAuth：按 loginId 取消登录（login_id 为空时取消当前流程）
 #[tauri::command]
-pub fn codex_oauth_login_cancel(login_id: Option<String>) -> Result<(), String> {
+pub fn codex_oauth_login_cancel(
+    app_handle: AppHandle,
+    login_id: Option<String>,
+) -> Result<(), String> {
     logger::log_info(&format!(
         "Codex OAuth cancel 命令触发: login_id={}",
         login_id.as_deref().unwrap_or("<none>")
@@ -1224,7 +1236,8 @@ pub fn codex_oauth_login_cancel(login_id: Option<String>) -> Result<(), String> 
         "Codex OAuth cancel 命令返回: {:?}",
         result.as_ref().map(|_| "ok").map_err(|e| e)
     ));
-    result
+    result?;
+    codex_oauth::close_oauth_window(&app_handle)
 }
 
 /// OAuth：手动提交回调链接（用于本地端口不可达时）
@@ -1238,6 +1251,7 @@ pub fn codex_oauth_submit_callback_url(
     let payload = serde_json::json!({ "loginId": login_id });
     let _ = app_handle.emit("codex-oauth-login-completed", payload.clone());
     let _ = app_handle.emit("ghcp-oauth-login-completed", payload);
+    codex_oauth::close_oauth_window(&app_handle)?;
     Ok(())
 }
 

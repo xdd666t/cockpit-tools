@@ -53,6 +53,7 @@ import {
   Terminal,
   Link2,
   ChevronDown,
+  ShieldCheck,
 } from "lucide-react";
 import { useCodexAccountStore } from "../stores/useCodexAccountStore";
 import { useCodexInstanceStore } from "../stores/useCodexInstanceStore";
@@ -4500,6 +4501,22 @@ export function CodexAccountsPage() {
       await navigator.clipboard.writeText(oauthUrl).catch(() => {});
       setOauthUrlCopied(true);
       setTimeout(() => setOauthUrlCopied(false), 1200);
+    }
+  };
+
+  const handleOpenOauthIncognitoWindow = async () => {
+    if (!oauthUrl) return;
+    setAddStatus("idle");
+    setAddMessage("");
+    try {
+      await codexService.openCodexOAuthIncognitoWindow(oauthUrl);
+    } catch (error) {
+      setAddStatus("error");
+      setAddMessage(
+        t("common.shared.oauth.failed", "授权失败") +
+          ": " +
+          String(error).replace(/^Error:\s*/, ""),
+      );
     }
   };
 
@@ -13313,6 +13330,21 @@ export function CodexAccountsPage() {
                                   "Open in Browser",
                                 )}
                           </button>
+                          {!isOauthTimeoutState && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-full"
+                              onClick={() =>
+                                void handleOpenOauthIncognitoWindow()
+                              }
+                            >
+                              <ShieldCheck size={16} />
+                              {t(
+                                "common.shared.oauth.incognitoWindow",
+                                "无痕窗口",
+                              )}
+                            </button>
+                          )}
                           <div className="oauth-link">
                             <label>
                               {t(

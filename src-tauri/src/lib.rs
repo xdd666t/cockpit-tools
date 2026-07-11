@@ -734,6 +734,7 @@ pub fn run() {
             commands::codex::refresh_all_codex_quotas,
             commands::codex::refresh_current_codex_quota,
             commands::codex::codex_oauth_login_start,
+            commands::codex::codex_oauth_open_incognito_window,
             commands::codex::codex_oauth_login_completed,
             commands::codex::codex_oauth_submit_callback_url,
             commands::codex::codex_oauth_login_cancel,
