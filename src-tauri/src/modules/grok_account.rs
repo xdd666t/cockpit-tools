@@ -24,7 +24,8 @@ const CLI_USER_URL: &str = "https://cli-chat-proxy.grok.com/v1/user?include=subs
 const SUBSCRIPTIONS_URL: &str = "https://grok.com/rest/subscriptions";
 const TASK_USAGE_URL: &str = "https://grok.com/rest/tasks/usage";
 const FALLBACK_GROK_CLIENT_VERSION: &str = "0.2.93";
-const TASK_USAGE_MAX_ATTEMPTS: usize = 3;
+/// billing / user / task_usage 传输层瞬时失败（SSL EOF、断连、超时）重试次数
+const TRANSPORT_MAX_ATTEMPTS: usize = 3;
 const FILE_LOCK_TIMEOUT: Duration = Duration::from_secs(5);
 
 static ACCOUNT_LOCK: std::sync::LazyLock<Mutex<()>> = std::sync::LazyLock::new(|| Mutex::new(()));
@@ -1610,15 +1611,47 @@ fn cli_proxy_get(
         .header(USER_AGENT, format!("grok-cli/{}", client_version))
 }
 
+/// 传输层瞬时错误（SSL EOF / 断连 / 超时）重试；RequestBuilder 不可复用，需每次重建。
+async fn send_with_transport_retry<F>(
+    label: &str,
+    max_attempts: usize,
+    mut build: F,
+) -> Result<reqwest::Response, String>
+where
+    F: FnMut() -> reqwest::RequestBuilder,
+{
+    let mut attempt = 0_usize;
+    loop {
+        attempt += 1;
+        match build().send().await {
+            Ok(response) => return Ok(response),
+            Err(error) if attempt < max_attempts => {
+                logger::log_warn(&format!(
+                    "[Grok Account] {} 传输失败，第 {}/{} 次: {}",
+                    label, attempt, max_attempts, error
+                ));
+                // 线性退避：0.5s / 1s / 1.5s…
+                tokio::time::sleep(Duration::from_millis(500 * attempt as u64)).await;
+            }
+            Err(error) => {
+                return Err(format!("{}失败: {}", label, error));
+            }
+        }
+    }
+}
+
 async fn cli_user_for(
     client: &reqwest::Client,
     account: &GrokAccount,
     client_version: &str,
 ) -> Option<Value> {
-    let response = cli_proxy_get(client, CLI_USER_URL, &account.access_token, client_version)
-        .send()
-        .await
-        .ok()?;
+    let access_token = account.access_token.clone();
+    let client_version = client_version.to_string();
+    let response = send_with_transport_retry("查询 Grok 用户信息", TRANSPORT_MAX_ATTEMPTS, || {
+        cli_proxy_get(client, CLI_USER_URL, &access_token, &client_version)
+    })
+    .await
+    .ok()?;
     if !response.status().is_success() {
         return None;
     }
@@ -1631,17 +1664,24 @@ async fn subscriptions_for(account: &GrokAccount, client_version: &str) -> Optio
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .ok()?;
-    let mut request = client
-        .get(SUBSCRIPTIONS_URL)
-        .header(AUTHORIZATION, format!("Bearer {}", account.access_token))
-        .header(ACCEPT, "application/json,text/plain,*/*")
-        .header("x-xai-token-auth", "xai-grok-cli")
-        .header("x-grok-client-version", client_version)
-        .header(USER_AGENT, format!("grok-cli/{}", client_version));
-    if let Some(user_id) = account.user_id.as_deref() {
-        request = request.header("x-userid", user_id);
-    }
-    let response = request.send().await.ok()?;
+    let access_token = account.access_token.clone();
+    let client_version = client_version.to_string();
+    let user_id = account.user_id.clone();
+    let response = send_with_transport_retry("查询 Grok 订阅", TRANSPORT_MAX_ATTEMPTS, || {
+        let mut request = client
+            .get(SUBSCRIPTIONS_URL)
+            .header(AUTHORIZATION, format!("Bearer {}", access_token))
+            .header(ACCEPT, "application/json,text/plain,*/*")
+            .header("x-xai-token-auth", "xai-grok-cli")
+            .header("x-grok-client-version", &client_version)
+            .header(USER_AGENT, format!("grok-cli/{}", client_version));
+        if let Some(user_id) = user_id.as_deref() {
+            request = request.header("x-userid", user_id);
+        }
+        request
+    })
+    .await
+    .ok()?;
     if !response.status().is_success() {
         return None;
     }
@@ -1654,29 +1694,17 @@ async fn task_usage_for(account: &GrokAccount) -> Result<Value, String> {
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|error| format!("创建 Grok 任务配额客户端失败: {}", error))?;
-    let mut attempt = 0_usize;
-    let response = loop {
-        attempt += 1;
-        match client
-            .get(TASK_USAGE_URL)
-            .header(AUTHORIZATION, format!("Bearer {}", account.access_token))
-            .header(ACCEPT, "application/json")
-            .header("x-xai-token-auth", "xai-grok-cli")
-            .header(USER_AGENT, "Grok Build")
-            .send()
-            .await
-        {
-            Ok(response) => break response,
-            Err(error) if attempt < TASK_USAGE_MAX_ATTEMPTS => {
-                logger::log_warn(&format!(
-                    "[Grok Account] 任务配额请求传输失败，第 {}/{} 次: {}",
-                    attempt, TASK_USAGE_MAX_ATTEMPTS, error
-                ));
-                tokio::time::sleep(Duration::from_millis(500 * attempt as u64)).await;
-            }
-            Err(error) => return Err(format!("查询 Grok 任务配额失败: {}", error)),
-        }
-    };
+    let access_token = account.access_token.clone();
+    let response =
+        send_with_transport_retry("查询 Grok 任务配额", TRANSPORT_MAX_ATTEMPTS, || {
+            client
+                .get(TASK_USAGE_URL)
+                .header(AUTHORIZATION, format!("Bearer {}", access_token))
+                .header(ACCEPT, "application/json")
+                .header("x-xai-token-auth", "xai-grok-cli")
+                .header(USER_AGENT, "Grok Build")
+        })
+        .await?;
     let status = response.status();
     let body = response
         .text()
@@ -1829,10 +1857,18 @@ async fn query_quota(account: &mut GrokAccount) -> Result<(), String> {
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|error| format!("创建 Grok 配额客户端失败: {}", error))?;
-    let response = cli_proxy_get(&client, BILLING_URL, &account.access_token, &client_version)
-        .send()
-        .await
-        .map_err(|error| format!("查询 Grok 配额失败: {}", error))?;
+    // billing 是主数据源：补上与 task_usage 相同的传输重试，降低 SSL EOF 等偶发失败
+    let access_token = account.access_token.clone();
+    let client_version_for_billing = client_version.clone();
+    let response = send_with_transport_retry("查询 Grok 配额", TRANSPORT_MAX_ATTEMPTS, || {
+        cli_proxy_get(
+            &client,
+            BILLING_URL,
+            &access_token,
+            &client_version_for_billing,
+        )
+    })
+    .await?;
     let status = response.status();
     let body = response
         .text()
