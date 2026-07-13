@@ -18,6 +18,8 @@ import {
   FolderPlus,
   Image,
   KeyRound,
+  Pin,
+  PinOff,
   Plus,
   Power,
   RefreshCw,
@@ -1689,6 +1691,36 @@ export function CodexApiServicePage() {
         }
       },
       t("codex.apiService.keys.policySaved", "Key 策略已保存"),
+    );
+  };
+
+  const handleSetApiKeyAccountPriority = async (
+    apiKey: CodexLocalAccessApiKey,
+    draft: ApiKeyPolicyDraft,
+    accountId: string,
+  ) => {
+    if (
+      draft.inheritAccountPool ||
+      !draft.accountIds.includes(accountId) ||
+      !apiKey.accountIds?.includes(accountId)
+    ) {
+      return;
+    }
+    const priorityRank = (apiKey.priorityAccountIds ?? []).indexOf(accountId);
+    const pinned = priorityRank !== 0;
+    await runAction(
+      async () => {
+        const next =
+          await codexLocalAccessService.setCodexLocalAccessApiKeyAccountPriority(
+            apiKey.id,
+            accountId,
+            pinned,
+          );
+        setState(next);
+      },
+      pinned
+        ? t("codex.apiService.keys.accountPrioritySaved", "已置顶账号")
+        : t("codex.apiService.keys.accountPriorityCleared", "已取消置顶账号"),
     );
   };
 
@@ -3542,52 +3574,124 @@ export function CodexApiServicePage() {
                               {keySelectableAccounts.map((account) => {
                                 const presentation =
                                   buildCodexAccountPresentation(account, t);
+                                const accountSelected =
+                                  isCodexApiKeyScopeAccountActive({
+                                    accountId: account.id,
+                                    inheritAccountPool:
+                                      policyDraft.inheritAccountPool,
+                                    accountIds: policyDraft.accountIds,
+                                    inheritedAccountIds: memberAccountIds,
+                                  });
+                                const canPinAccount =
+                                  !policyDraft.inheritAccountPool &&
+                                  !accountScopeLocked &&
+                                  !policyDirty &&
+                                  apiKey.accountIds?.includes(account.id);
+                                const priorityRank = (
+                                  apiKey.priorityAccountIds ?? []
+                                ).indexOf(account.id);
+                                const isPrioritizedAccount = priorityRank >= 0;
+                                const isTopPriorityAccount = priorityRank === 0;
                                 return (
-                                  <label
+                                  <div
                                     key={account.id}
-                                    className="api-key-account-scope-item"
+                                    className={`api-key-account-scope-item${
+                                      isPrioritizedAccount ? " is-preferred" : ""
+                                    }`}
                                   >
-                                    <input
-                                      type="checkbox"
-                                      checked={isCodexApiKeyScopeAccountActive({
-                                        accountId: account.id,
-                                        inheritAccountPool:
-                                          policyDraft.inheritAccountPool,
-                                        accountIds: policyDraft.accountIds,
-                                        inheritedAccountIds: memberAccountIds,
-                                      })}
-                                      onChange={() =>
-                                        setApiKeyPolicyDrafts((drafts) => {
-                                          const currentDraft =
-                                            drafts[apiKey.id] ?? policyDraft;
-                                          return {
-                                            ...drafts,
-                                            [apiKey.id]: {
-                                              ...currentDraft,
-                                              accountIds:
-                                                toggleStringSelection(
-                                                  currentDraft.accountIds,
-                                                  account.id,
-                                                ),
-                                            },
-                                          };
-                                        })
+                                    <label className="api-key-account-scope-selection">
+                                      <input
+                                        type="checkbox"
+                                        checked={accountSelected}
+                                        onChange={() =>
+                                          setApiKeyPolicyDrafts((drafts) => {
+                                            const currentDraft =
+                                              drafts[apiKey.id] ?? policyDraft;
+                                            const accountIds = toggleStringSelection(
+                                              currentDraft.accountIds,
+                                              account.id,
+                                            );
+                                            return {
+                                              ...drafts,
+                                              [apiKey.id]: {
+                                                ...currentDraft,
+                                                accountIds,
+                                              },
+                                            };
+                                          })
+                                        }
+                                        disabled={
+                                          busy ||
+                                          policyDraft.inheritAccountPool ||
+                                          accountScopeLocked
+                                        }
+                                      />
+                                      <span>
+                                        <strong title={presentation.displayName}>
+                                          {maskAccountText(
+                                            presentation.displayName,
+                                          )}
+                                        </strong>
+                                        <small>{presentation.planLabel}</small>
+                                      </span>
+                                    </label>
+                                    <button
+                                      type="button"
+                                      className="api-key-account-priority-btn"
+                                      data-priority-rank={
+                                        isPrioritizedAccount
+                                          ? priorityRank + 1
+                                          : undefined
                                       }
-                                      disabled={
-                                        busy ||
-                                        policyDraft.inheritAccountPool ||
-                                        accountScopeLocked
+                                      aria-label={
+                                        isTopPriorityAccount
+                                          ? t(
+                                              "codex.apiService.keys.accountPriorityClear",
+                                              "取消置顶账号",
+                                            )
+                                          : isPrioritizedAccount
+                                            ? t(
+                                                "codex.apiService.keys.accountPriorityPromote",
+                                                "提升为最高优先级",
+                                              )
+                                          : t(
+                                              "codex.apiService.keys.accountPrioritySet",
+                                              "置顶账号优先调用",
+                                            )
                                       }
-                                    />
-                                    <span>
-                                      <strong title={presentation.displayName}>
-                                        {maskAccountText(
-                                          presentation.displayName,
-                                        )}
-                                      </strong>
-                                      <small>{presentation.planLabel}</small>
-                                    </span>
-                                  </label>
+                                      aria-pressed={isPrioritizedAccount}
+                                      title={
+                                        isTopPriorityAccount
+                                          ? t(
+                                              "codex.apiService.keys.accountPriorityClear",
+                                              "取消置顶账号",
+                                            )
+                                          : isPrioritizedAccount
+                                            ? t(
+                                                "codex.apiService.keys.accountPriorityPromote",
+                                                "提升为最高优先级",
+                                              )
+                                          : t(
+                                              "codex.apiService.keys.accountPrioritySet",
+                                              "置顶账号优先调用",
+                                            )
+                                      }
+                                      onClick={() =>
+                                        void handleSetApiKeyAccountPriority(
+                                          apiKey,
+                                          policyDraft,
+                                          account.id,
+                                        )
+                                      }
+                                      disabled={busy || !canPinAccount}
+                                    >
+                                      {isTopPriorityAccount ? (
+                                        <PinOff size={14} />
+                                      ) : (
+                                        <Pin size={14} />
+                                      )}
+                                    </button>
+                                  </div>
                                 );
                               })}
                             </div>

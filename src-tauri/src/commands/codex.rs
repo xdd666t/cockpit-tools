@@ -3115,6 +3115,16 @@ pub async fn codex_local_access_update_api_key(
 }
 
 #[tauri::command]
+pub async fn codex_local_access_set_api_key_account_priority(
+    api_key_id: String,
+    account_id: String,
+    pinned: bool,
+) -> Result<CodexLocalAccessState, String> {
+    codex_local_access::set_local_access_api_key_account_priority(api_key_id, account_id, pinned)
+        .await
+}
+
+#[tauri::command]
 pub async fn codex_local_access_rotate_named_api_key(
     api_key_id: String,
 ) -> Result<CodexLocalAccessState, String> {

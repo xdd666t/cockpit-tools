@@ -383,6 +383,10 @@ pub struct CodexLocalAccessApiKey {
     pub inherit_account_pool: Option<bool>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub account_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub priority_account_ids: Vec<String>,
+    #[serde(default, skip_serializing)]
+    pub preferred_account_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_prefix: Option<String>,
     #[serde(default)]

@@ -783,6 +783,7 @@ pub fn run() {
             commands::codex::codex_local_access_update_image_generation_mode,
             commands::codex::codex_local_access_create_api_key,
             commands::codex::codex_local_access_update_api_key,
+            commands::codex::codex_local_access_set_api_key_account_priority,
             commands::codex::codex_local_access_rotate_named_api_key,
             commands::codex::codex_local_access_delete_api_key,
             commands::codex::codex_local_access_set_enabled,

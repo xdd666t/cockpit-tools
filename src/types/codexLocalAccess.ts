@@ -56,6 +56,7 @@ export interface CodexLocalAccessApiKey {
   providerGateway?: unknown | null;
   inheritAccountPool?: boolean;
   accountIds?: string[];
+  priorityAccountIds?: string[];
   modelPrefix?: string | null;
   allowedModels: string[];
   excludedModels: string[];

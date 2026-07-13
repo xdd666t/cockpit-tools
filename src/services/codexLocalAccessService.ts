@@ -253,6 +253,18 @@ export async function updateCodexLocalAccessApiKey(
   });
 }
 
+export async function setCodexLocalAccessApiKeyAccountPriority(
+  apiKeyId: string,
+  accountId: string,
+  pinned: boolean,
+): Promise<CodexLocalAccessState> {
+  return await invoke("codex_local_access_set_api_key_account_priority", {
+    apiKeyId,
+    accountId,
+    pinned,
+  });
+}
+
 export async function rotateCodexLocalAccessNamedApiKey(
   apiKeyId: string,
 ): Promise<CodexLocalAccessState> {

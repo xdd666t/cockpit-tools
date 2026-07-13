@@ -147,6 +147,52 @@ func TestCockpitSelectorRestrictsAuthsToClientAPIKeyAccountScope(t *testing.T) {
 	}
 }
 
+func TestAPIKeyPriorityStateOrdersFallbackAccountsWithoutRestart(t *testing.T) {
+	tempDir := t.TempDir()
+	priorityPath := filepath.Join(tempDir, "api-key-priorities.json")
+	if err := os.WriteFile(priorityPath, []byte(`{"priorityAccountIds":{"key-team":["account-a","account-b"]}}`), 0o600); err != nil {
+		t.Fatalf("write priority state: %v", err)
+	}
+	store := newAPIKeyPriorityStateStore(filepath.Join(tempDir, "manifest.json"))
+
+	accountA := &accountSpec{ID: "account-a"}
+	accountB := &accountSpec{ID: "account-b"}
+	accountC := &accountSpec{ID: "account-c"}
+	selector := &cockpitSelector{
+		manifest: &manifest{
+			accountByAuthID: map[string]*accountSpec{
+				"auth-a": accountA,
+				"auth-b": accountB,
+				"auth-c": accountC,
+			},
+		},
+		priorities: store,
+	}
+	ctx := context.WithValue(context.Background(), clientAPIKeyContextKey, &apiKeySpec{ID: "key-team"})
+	auths := []*coreauth.Auth{{ID: "auth-c"}, {ID: "auth-b"}, {ID: "auth-a"}}
+	ordered := selector.prioritizeAuthsForAPIKey(ctx, auths)
+	if ordered[0].ID != "auth-a" || ordered[1].ID != "auth-b" || ordered[2].ID != "auth-c" {
+		t.Fatalf("priority accounts should lead in order, got %#v", ordered)
+	}
+	fallbackAuths := []*coreauth.Auth{{ID: "auth-c"}, {ID: "auth-b"}}
+	ordered = selector.prioritizeAuthsForAPIKey(ctx, fallbackAuths)
+	if ordered[0].ID != "auth-b" {
+		t.Fatalf("next priority account should lead when the first is unavailable, got %#v", ordered)
+	}
+
+	if err := os.WriteFile(priorityPath, []byte(`{"priorityAccountIds":{"key-team":["account-b","account-a"]}}`), 0o600); err != nil {
+		t.Fatalf("update priority state: %v", err)
+	}
+	updatedAt := time.Now().Add(time.Second)
+	if err := os.Chtimes(priorityPath, updatedAt, updatedAt); err != nil {
+		t.Fatalf("advance priority state timestamp: %v", err)
+	}
+	ordered = selector.prioritizeAuthsForAPIKey(ctx, auths)
+	if ordered[0].ID != "auth-b" || ordered[1].ID != "auth-a" {
+		t.Fatalf("updated priority should apply without a sidecar restart, got %#v", ordered)
+	}
+}
+
 func TestCockpitSessionAffinitySeparatesClientAPIKeyScopes(t *testing.T) {
 	highQuotaAccount := &accountSpec{
 		ID:       "account-high",

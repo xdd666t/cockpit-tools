@@ -109,6 +109,97 @@ type apiKeySpec struct {
 	Enabled         bool                 `json:"enabled"`
 }
 
+type apiKeyPriorityState struct {
+	PriorityAccountIDs  map[string][]string `json:"priorityAccountIds"`
+	PreferredAccountIDs map[string]string   `json:"preferredAccountIds"`
+}
+
+type apiKeyPriorityStateStore struct {
+	path            string
+	mu              sync.RWMutex
+	lastModUnixNano int64
+	priorities      map[string][]string
+}
+
+func newAPIKeyPriorityStateStore(manifestPath string) *apiKeyPriorityStateStore {
+	store := &apiKeyPriorityStateStore{
+		path:       filepath.Join(filepath.Dir(manifestPath), "api-key-priorities.json"),
+		priorities: make(map[string][]string),
+	}
+	store.reloadIfChanged()
+	return store
+}
+
+func (s *apiKeyPriorityStateStore) priorityAccountIDs(apiKeyID string) []string {
+	if s == nil {
+		return nil
+	}
+	s.reloadIfChanged()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return append([]string(nil), s.priorities[strings.TrimSpace(apiKeyID)]...)
+}
+
+func (s *apiKeyPriorityStateStore) reloadIfChanged() {
+	if s == nil || strings.TrimSpace(s.path) == "" {
+		return
+	}
+	info, err := os.Stat(s.path)
+	if err != nil {
+		return
+	}
+	modifiedAt := info.ModTime().UnixNano()
+	s.mu.RLock()
+	unchanged := modifiedAt == s.lastModUnixNano
+	s.mu.RUnlock()
+	if unchanged {
+		return
+	}
+
+	data, err := os.ReadFile(s.path)
+	if err != nil {
+		return
+	}
+	var state apiKeyPriorityState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return
+	}
+	next := make(map[string][]string, len(state.PriorityAccountIDs))
+	for apiKeyID, accountIDs := range state.PriorityAccountIDs {
+		apiKeyID = strings.TrimSpace(apiKeyID)
+		if apiKeyID == "" {
+			continue
+		}
+		seen := make(map[string]struct{}, len(accountIDs))
+		priorities := make([]string, 0, len(accountIDs))
+		for _, accountID := range accountIDs {
+			accountID = strings.TrimSpace(accountID)
+			if accountID == "" {
+				continue
+			}
+			if _, exists := seen[accountID]; exists {
+				continue
+			}
+			seen[accountID] = struct{}{}
+			priorities = append(priorities, accountID)
+		}
+		if len(priorities) > 0 {
+			next[apiKeyID] = priorities
+		}
+	}
+	for apiKeyID, accountID := range state.PreferredAccountIDs {
+		apiKeyID = strings.TrimSpace(apiKeyID)
+		accountID = strings.TrimSpace(accountID)
+		if apiKeyID != "" && accountID != "" && len(next[apiKeyID]) == 0 {
+			next[apiKeyID] = []string{accountID}
+		}
+	}
+	s.mu.Lock()
+	s.lastModUnixNano = modifiedAt
+	s.priorities = next
+	s.mu.Unlock()
+}
+
 type providerGatewaySpec struct {
 	BaseURL            string                                    `json:"baseUrl"`
 	APIKey             string                                    `json:"apiKey"`
@@ -1456,11 +1547,12 @@ func requestKindFromPath(path string) string {
 }
 
 type cockpitSelector struct {
-	manifest *manifest
-	emitter  *eventEmitter
-	quota    *quotaReserveStateStore
-	mu       sync.Mutex
-	cursor   int
+	manifest   *manifest
+	emitter    *eventEmitter
+	quota      *quotaReserveStateStore
+	priorities *apiKeyPriorityStateStore
+	mu         sync.Mutex
+	cursor     int
 }
 
 type recordingSelector struct {
@@ -1735,12 +1827,53 @@ func (s *cockpitSelector) Pick(ctx context.Context, provider, model string, opts
 	s.mu.Unlock()
 
 	ordered := s.orderAuths(available, start)
+	ordered = s.prioritizeAuthsForAPIKey(ctx, ordered)
 	if len(ordered) == 0 {
 		return nil, noAuthAvailableError(quotaReserveReasons)
 	}
 	selected := ordered[0]
 	s.emitAuthSelected(ctx, selected, provider, model, len(auths), len(available))
 	return selected, nil
+}
+
+func (s *cockpitSelector) prioritizeAuthsForAPIKey(ctx context.Context, auths []*coreauth.Auth) []*coreauth.Auth {
+	if s == nil || ctx == nil || len(auths) <= 1 || s.priorities == nil {
+		return auths
+	}
+	spec, _ := ctx.Value(clientAPIKeyContextKey).(*apiKeySpec)
+	if spec == nil {
+		return auths
+	}
+	priorityAccountIDs := s.priorities.priorityAccountIDs(spec.ID)
+	if len(priorityAccountIDs) == 0 {
+		return auths
+	}
+
+	ordered := make([]*coreauth.Auth, 0, len(auths))
+	selected := make(map[*coreauth.Auth]struct{}, len(priorityAccountIDs))
+	for _, priorityAccountID := range priorityAccountIDs {
+		for _, auth := range auths {
+			account := s.accountForAuth(auth)
+			if account == nil || account.ID != priorityAccountID {
+				continue
+			}
+			if _, alreadySelected := selected[auth]; alreadySelected {
+				break
+			}
+			ordered = append(ordered, auth)
+			selected[auth] = struct{}{}
+			break
+		}
+	}
+	if len(ordered) == 0 {
+		return auths
+	}
+	for _, auth := range auths {
+		if _, alreadySelected := selected[auth]; !alreadySelected {
+			ordered = append(ordered, auth)
+		}
+	}
+	return ordered
 }
 
 func (s *cockpitSelector) filterAuthsForAPIKeyScope(ctx context.Context, auths []*coreauth.Auth) []*coreauth.Auth {
@@ -6177,7 +6310,13 @@ func main() {
 	usageTracker := newRequestUsageTracker()
 	policy := &requestPolicy{manifest: m, emitter: emitter, tracker: usageTracker}
 	hook := &authHook{manifest: m, emitter: emitter}
-	selector := &cockpitSelector{manifest: m, emitter: emitter, quota: quotaState}
+	priorityState := newAPIKeyPriorityStateStore(*manifestPath)
+	selector := &cockpitSelector{
+		manifest:   m,
+		emitter:    emitter,
+		quota:      quotaState,
+		priorities: priorityState,
+	}
 	coreManager := buildCoreAuthManager(cfg, selector, hook, m, quotaState, usageTracker)
 
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

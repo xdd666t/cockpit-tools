@@ -72,6 +72,7 @@ const CODEX_PROVIDER_GATEWAY_MODEL_SLOTS: [&str; 3] = ["gpt-5.5", "gpt-5.4", "gp
 const CODEX_PROVIDER_GATEWAY_STATE_FILE: &str = "state.json";
 const CODEX_LOCAL_ACCESS_SIDECAR_CONFIG_FILE: &str = "config.json";
 const CODEX_LOCAL_ACCESS_SIDECAR_MANIFEST_FILE: &str = "manifest.json";
+const CODEX_LOCAL_ACCESS_SIDECAR_API_KEY_PRIORITY_FILE: &str = "api-key-priorities.json";
 const CODEX_LOCAL_ACCESS_SIDECAR_QUOTA_RESERVE_FILE: &str = "quota-reserve.json";
 const CODEX_LOCAL_ACCESS_SIDECAR_AUTHS_DIR: &str = "auths";
 const CODEX_LOCAL_ACCESS_SIDECAR_BIN_NAME: &str = "cockpit-cliproxy";
@@ -4260,12 +4261,6 @@ fn build_ordered_account_ids(
     }
 
     let mut ordered = Vec::with_capacity(account_ids.len());
-    if let Some(preferred) = preferred_account_id {
-        if account_ids.iter().any(|account_id| account_id == preferred) {
-            ordered.push(preferred.to_string());
-        }
-    }
-
     for offset in 0..account_ids.len() {
         let account_id = &account_ids[(start + offset) % account_ids.len()];
         if ordered.iter().any(|value| value == account_id) {
@@ -4273,8 +4268,10 @@ fn build_ordered_account_ids(
         }
         ordered.push(account_id.clone());
     }
-
-    ordered
+    let priorities = preferred_account_id
+        .map(|account_id| vec![account_id.to_string()])
+        .unwrap_or_default();
+    prioritize_account_ids(ordered, &priorities)
 }
 
 fn normalize_plan_key(plan_type: Option<&str>) -> String {
@@ -4757,27 +4754,22 @@ fn max_credential_attempts_for_strategy(
     .max(1)
 }
 
-fn pin_account_to_front(
+fn prioritize_account_ids(
     account_ids: Vec<String>,
-    preferred_account_id: Option<&str>,
+    priority_account_ids: &[String],
 ) -> Vec<String> {
-    let Some(preferred_account_id) = preferred_account_id else {
-        return account_ids;
-    };
-    let preferred_account_id = preferred_account_id.trim();
-    if preferred_account_id.is_empty() {
-        return account_ids;
-    }
-
     let mut ordered = Vec::with_capacity(account_ids.len());
-    if account_ids
-        .iter()
-        .any(|account_id| account_id == preferred_account_id)
-    {
-        ordered.push(preferred_account_id.to_string());
+    for priority_account_id in priority_account_ids {
+        if priority_account_id.trim().is_empty()
+            || !account_ids.iter().any(|account_id| account_id == priority_account_id)
+            || ordered.iter().any(|account_id| account_id == priority_account_id)
+        {
+            continue;
+        }
+        ordered.push(priority_account_id.clone());
     }
     for account_id in account_ids {
-        if account_id == preferred_account_id {
+        if ordered.iter().any(|value| value == &account_id) {
             continue;
         }
         ordered.push(account_id);
@@ -4787,12 +4779,12 @@ fn pin_account_to_front(
 
 fn pin_account_to_front_for_strategy(
     account_ids: Vec<String>,
-    preferred_account_id: Option<&str>,
+    priority_account_ids: &[String],
     strategy: CodexLocalAccessRoutingStrategy,
     custom_rules: &[CodexLocalAccessCustomRoutingRule],
 ) -> Vec<String> {
     if strategy != CodexLocalAccessRoutingStrategy::Custom {
-        return pin_account_to_front(account_ids, preferred_account_id);
+        return prioritize_account_ids(account_ids, priority_account_ids);
     }
 
     let rule_map = custom_rule_map(custom_rules);
@@ -4810,15 +4802,8 @@ fn pin_account_to_front_for_strategy(
         }
     }
 
-    let preferred_is_backup = preferred_account_id
-        .and_then(|account_id| rule_map.get(account_id.trim()))
-        .map(|(_, _, is_backup)| *is_backup)
-        .unwrap_or(false);
-    if preferred_is_backup {
-        backup = pin_account_to_front(backup, preferred_account_id);
-    } else {
-        regular = pin_account_to_front(regular, preferred_account_id);
-    }
+    regular = prioritize_account_ids(regular, priority_account_ids);
+    backup = prioritize_account_ids(backup, priority_account_ids);
     regular.extend(backup);
     regular
 }
@@ -6908,6 +6893,10 @@ fn sidecar_manifest_path(base_dir: &Path) -> PathBuf {
     base_dir.join(CODEX_LOCAL_ACCESS_SIDECAR_MANIFEST_FILE)
 }
 
+fn sidecar_api_key_priority_path(base_dir: &Path) -> PathBuf {
+    base_dir.join(CODEX_LOCAL_ACCESS_SIDECAR_API_KEY_PRIORITY_FILE)
+}
+
 fn sidecar_quota_reserve_path(base_dir: &Path) -> PathBuf {
     base_dir.join(CODEX_LOCAL_ACCESS_SIDECAR_QUOTA_RESERVE_FILE)
 }
@@ -7217,6 +7206,37 @@ fn sidecar_api_key_manifest_values(collection: &CodexLocalAccessCollection) -> V
     values
 }
 
+fn sidecar_api_key_priority_state_values(collection: &CodexLocalAccessCollection) -> Value {
+    let mut priority_account_ids = Map::new();
+    for item in &collection.api_keys {
+        if api_key_inherits_account_pool(item) || api_key_has_fixed_account_scope(collection, item) {
+            continue;
+        }
+        let priorities = normalize_account_id_list(item.priority_account_ids.clone())
+            .into_iter()
+            .filter(|account_id| item.account_ids.iter().any(|selected_id| selected_id == account_id))
+            .collect::<Vec<_>>();
+        if !priorities.is_empty() {
+            priority_account_ids.insert(
+                item.id.clone(),
+                Value::Array(priorities.into_iter().map(Value::String).collect()),
+            );
+        }
+    }
+    json!({
+        "priorityAccountIds": priority_account_ids,
+    })
+}
+
+fn write_sidecar_api_key_priority_state_in_dir(
+    collection: &CodexLocalAccessCollection,
+    base_dir: &Path,
+) -> Result<(), String> {
+    let content = serde_json::to_string_pretty(&sidecar_api_key_priority_state_values(collection))
+        .map_err(|error| format!("序列化 sidecar API Key 置顶状态失败: {}", error))?;
+    write_string_atomic_if_changed(&sidecar_api_key_priority_path(base_dir), &content).map(|_| ())
+}
+
 fn api_key_inherits_account_pool(api_key: &CodexLocalAccessApiKey) -> bool {
     if api_key.provider_gateway.is_some() {
         return false;
@@ -7320,6 +7340,24 @@ fn remove_account_refs_from_collection(
         let before = api_key.account_ids.clone();
         api_key.account_ids.retain(|id| !remove_ids.contains(id));
         changed |= api_key.account_ids != before;
+        if api_key
+            .priority_account_ids
+            .iter()
+            .any(|id| remove_ids.contains(id))
+        {
+            api_key
+                .priority_account_ids
+                .retain(|id| !remove_ids.contains(id));
+            changed = true;
+        }
+        if api_key
+            .preferred_account_id
+            .as_ref()
+            .is_some_and(|id| remove_ids.contains(id))
+        {
+            api_key.preferred_account_id = None;
+            changed = true;
+        }
     }
 
     let before_custom_rules = collection.custom_routing_rules.clone();
@@ -8322,6 +8360,7 @@ async fn prepare_sidecar_launch_config_in_dir(
     let fingerprint = sidecar_config_fingerprint(&config_content, &manifest_content);
     write_string_atomic_if_changed(&config_path, &config_content)?;
     write_string_atomic_if_changed(&manifest_path, &manifest_content)?;
+    write_sidecar_api_key_priority_state_in_dir(collection, &base_dir)?;
     write_sidecar_quota_reserve_state_in_dir(collection, &base_dir)?;
 
     Ok(SidecarLaunchConfig {
@@ -9222,6 +9261,8 @@ fn build_local_access_api_key(label: Option<&str>) -> CodexLocalAccessApiKey {
         provider_gateway: None,
         inherit_account_pool: Some(true),
         account_ids: Vec::new(),
+        priority_account_ids: Vec::new(),
+        preferred_account_id: None,
         model_prefix: None,
         allowed_models: Vec::new(),
         excluded_models: Vec::new(),
@@ -9249,6 +9290,8 @@ fn normalize_collection_api_keys(collection: &mut CodexLocalAccessCollection) ->
             provider_gateway: None,
             inherit_account_pool: Some(true),
             account_ids: Vec::new(),
+            priority_account_ids: Vec::new(),
+            preferred_account_id: None,
             model_prefix: None,
             allowed_models: Vec::new(),
             excluded_models: Vec::new(),
@@ -9292,6 +9335,32 @@ fn normalize_collection_api_keys(collection: &mut CodexLocalAccessCollection) ->
         let inherit_account_pool = api_key_inherits_account_pool(&item);
         if item.inherit_account_pool != Some(inherit_account_pool) {
             item.inherit_account_pool = Some(inherit_account_pool);
+            changed = true;
+        }
+        let mut priority_account_ids = normalize_account_id_list(item.priority_account_ids.clone());
+        if priority_account_ids.is_empty() {
+            if let Some(preferred_account_id) =
+                normalize_optional_account_ref(item.preferred_account_id.as_deref())
+            {
+                priority_account_ids.push(preferred_account_id);
+            }
+        }
+        if inherit_account_pool
+            || api_key_has_fixed_account_scope(collection, &item)
+        {
+            priority_account_ids.clear();
+        } else {
+            priority_account_ids.retain(|account_id| {
+                item.account_ids
+                    .iter()
+                    .any(|selected_account_id| selected_account_id == account_id)
+            });
+        }
+        if item.priority_account_ids != priority_account_ids {
+            item.priority_account_ids = priority_account_ids;
+            changed = true;
+        }
+        if item.preferred_account_id.take().is_some() {
             changed = true;
         }
         if item.created_at <= 0 {
@@ -9400,23 +9469,49 @@ fn scoped_collection_account_ids(
     }
 }
 
+fn api_key_priority_account_ids(
+    collection: &CodexLocalAccessCollection,
+    api_key: &ResolvedLocalApiKey,
+) -> Vec<String> {
+    if api_key.inherit_account_pool {
+        return Vec::new();
+    }
+    let Some(stored_api_key) = collection.api_keys.iter().find(|item| item.id == api_key.id) else {
+        return Vec::new();
+    };
+    if api_key_has_fixed_account_scope(collection, stored_api_key) {
+        return Vec::new();
+    }
+    normalize_account_id_list(stored_api_key.priority_account_ids.clone())
+        .into_iter()
+        .filter(|priority_account_id| {
+            api_key
+            .account_ids
+            .iter()
+            .any(|account_id| account_id == priority_account_id)
+        })
+        .collect()
+}
+
 fn request_ordered_account_ids(
     collection: &CodexLocalAccessCollection,
     scoped_account_ids: &[String],
     strategy: CodexLocalAccessRoutingStrategy,
     start: usize,
-    affinity_account_id: Option<&str>,
+    priority_account_ids: &[String],
 ) -> Vec<String> {
-    if strategy == CodexLocalAccessRoutingStrategy::Custom {
+    let ordered = if strategy == CodexLocalAccessRoutingStrategy::Custom {
         let scoped: HashSet<&str> = scoped_account_ids.iter().map(String::as_str).collect();
-        return collection
+        collection
             .account_ids
             .iter()
             .filter(|account_id| scoped.contains(account_id.as_str()))
             .cloned()
-            .collect();
-    }
-    build_ordered_account_ids(scoped_account_ids, start, affinity_account_id)
+            .collect()
+    } else {
+        build_ordered_account_ids(scoped_account_ids, start, None)
+    };
+    prioritize_account_ids(ordered, priority_account_ids)
 }
 
 fn allocate_random_local_port(bind_host: &str) -> Result<u16, String> {
@@ -12339,6 +12434,8 @@ fn build_provider_gateway_collection_for_profile(
         provider_gateway: Some(provider_gateway.clone()),
         inherit_account_pool: Some(false),
         account_ids: vec![account.id.clone()],
+        priority_account_ids: Vec::new(),
+        preferred_account_id: None,
         model_prefix: None,
         allowed_models: Vec::new(),
         excluded_models: Vec::new(),
@@ -12394,6 +12491,8 @@ fn build_bound_oauth_local_gateway_collection_for_profile(
         provider_gateway: None,
         inherit_account_pool: Some(false),
         account_ids: vec![account.id.clone()],
+        priority_account_ids: Vec::new(),
+        preferred_account_id: None,
         model_prefix: None,
         allowed_models: Vec::new(),
         excluded_models: Vec::new(),
@@ -12575,6 +12674,8 @@ fn build_model_provider_gateway_test_collection(
         provider_gateway,
         inherit_account_pool: Some(false),
         account_ids: vec![account.id.clone()],
+        priority_account_ids: Vec::new(),
+        preferred_account_id: None,
         model_prefix: None,
         allowed_models: vec![client_model_id.trim().to_string()],
         excluded_models: Vec::new(),
@@ -15357,6 +15458,63 @@ pub async fn create_local_access_api_key(
     snapshot_state().await
 }
 
+pub async fn set_local_access_api_key_account_priority(
+    api_key_id: String,
+    account_id: String,
+    pinned: bool,
+) -> Result<CodexLocalAccessState, String> {
+    ensure_runtime_loaded().await?;
+    let maybe_collection = {
+        let runtime = gateway_runtime().lock().await;
+        runtime.collection.clone()
+    };
+    let Some(mut collection) = maybe_collection else {
+        return Err("本地接入集合尚未创建".to_string());
+    };
+    normalize_collection_api_keys(&mut collection);
+    let api_key_id = api_key_id.trim();
+    let Some(index) = collection
+        .api_keys
+        .iter()
+        .position(|item| item.id == api_key_id)
+    else {
+        return Err("API Key 不存在".to_string());
+    };
+
+    let api_key = &collection.api_keys[index];
+    if api_key_inherits_account_pool(api_key) || api_key_has_fixed_account_scope(&collection, api_key) {
+        return Err("仅自定义账号池的 API Key 支持置顶账号".to_string());
+    }
+    let account_id = normalize_optional_account_ref(Some(&account_id))
+        .ok_or_else(|| "请选择要置顶的账号".to_string())?;
+    if pinned && !api_key.account_ids.iter().any(|selected_id| selected_id == &account_id) {
+        return Err("置顶账号不在当前 API Key 的自定义账号池中".to_string());
+    }
+
+    let api_key = &mut collection.api_keys[index];
+    let mut priority_account_ids = normalize_account_id_list(api_key.priority_account_ids.clone());
+    priority_account_ids.retain(|priority_account_id| priority_account_id != &account_id);
+    if pinned {
+        priority_account_ids.insert(0, account_id);
+    }
+    api_key.priority_account_ids = priority_account_ids;
+    api_key.preferred_account_id = None;
+    api_key.updated_at = now_ms();
+    collection.updated_at = now_ms();
+    save_collection_to_disk(&collection)?;
+    if collection.gateway_mode == CodexLocalAccessGatewayMode::Sidecar {
+        let base_dir = local_access_sidecar_dir()?;
+        std::fs::create_dir_all(&base_dir)
+            .map_err(|error| format!("创建 API 服务 sidecar 目录失败: {}", error))?;
+        write_sidecar_api_key_priority_state_in_dir(&collection, &base_dir)?;
+    }
+    {
+        let mut runtime = gateway_runtime().lock().await;
+        sync_runtime_collection(&mut runtime, collection);
+    }
+    snapshot_state().await
+}
+
 pub async fn update_local_access_api_key(
     api_key_id: String,
     label: Option<String>,
@@ -18005,6 +18163,10 @@ async fn proxy_request_with_account_pool(
             None => None,
         }
     };
+    let priority_account_ids = affinity_account_id
+        .as_ref()
+        .map(|account_id| vec![account_id.clone()])
+        .unwrap_or_else(|| api_key_priority_account_ids(collection, api_key));
     let mut last_status = 503u16;
     let mut last_error = "本地接入集合暂无可用账号".to_string();
     let mut last_error_category: Option<String> = None;
@@ -18021,7 +18183,7 @@ async fn proxy_request_with_account_pool(
             &scoped_account_ids,
             strategy,
             start,
-            affinity_account_id.as_deref(),
+            &priority_account_ids,
         );
         let strategy_account_ids = pin_account_to_front_for_strategy(
             apply_routing_strategy(
@@ -18030,7 +18192,7 @@ async fn proxy_request_with_account_pool(
                 &collection.custom_routing_rules,
                 start,
             ),
-            affinity_account_id.as_deref(),
+            &priority_account_ids,
             strategy,
             &collection.custom_routing_rules,
         );
@@ -19107,12 +19269,16 @@ async fn proxy_websocket_with_account_pool(
     } else {
         None
     };
+    let priority_account_ids = affinity_account_id
+        .as_ref()
+        .map(|account_id| vec![account_id.clone()])
+        .unwrap_or_else(|| api_key_priority_account_ids(collection, api_key));
     let ordered_account_ids = request_ordered_account_ids(
         collection,
         &scoped_account_ids,
         strategy,
         start,
-        affinity_account_id.as_deref(),
+        &priority_account_ids,
     );
     let strategy_account_ids = pin_account_to_front_for_strategy(
         apply_routing_strategy(
@@ -19121,7 +19287,7 @@ async fn proxy_websocket_with_account_pool(
             &collection.custom_routing_rules,
             start,
         ),
-        affinity_account_id.as_deref(),
+        &priority_account_ids,
         strategy,
         &collection.custom_routing_rules,
     );
@@ -20359,7 +20525,8 @@ mod tests {
         parse_responses_payload_from_upstream, parse_websocket_upstream_error,
         pin_account_to_front_for_strategy, prepare_gateway_request,
         prepare_gateway_request_with_default_service_tier, prepare_sidecar_launch_config_in_dir,
-        prepare_websocket_initial_request, profile_base_url_matches,
+        api_key_priority_account_ids, prepare_websocket_initial_request,
+        profile_base_url_matches,
         is_local_access_gateway_base_url, lookup_codex_model_provider_base_url_in_dir,
         resolve_sidecar_upstream_base_url, resolve_sidecar_upstream_base_url_with,
         sidecar_codex_key_config_value, provider_gateway_api_key_id,
@@ -20369,12 +20536,14 @@ mod tests {
         provider_gateway_models_for_account, read_http_request, recompute_time_windows,
         recover_invalid_stats_file,
         remove_account_refs_from_collection, remove_codex_local_access_config,
-        reprice_request_logs_for_collection, request_image_generation_mode, resolve_plan_rank,
+        reprice_request_logs_for_collection, request_image_generation_mode,
+        request_ordered_account_ids, resolve_plan_rank,
         resolve_supported_model_alias, resolve_upstream_target,
         restore_config_toml_from_takeover_backup, sanitize_collection_with_accounts,
         scutil_proxy_map, should_retry_single_account_upstream_status,
         should_treat_response_as_stream, should_try_next_account, sidecar_account_manifest_value,
         sidecar_api_key_account_scope_values, sidecar_api_key_manifest_values,
+        sidecar_api_key_priority_state_values,
         sidecar_auth_file_name, sidecar_auth_json_for_account, sidecar_auths_dir,
         sidecar_cached_account_usable_after_prepare_error, sidecar_client_api_keys,
         sidecar_codex_api_key_auth_id,
@@ -20552,6 +20721,92 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(account_ids, vec!["account-b", "account-c"]);
+    }
+
+    #[test]
+    fn api_key_priority_queue_respects_custom_scope_session_affinity_and_fallbacks() {
+        let mut collection = test_local_access_collection(vec![
+            "account-a".to_string(),
+            "account-b".to_string(),
+            "account-c".to_string(),
+        ]);
+        let mut api_key = build_local_access_api_key(Some("Team A"));
+        api_key.id = "key-team-a".to_string();
+        api_key.inherit_account_pool = Some(false);
+        api_key.account_ids = vec![
+            "account-a".to_string(),
+            "account-b".to_string(),
+            "account-c".to_string(),
+        ];
+        api_key.priority_account_ids = vec!["account-a".to_string(), "account-b".to_string()];
+        collection.api_keys = vec![api_key.clone()];
+
+        let resolved = ResolvedLocalApiKey {
+            id: api_key.id.clone(),
+            label: api_key.label.clone(),
+            provider_gateway: None,
+            inherit_account_pool: false,
+            account_ids: api_key.account_ids.clone(),
+            model_prefix: None,
+            allowed_models: Vec::new(),
+            excluded_models: Vec::new(),
+        };
+
+        assert_eq!(
+            api_key_priority_account_ids(&collection, &resolved),
+            vec!["account-a", "account-b"]
+        );
+        assert_eq!(
+            request_ordered_account_ids(
+                &collection,
+                &resolved.account_ids,
+                CodexLocalAccessRoutingStrategy::Auto,
+                0,
+                &["account-c".to_string()],
+            ),
+            vec!["account-c", "account-a", "account-b"],
+            "an existing session affinity must win over the Key preference"
+        );
+        assert_eq!(
+            request_ordered_account_ids(
+                &collection,
+                &resolved.account_ids,
+                CodexLocalAccessRoutingStrategy::Auto,
+                0,
+                &api_key_priority_account_ids(&collection, &resolved),
+            ),
+            vec!["account-a", "account-b", "account-c"],
+            "new requests should try priority accounts in queue order"
+        );
+        assert_eq!(
+            request_ordered_account_ids(
+                &collection,
+                &["account-b".to_string(), "account-c".to_string()],
+                CodexLocalAccessRoutingStrategy::Auto,
+                0,
+                &api_key_priority_account_ids(&collection, &resolved),
+            ),
+            vec!["account-b", "account-c"],
+            "when the first priority account is unavailable, the next priority account is tried"
+        );
+
+        let priorities = sidecar_api_key_priority_state_values(&collection);
+        assert_eq!(
+            priorities
+                .get("priorityAccountIds")
+                .and_then(|value| value.get("key-team-a"))
+                .and_then(Value::as_array)
+                .map(|values| values.iter().filter_map(Value::as_str).collect::<Vec<_>>()),
+            Some(vec!["account-a", "account-b"])
+        );
+
+        collection.api_keys[0].inherit_account_pool = Some(true);
+        assert!(normalize_collection_api_keys(&mut collection));
+        assert!(collection.api_keys[0].priority_account_ids.is_empty());
+        assert!(sidecar_api_key_priority_state_values(&collection)
+            .get("priorityAccountIds")
+            .and_then(Value::as_object)
+            .is_some_and(|values| values.is_empty()));
     }
 
     #[test]
@@ -23158,7 +23413,7 @@ data: {"type":"response.completed","response":{"id":"resp_123","usage":{"input_t
         );
         let affinity_ordered = pin_account_to_front_for_strategy(
             ordered,
-            Some("backup"),
+            &["backup".to_string()],
             CodexLocalAccessRoutingStrategy::Custom,
             &rules,
         );
