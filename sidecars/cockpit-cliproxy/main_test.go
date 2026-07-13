@@ -143,6 +143,40 @@ func TestLoadManifestIndexesAPIKeyAccounts(t *testing.T) {
 	}
 }
 
+func TestLoadManifestIndexesTokenAccounts(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "manifest.json")
+	if err := os.WriteFile(path, []byte(`{
+		"accounts": [{
+			"id":"token-account",
+			"email":" token@example.com ",
+			"authId":"nested/token-account.json",
+			"authKind":"access_token",
+			"accessTokenOnly":true,
+			"chatgptAccountId":" acct-token "
+		}]
+	}`), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	m, err := loadManifest(path)
+	if err != nil {
+		t.Fatalf("load manifest: %v", err)
+	}
+
+	if got := m.accountByAuthID["nested/token-account.json"]; got == nil || got.ID != "token-account" {
+		t.Fatalf("auth id should index token account, got %#v", got)
+	}
+	if got := m.accountByAuthID["token-account.json"]; got == nil || got.ID != "token-account" {
+		t.Fatalf("auth file basename should index token account, got %#v", got)
+	}
+	if got := m.accountByChatGPT["acct-token"]; got == nil || got.ID != "token-account" {
+		t.Fatalf("chatgpt account id should index token account, got %#v", got)
+	}
+	if got := m.accountByEmail["token@example.com"]; got == nil || got.ID != "token-account" {
+		t.Fatalf("email should index token account, got %#v", got)
+	}
+}
+
 func TestLoadManifestParsesBoundOAuthQuotaReserve(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "manifest.json")
 	if err := os.WriteFile(path, []byte(`{
@@ -662,6 +696,83 @@ func TestSidecarRuntimeRegistersConfigCodexAPIKeyAuths(t *testing.T) {
 	}
 	if got := m.accountByAuthID[strings.ToLower(codexAPIKeyAuth.ID)]; got == nil || got.ID != "api-account" {
 		t.Fatalf("expected auth to be linked to manifest account, got %#v", got)
+	}
+}
+
+func TestSidecarRuntimeRegistersManifestCodexAccessTokenAuths(t *testing.T) {
+	tempDir := t.TempDir()
+	authDir := filepath.Join(tempDir, "auths")
+	if err := os.MkdirAll(authDir, 0o755); err != nil {
+		t.Fatalf("create auth dir: %v", err)
+	}
+	configPath := filepath.Join(tempDir, "config.json")
+	if err := os.WriteFile(configPath, []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write config path: %v", err)
+	}
+	authFile := filepath.Join(authDir, "token-account.json")
+	if err := os.WriteFile(authFile, []byte(`{
+		"type":"codex",
+		"email":"token@example.com",
+		"access_token":"session-runtime-token",
+		"personal_access_token":"at-runtime-token",
+		"at_token":"at-runtime-token",
+		"account_id":"acct-token",
+		"openai_auth_mode":"personal_access_token",
+		"proxy_url":"http://127.0.0.1:9"
+	}`), 0o600); err != nil {
+		t.Fatalf("write auth file: %v", err)
+	}
+
+	cfg := &config.Config{AuthDir: authDir}
+	account := &accountSpec{
+		ID:               "token-account",
+		Email:            "token@example.com",
+		AuthID:           "token-account.json",
+		AuthKind:         "access_token",
+		AccessTokenOnly:  true,
+		ChatGPTAccountID: "acct-token",
+	}
+	m := &manifest{
+		Accounts:         []accountSpec{*account},
+		accountByID:      map[string]*accountSpec{"token-account": account},
+		accountByAuthID:  map[string]*accountSpec{"token-account.json": account},
+		accountByAPIKey:  map[string]*accountSpec{},
+		accountByChatGPT: map[string]*accountSpec{"acct-token": account},
+		accountByEmail:   map[string]*accountSpec{"token@example.com": account},
+		ModelIDs:         []string{"gpt-5.4"},
+	}
+	manager := buildCoreAuthManager(cfg, &cockpitSelector{manifest: m}, &authHook{manifest: m}, m, nil, newRequestUsageTracker())
+
+	runtime, err := newSidecarRuntime(context.Background(), configPath, cfg, m, manager)
+	if err != nil {
+		t.Fatalf("newSidecarRuntime: %v", err)
+	}
+	defer runtime.Stop()
+
+	var tokenAuth *coreauth.Auth
+	for _, auth := range manager.List() {
+		if auth == nil || !strings.EqualFold(auth.Provider, "codex") {
+			continue
+		}
+		if auth.Metadata != nil && auth.Metadata["access_token"] == "at-runtime-token" {
+			tokenAuth = auth
+			break
+		}
+	}
+	if tokenAuth == nil {
+		t.Fatalf("expected codex access token auth to be registered, got %#v", manager.List())
+	}
+	if tokenAuth.ProxyURL != "http://127.0.0.1:9" {
+		t.Fatalf("expected proxy url from auth metadata, got %q", tokenAuth.ProxyURL)
+	}
+	if got := m.accountByAuthID[strings.ToLower(tokenAuth.ID)]; got == nil || got.ID != "token-account" {
+		t.Fatalf("expected token auth to be linked to manifest account, got %#v", got)
+	}
+	if info := findModelInfoForTest(
+		registry.GetGlobalRegistry().GetModelsForClient(tokenAuth.ID),
+		"gpt-5.4",
+	); info == nil {
+		t.Fatalf("expected manifest models to be registered for token auth")
 	}
 }
 

@@ -5453,6 +5453,32 @@ fn is_importable_access_token(token: &str) -> bool {
     decode_jwt_payload_value(token).is_some() || is_opaque_access_token(token)
 }
 
+fn extract_bearer_token_from_header(value: &str) -> Option<String> {
+    let value = normalize_optional_ref(Some(value))?;
+    let mut parts = value.split_whitespace();
+    let scheme = parts.next()?;
+    let token = parts.next()?;
+    if parts.next().is_some() || !scheme.eq_ignore_ascii_case("bearer") {
+        return None;
+    }
+    let token = normalize_optional_ref(Some(token))?;
+    is_importable_access_token(&token).then(|| token.to_string())
+}
+
+fn extract_opaque_access_token_from_text(value: &str) -> Option<String> {
+    let value = normalize_optional_ref(Some(value))?;
+    for (start, _) in value.match_indices("at-") {
+        let token: String = value[start..]
+            .chars()
+            .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '-' || *ch == '_')
+            .collect();
+        if is_opaque_access_token(&token) {
+            return Some(token);
+        }
+    }
+    None
+}
+
 fn first_json_scalar_string(value: &serde_json::Value, paths: &[&[&str]]) -> Option<String> {
     paths.iter().find_map(|path| {
         let mut current = value;
@@ -5509,6 +5535,51 @@ fn merge_access_token_import_hints(
     primary
 }
 
+fn first_personal_access_token_string(value: &serde_json::Value) -> Option<String> {
+    first_json_scalar_string(
+        value,
+        &[
+            &["personal_access_token"],
+            &["personalAccessToken"],
+            &["at_token"],
+            &["atToken"],
+            &["tokens", "personal_access_token"],
+            &["tokens", "personalAccessToken"],
+            &["tokens", "at_token"],
+            &["tokens", "atToken"],
+            &["credentials", "personal_access_token"],
+            &["credentials", "personalAccessToken"],
+            &["credentials", "at_token"],
+            &["credentials", "atToken"],
+        ],
+    )
+    .filter(|token| is_importable_access_token(token))
+    .or_else(|| {
+        first_json_scalar_string(
+            value,
+            &[
+                &["headers", "authorization"],
+                &["headers", "Authorization"],
+                &["credentials", "headers", "authorization"],
+                &["credentials", "headers", "Authorization"],
+            ],
+        )
+        .and_then(|header| extract_bearer_token_from_header(&header))
+    })
+    .or_else(|| {
+        first_json_scalar_string(
+            value,
+            &[
+                &["credentials", "access_token"],
+                &["credentials", "accessToken"],
+                &["access_token"],
+                &["accessToken"],
+            ],
+        )
+        .filter(|token| is_opaque_access_token(token))
+    })
+}
+
 fn extract_access_token_import_hints_from_value(
     value: &serde_json::Value,
 ) -> CodexAccessTokenImportHints {
@@ -5544,6 +5615,9 @@ fn extract_access_token_import_hints_from_value(
                 &["account", "plan_type"],
                 &["account", "planType"],
                 &["account", "plan"],
+                &["credentials", "plan_type"],
+                &["credentials", "planType"],
+                &["credentials", "chatgpt_plan_type"],
             ],
         ),
         subscription_active_until: first_json_scalar_string(
@@ -5551,8 +5625,14 @@ fn extract_access_token_import_hints_from_value(
             &[
                 &["subscription_active_until"],
                 &["subscriptionActiveUntil"],
+                &["expires_at"],
+                &["expiresAt"],
                 &["account", "subscription_active_until"],
                 &["account", "subscriptionActiveUntil"],
+                &["credentials", "subscription_active_until"],
+                &["credentials", "subscriptionActiveUntil"],
+                &["credentials", "expires_at"],
+                &["credentials", "expiresAt"],
             ],
         ),
         account_id: first_json_scalar_string(
@@ -5567,6 +5647,8 @@ fn extract_access_token_import_hints_from_value(
                 &["account", "accountId"],
                 &["credentials", "account_id"],
                 &["credentials", "accountId"],
+                &["credentials", "chatgpt_account_id"],
+                &["credentials", "workspace_id"],
             ],
         ),
         organization_id: first_json_scalar_string(
@@ -5761,21 +5843,25 @@ fn extract_access_token_only_from_value(
     match value {
         serde_json::Value::String(raw) => normalize_optional_ref(Some(raw))
             .filter(|token| is_importable_access_token(token))
+            .or_else(|| extract_opaque_access_token_from_text(raw))
             .map(|token| (token, CodexAccessTokenImportHints::default())),
-        serde_json::Value::Object(_) => first_json_string(
-            value,
-            &[
-                &["tokens", "access_token"],
-                &["tokens", "accessToken"],
-                &["credentials", "access_token"],
-                &["credentials", "accessToken"],
-                &["access_token"],
-                &["accessToken"],
-                &["token"],
-            ],
-        )
-        .filter(|token| is_importable_access_token(token))
-        .map(|token| (token, extract_access_token_import_hints_from_value(value))),
+        serde_json::Value::Object(_) => first_personal_access_token_string(value)
+            .or_else(|| {
+                first_json_string(
+                    value,
+                    &[
+                        &["tokens", "access_token"],
+                        &["tokens", "accessToken"],
+                        &["credentials", "access_token"],
+                        &["credentials", "accessToken"],
+                        &["access_token"],
+                        &["accessToken"],
+                        &["token"],
+                    ],
+                )
+                .filter(|token| is_importable_access_token(token))
+            })
+            .map(|token| (token, extract_access_token_import_hints_from_value(value))),
         _ => None,
     }
 }
@@ -5783,6 +5869,16 @@ fn extract_access_token_only_from_value(
 fn extract_codex_import_candidate_from_value(
     value: &serde_json::Value,
 ) -> Option<CodexJsonImportCandidate> {
+    if value.is_object() {
+        if let Some(access_token) = first_personal_access_token_string(value) {
+            let hints = extract_access_token_import_hints_from_value(value);
+            return Some(CodexJsonImportCandidate::AccessToken {
+                access_token,
+                hints,
+            });
+        }
+    }
+
     if let Some(candidate) = extract_codex_session_candidate_from_value(value) {
         return Some(candidate);
     }
@@ -8374,20 +8470,19 @@ mod tests {
 
     #[test]
     fn extract_candidate_from_sub2api_account_credentials() {
-        let access_token = make_jwt(serde_json::json!({
-            "email": "sub2api@example.com",
-            "https://api.openai.com/auth": {
-                "chatgpt_account_id": "acc-sub2api",
-                "chatgpt_user_id": "user-sub2api"
-            }
-        }));
         let value = serde_json::json!({
             "name": "Sub2API account",
             "notes": "imported from sub2api",
             "platform": "openai",
             "type": "oauth",
             "credentials": {
-                "access_token": access_token
+                "email": "sub2api@example.com",
+                "access_token": "at-sub2api-team-token",
+                "token_type": "Bearer",
+                "auth_mode": "personal_access_token",
+                "openai_auth_mode": "personal_access_token",
+                "plan_type": "team",
+                "chatgpt_account_id": "acc-sub2api"
             }
         });
 
@@ -8399,10 +8494,75 @@ mod tests {
                 access_token,
                 hints,
             } => {
+                assert_eq!(access_token, "at-sub2api-team-token");
+                assert_eq!(hints.email.as_deref(), Some("sub2api@example.com"));
+                assert_eq!(hints.plan_type.as_deref(), Some("team"));
+                assert_eq!(hints.account_id.as_deref(), Some("acc-sub2api"));
                 assert_eq!(hints.account_note.as_deref(), Some("imported from sub2api"));
-                assert!(decode_jwt_payload_value(&access_token).is_some());
             }
             _ => panic!("expected accessToken-only candidate"),
+        }
+    }
+
+    #[test]
+    fn extract_candidate_prefers_cpa_personal_access_token_over_session_token() {
+        let session_access_token = make_jwt(serde_json::json!({
+            "email": "cpa@example.com",
+            "https://api.openai.com/auth": {
+                "chatgpt_account_id": "acc-cpa-session"
+            }
+        }));
+        let value = serde_json::json!({
+            "type": "codex",
+            "provider": "openai",
+            "id_token": "",
+            "access_token": session_access_token,
+            "refresh_token": "",
+            "email": "cpa@example.com",
+            "plan_type": "team",
+            "account_id": "acc-cpa",
+            "chatgpt_account_id": "acc-cpa-chatgpt",
+            "at_token": "at-cpa-team-token",
+            "personal_access_token": "at-cpa-personal-token",
+            "token_type": "Bearer",
+            "auth_mode": "personal_access_token",
+            "openai_auth_mode": "personal_access_token",
+            "headers": {
+                "authorization": "Bearer at-cpa-header-token"
+            }
+        });
+
+        let candidate = extract_codex_import_candidate_from_value(&value)
+            .expect("CPA personal access token object should be accepted");
+
+        match candidate {
+            CodexJsonImportCandidate::AccessToken {
+                access_token,
+                hints,
+            } => {
+                assert_eq!(access_token, "at-cpa-personal-token");
+                assert_eq!(hints.email.as_deref(), Some("cpa@example.com"));
+                assert_eq!(hints.plan_type.as_deref(), Some("team"));
+                assert_eq!(hints.account_id.as_deref(), Some("acc-cpa"));
+            }
+            _ => panic!("expected CPA personal access token candidate"),
+        }
+    }
+
+    #[test]
+    fn extract_candidate_accepts_team_access_token_list_line() {
+        let value = serde_json::Value::String(
+            "team@example.comat-team-list-token.eyJhbGciOiJub25lIn0.payload".to_string(),
+        );
+
+        let candidate = extract_codex_import_candidate_from_value(&value)
+            .expect("team AT list line should expose the at-* token");
+
+        match candidate {
+            CodexJsonImportCandidate::AccessToken { access_token, .. } => {
+                assert_eq!(access_token, "at-team-list-token");
+            }
+            _ => panic!("expected access-token-only candidate"),
         }
     }
 
