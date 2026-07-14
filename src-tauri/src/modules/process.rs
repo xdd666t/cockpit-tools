@@ -424,7 +424,7 @@ fn powershell_output(args: &[&str]) -> std::io::Result<std::process::Output> {
 }
 
 #[cfg(target_os = "windows")]
-pub(crate) fn powershell_output_with_timeout(
+fn powershell_output_with_timeout(
     args: &[&str],
     timeout: Duration,
 ) -> std::io::Result<std::process::Output> {
@@ -1064,7 +1064,7 @@ fn windows_trae_candidate_matches_platform(
     })
 }
 
-#[cfg(any(test, target_os = "windows"))]
+#[cfg(target_os = "windows")]
 fn running_app_candidate_matches(
     app: &str,
     path: &std::path::Path,

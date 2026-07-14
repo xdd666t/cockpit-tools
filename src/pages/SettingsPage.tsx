@@ -145,6 +145,7 @@ interface GeneralConfig {
   kiro_auto_refresh_minutes: number;
   cursor_auto_refresh_minutes: number;
   grok_auto_refresh_minutes: number;
+  grok_sync_official_auth_on_switch: boolean;
   close_behavior: 'ask' | 'minimize' | 'quit';
   minimize_behavior?: 'dock_and_tray' | 'tray_only';
   hide_dock_icon?: boolean;
@@ -482,6 +483,7 @@ export function SettingsPage() {
   const [kiroAutoRefresh, setKiroAutoRefresh] = useState('10');
   const [cursorAutoRefresh, setCursorAutoRefresh] = useState('10');
   const [grokAutoRefresh, setGrokAutoRefresh] = useState('10');
+  const [grokSyncOfficialAuthOnSwitch, setGrokSyncOfficialAuthOnSwitch] = useState(false);
   const [grokCliPath, setGrokCliPath] = useState('');
   const [grokCliStatus, setGrokCliStatus] = useState<GrokCliStatus | null>(null);
   const [grokCliStatusError, setGrokCliStatusError] = useState<string | null>(null);
@@ -1022,7 +1024,10 @@ export function SettingsPage() {
       trae_cn_auto_refresh_minutes: traeCnAutoRefreshNum,
       trae_solo_cn_auto_refresh_minutes: traeSoloCnAutoRefreshNum,
       zed_auto_refresh_minutes: zedAutoRefreshNum,
-      cursor_auto_refresh_minutes: cursorAutoRefreshNum,      grok_auto_refresh_minutes: grokAutoRefreshNum,      close_behavior: closeBehavior,
+      cursor_auto_refresh_minutes: cursorAutoRefreshNum,
+      grok_auto_refresh_minutes: grokAutoRefreshNum,
+      grok_sync_official_auth_on_switch: grokSyncOfficialAuthOnSwitch,
+      close_behavior: closeBehavior,
       minimize_behavior: minimizeBehavior,
       hide_dock_icon: hideDockIcon,
       tray_icon_style: isMacOS ? trayIconStyle : undefined,
@@ -1227,6 +1232,7 @@ export function SettingsPage() {
     zcodeAutoRefresh,
     cursorAutoRefresh,
     grokAutoRefresh,
+    grokSyncOfficialAuthOnSwitch,
     closeBehavior,
     minimizeBehavior,
     hideDockIcon,
@@ -1566,7 +1572,10 @@ export function SettingsPage() {
       setGhcpAutoRefresh(String(config.ghcp_auto_refresh_minutes ?? 10));
       setWindsurfAutoRefresh(String(config.windsurf_auto_refresh_minutes ?? 10));
       setKiroAutoRefresh(String(config.kiro_auto_refresh_minutes ?? 10));
-      setCursorAutoRefresh(String(config.cursor_auto_refresh_minutes ?? 10));      setGrokAutoRefresh(String(config.grok_auto_refresh_minutes ?? 10));      setCloseBehavior(config.close_behavior || 'ask');
+      setCursorAutoRefresh(String(config.cursor_auto_refresh_minutes ?? 10));
+      setGrokAutoRefresh(String(config.grok_auto_refresh_minutes ?? 10));
+      setGrokSyncOfficialAuthOnSwitch(Boolean(config.grok_sync_official_auth_on_switch));
+      setCloseBehavior(config.close_behavior || 'ask');
       setMinimizeBehavior(config.minimize_behavior || 'dock_and_tray');
       setHideDockIcon(Boolean(config.hide_dock_icon));
       setTrayIconStyle(config.tray_icon_style === 'color' ? 'color' : 'template');
@@ -6964,6 +6973,32 @@ export function SettingsPage() {
                     </div>
                   </div>
                   {grokCliStatusError && <div className="form-error">{grokCliStatusError}</div>}
+
+                  <div className="settings-row">
+                    <div className="row-label">
+                      <div className="row-title">
+                        {t('quickSettings.grok.syncOfficialAuthOnSwitch', '切号同步官方登录')}
+                      </div>
+                      <div className="row-desc">
+                        {t(
+                          'quickSettings.grok.syncOfficialAuthOnSwitchDesc',
+                          '开启后，默认实例切换 OAuth 账号会写入官方 ~/.grok/auth.json；关闭时使用独立 GROK_HOME。API Key 和多开实例不改写官方登录。',
+                        )}
+                      </div>
+                    </div>
+                    <div className="row-control">
+                      <label className="switch">
+                        <input
+                          type="checkbox"
+                          checked={grokSyncOfficialAuthOnSwitch}
+                          onChange={(event) =>
+                            setGrokSyncOfficialAuthOnSwitch(event.target.checked)
+                          }
+                        />
+                        <span className="slider"></span>
+                      </label>
+                    </div>
+                  </div>
 
                   <div className="settings-row">
                     <div className="row-label">

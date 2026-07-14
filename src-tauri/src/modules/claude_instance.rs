@@ -7,8 +7,6 @@ use std::process::Command;
 #[cfg(not(target_os = "macos"))]
 use std::process::Stdio;
 use std::sync::Mutex;
-#[cfg(target_os = "windows")]
-use std::time::Duration;
 
 use chrono::Utc;
 use serde::Serialize;
@@ -23,6 +21,9 @@ use crate::modules::instance_store;
 
 static CLAUDE_INSTANCE_STORE_LOCK: std::sync::LazyLock<Mutex<()>> =
     std::sync::LazyLock::new(|| Mutex::new(()));
+
+#[cfg(target_os = "windows")]
+const WINDOWS_CLAUDE_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 const CLAUDE_INSTANCES_FILE: &str = "claude_instances.json";
 const CLAUDE_GLOBAL_CONFIG_FILE: &str = ".claude.json";
@@ -1083,16 +1084,23 @@ fn scan_windows_start_apps_for_claude(
     candidates: &mut Vec<ClaudeDesktopLaunchCandidate>,
     seen: &mut HashSet<String>,
 ) {
-    let output = modules::process::powershell_output_with_timeout(
-        &[
+    use std::os::windows::process::CommandExt;
+
+    let mut command = Command::new("powershell.exe");
+    command
+        .args([
             "-NoProfile",
             "-NonInteractive",
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
             "Get-StartApps | Where-Object { $_.Name -like '*Claude*' -or $_.AppID -like 'Claude_*' } | ForEach-Object { \"$($_.Name)`t$($_.AppID)\" }",
-        ],
-        Duration::from_secs(5),
+        ])
+        .creation_flags(0x08000000)
+        .stdin(Stdio::null());
+    let output = modules::process_timeout::output_with_timeout(
+        &mut command,
+        WINDOWS_CLAUDE_PROBE_TIMEOUT,
     );
     let Ok(output) = output else {
         return;
@@ -1129,6 +1137,8 @@ fn scan_windows_appx_packages_for_claude(
     candidates: &mut Vec<ClaudeDesktopLaunchCandidate>,
     seen: &mut HashSet<String>,
 ) -> bool {
+    use std::os::windows::process::CommandExt;
+
     let configured_roots = split_scan_roots(scan_roots);
     let normalized_roots = configured_roots
         .iter()
@@ -1136,16 +1146,21 @@ fn scan_windows_appx_packages_for_claude(
         .filter(|root| !root.is_empty())
         .collect::<Vec<_>>();
 
-    let output = modules::process::powershell_output_with_timeout(
-        &[
+    let mut command = Command::new("powershell.exe");
+    command
+        .args([
             "-NoProfile",
             "-NonInteractive",
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
             "Get-AppxPackage | Where-Object { $_.Name -like '*Claude*' -or $_.PackageFamilyName -like '*Claude*' -or $_.PackageFullName -like '*Claude*' } | ForEach-Object { $_.InstallLocation }",
-        ],
-        Duration::from_secs(5),
+        ])
+        .creation_flags(0x08000000)
+        .stdin(Stdio::null());
+    let output = modules::process_timeout::output_with_timeout(
+        &mut command,
+        WINDOWS_CLAUDE_PROBE_TIMEOUT,
     );
     let Ok(output) = output else {
         return false;

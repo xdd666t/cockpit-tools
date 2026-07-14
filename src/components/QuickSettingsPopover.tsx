@@ -70,6 +70,7 @@ interface GeneralConfig {
   kiro_auto_refresh_minutes: number;
   cursor_auto_refresh_minutes: number;
   grok_auto_refresh_minutes: number;
+  grok_sync_official_auth_on_switch: boolean;
   codebuddy_auto_refresh_minutes: number;
   codebuddy_cn_auto_refresh_minutes: number;
   qoder_auto_refresh_minutes: number;
@@ -1900,6 +1901,40 @@ export function QuickSettingsPopover({ type }: QuickSettingsPopoverProps) {
 
         {config && (
           <div className="qs-body">
+            {type === 'grok' && (
+              <div className="qs-section">
+                <div className="qs-row">
+                  <div className="qs-row-label">
+                    <span>
+                      {t(
+                        'quickSettings.grok.syncOfficialAuthOnSwitch',
+                        '切号同步官方登录',
+                      )}
+                    </span>
+                  </div>
+                  <div className="qs-row-control">
+                    <label className="qs-switch">
+                      <input
+                        type="checkbox"
+                        checked={config.grok_sync_official_auth_on_switch}
+                        onChange={(event) =>
+                          saveConfig({
+                            grok_sync_official_auth_on_switch: event.target.checked,
+                          })
+                        }
+                      />
+                      <span className="qs-switch-slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div className="qs-hint">
+                  {t(
+                    'quickSettings.grok.syncOfficialAuthOnSwitchDesc',
+                    '开启后，默认实例切换 OAuth 账号会写入官方 ~/.grok/auth.json；关闭时使用独立 GROK_HOME。API Key 和多开实例不改写官方登录。',
+                  )}
+                </div>
+              </div>
+            )}
             {type === 'codex' && (
               <div className="qs-section">
                 <div className="qs-row">

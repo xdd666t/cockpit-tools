@@ -16,10 +16,11 @@ use crate::models::codex_local_access::{
     CodexLocalAccessTestResult, CodexLocalAccessTimeoutPreset, CodexLocalAccessTimeouts,
     CodexLocalAccessUsageEvent, CodexLocalAccessUsageEventPage, CodexLocalAccessUsageStats,
 };
-use crate::modules::atomic_write::write_string_atomic;
+use crate::modules::atomic_write::{
+    write_string_atomic, write_string_atomic_if_hash_matches,
+};
 use crate::modules::{
-    account, codex_account, codex_oauth, codex_protocol, codex_quota, codex_wakeup, codex_wsl,
-    logger, process,
+    account, codex_account, codex_oauth, codex_protocol, codex_quota, codex_wakeup, logger, process,
 };
 use base64::{engine::general_purpose, Engine as _};
 use futures_util::{SinkExt, StreamExt};
@@ -131,7 +132,7 @@ const WEEK_WINDOW_MS: i64 = 7 * DAY_WINDOW_MS;
 const MONTH_WINDOW_MS: i64 = 30 * DAY_WINDOW_MS;
 const STATE_RECENT_USAGE_EVENT_LIMIT: usize = 100;
 const DEFAULT_MODEL_PRICING_VERSION: u64 = 2;
-const MODEL_PRICING_REPRICE_BATCH_SIZE: i64 = 50_000;
+const MODEL_PRICING_REPRICE_BATCH_SIZE: i64 = 1_000;
 const MODEL_PRICING_REPRICE_PARALLEL_MIN_ROWS: usize = 2_000;
 const LOCAL_ACCESS_LOGS_DB_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 const COOLDOWN_KEY_SEPARATOR: &str = "\u{1f}";
@@ -146,7 +147,6 @@ const BOUND_OAUTH_QUOTA_RESERVE_REFRESH_INTERVAL: Duration = Duration::from_secs
 const BOUND_OAUTH_QUOTA_RESERVE_MONITOR_TICK: Duration = Duration::from_secs(5);
 const BOUND_OAUTH_QUOTA_RESERVE_REQUEST_REFRESH_MIN_INTERVAL: Duration = Duration::from_secs(30);
 const GATEWAY_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
-const WSL_ACCESS_PLAN_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
 const GATEWAY_PORT_RELEASE_TIMEOUT: Duration = Duration::from_secs(5);
 const GATEWAY_PORT_RELEASE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const SIDECAR_READY_TIMEOUT: Duration = Duration::from_secs(15);
@@ -195,6 +195,12 @@ const BACKEND_CODEX_RESPONSES_COMPACT_PATH: &str = "/backend-api/codex/responses
 const IMAGES_GENERATIONS_PATH: &str = "/v1/images/generations";
 const IMAGES_EDITS_PATH: &str = "/v1/images/edits";
 static GATEWAY_RUNTIME: OnceLock<TokioMutex<GatewayRuntime>> = OnceLock::new();
+static GATEWAY_RUNTIME_LOAD_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+static GATEWAY_RUNTIME_LOAD_NOTIFY: OnceLock<Notify> = OnceLock::new();
+static GATEWAY_STATS_MAINTENANCE_RUNNING: AtomicBool = AtomicBool::new(false);
+static GATEWAY_STATS_MAINTENANCE_COMPLETED: AtomicBool = AtomicBool::new(false);
+static GATEWAY_COLLECTION_ACCOUNT_SANITIZE_RUNNING: AtomicBool = AtomicBool::new(false);
+static GATEWAY_COLLECTION_ACCOUNT_SANITIZE_COMPLETED: AtomicBool = AtomicBool::new(false);
 static GATEWAY_LIFECYCLE_LOCK: OnceLock<TokioMutex<()>> = OnceLock::new();
 static MODEL_PRICING_REPRICE_WORKER: OnceLock<TokioMutex<ModelPricingRepriceWorkerState>> =
     OnceLock::new();
@@ -351,12 +357,6 @@ struct GatewayRuntime {
     shutdown_sender: Option<watch::Sender<bool>>,
     task: Option<tokio::task::JoinHandle<()>>,
     sidecar_child: Option<Child>,
-    wsl_access_plan: Option<codex_wsl::WslAccessPlan>,
-    wsl_access_plan_resolved_at: Option<Instant>,
-    wsl_relay_bind_host: Option<String>,
-    wsl_relay_port: Option<u16>,
-    wsl_relay_shutdown_sender: Option<watch::Sender<bool>>,
-    wsl_relay_task: Option<tokio::task::JoinHandle<()>>,
 }
 
 #[derive(Default)]
@@ -673,6 +673,19 @@ struct RoutingCandidate {
 
 fn gateway_runtime() -> &'static TokioMutex<GatewayRuntime> {
     GATEWAY_RUNTIME.get_or_init(|| TokioMutex::new(GatewayRuntime::default()))
+}
+
+fn gateway_runtime_load_notify() -> &'static Notify {
+    GATEWAY_RUNTIME_LOAD_NOTIFY.get_or_init(Notify::new)
+}
+
+struct GatewayRuntimeLoadGuard;
+
+impl Drop for GatewayRuntimeLoadGuard {
+    fn drop(&mut self) {
+        GATEWAY_RUNTIME_LOAD_IN_FLIGHT.store(false, Ordering::SeqCst);
+        gateway_runtime_load_notify().notify_waiters();
+    }
 }
 
 fn model_pricing_reprice_worker() -> &'static TokioMutex<ModelPricingRepriceWorkerState> {
@@ -5234,6 +5247,48 @@ fn sort_usage_api_keys(api_keys: &mut [CodexLocalAccessApiKeyStats]) {
     });
 }
 
+fn merge_missing_usage_accounts(
+    runtime: &mut Vec<CodexLocalAccessAccountStats>,
+    maintained: &[CodexLocalAccessAccountStats],
+) {
+    for item in maintained {
+        if !runtime
+            .iter()
+            .any(|existing| existing.account_id == item.account_id)
+        {
+            runtime.push(item.clone());
+        }
+    }
+}
+
+fn merge_missing_usage_models(
+    runtime: &mut Vec<CodexLocalAccessModelStats>,
+    maintained: &[CodexLocalAccessModelStats],
+) {
+    for item in maintained {
+        if !runtime
+            .iter()
+            .any(|existing| existing.model_id == item.model_id)
+        {
+            runtime.push(item.clone());
+        }
+    }
+}
+
+fn merge_missing_usage_api_keys(
+    runtime: &mut Vec<CodexLocalAccessApiKeyStats>,
+    maintained: &[CodexLocalAccessApiKeyStats],
+) {
+    for item in maintained {
+        if !runtime
+            .iter()
+            .any(|existing| existing.api_key_id == item.api_key_id)
+        {
+            runtime.push(item.clone());
+        }
+    }
+}
+
 fn model_pricing(
     model_id: &str,
     long_context_threshold_tokens: Option<u64>,
@@ -6606,13 +6661,14 @@ fn migrate_local_access_json_events(
 fn count_request_logs_for_model_ids(
     conn: &Connection,
     model_ids: Option<&[String]>,
+    target_pricing_version: Option<u64>,
 ) -> Result<u64, String> {
     if matches!(model_ids, Some(items) if items.is_empty()) {
         return Ok(0);
     }
     let model_filter = model_ids.filter(|items| !items.is_empty());
     let mut params = Vec::<SqlValue>::new();
-    let count_sql = if let Some(model_ids) = model_filter {
+    let mut count_sql = if let Some(model_ids) = model_filter {
         let placeholders = std::iter::repeat("?")
             .take(model_ids.len())
             .collect::<Vec<_>>()
@@ -6626,6 +6682,16 @@ fn count_request_logs_for_model_ids(
     } else {
         "SELECT COUNT(*) FROM request_logs".to_string()
     };
+    if let Some(target_pricing_version) = target_pricing_version {
+        count_sql.push_str(if model_filter.is_some() {
+            " AND model_pricing_version != ?"
+        } else {
+            " WHERE model_pricing_version != ?"
+        });
+        params.push(SqlValue::Integer(
+            target_pricing_version.min(i64::MAX as u64) as i64,
+        ));
+    }
     let total: i64 = conn
         .query_row(count_sql.as_str(), params_from_iter(params), |row| {
             row.get(0)
@@ -6670,6 +6736,7 @@ fn read_request_log_reprice_rows_for_model(
     after_id: i64,
     limit: i64,
     service_tier_select: &str,
+    target_pricing_version: Option<u64>,
 ) -> Result<Vec<RequestLogRepriceRow>, String> {
     let select_sql = format!(
         r#"
@@ -6692,7 +6759,9 @@ fn read_request_log_reprice_rows_for_model(
             cached_input_usd_per_million,
             {service_tier_select}
         FROM request_logs
-        WHERE model_id = ?1 AND id > ?2
+        WHERE model_id = ?1
+          AND id > ?2
+          AND (?4 IS NULL OR model_pricing_version != ?4)
         ORDER BY id ASC
         LIMIT ?3
         "#
@@ -6701,33 +6770,42 @@ fn read_request_log_reprice_rows_for_model(
         .prepare(select_sql.as_str())
         .map_err(|e| format!("准备 API 服务历史估算价值按模型读取失败: {}", e))?;
     let rows = stmt
-        .query_map(params![model_id, after_id, limit.max(1)], |row| {
-            let read_u64 = |name: &str| -> rusqlite::Result<u64> {
-                let value: i64 = row.get(name)?;
-                Ok(value.max(0) as u64)
-            };
-            Ok(RequestLogRepriceRow {
-                id: row.get("id")?,
-                event_key: row.get("event_key")?,
-                timestamp: row.get("timestamp")?,
-                account_id: row.get("account_id")?,
-                api_key_id: row.get("api_key_id")?,
-                model_id: row.get("model_id")?,
-                usage: UsageCapture {
-                    input_tokens: read_u64("input_tokens")?,
-                    output_tokens: read_u64("output_tokens")?,
-                    total_tokens: read_u64("total_tokens")?,
-                    cached_tokens: read_u64("cached_tokens")?,
-                    reasoning_tokens: read_u64("reasoning_tokens")?,
-                },
-                previous_cost_usd: row.get("estimated_cost_usd")?,
-                previous_model_pricing_version: read_u64("model_pricing_version")?,
-                previous_input_usd_per_million: row.get("input_usd_per_million")?,
-                previous_output_usd_per_million: row.get("output_usd_per_million")?,
-                previous_cached_input_usd_per_million: row.get("cached_input_usd_per_million")?,
-                service_tier: row.get("service_tier")?,
-            })
-        })
+        .query_map(
+            params![
+                model_id,
+                after_id,
+                limit.max(1),
+                target_pricing_version.map(|version| version.min(i64::MAX as u64) as i64),
+            ],
+            |row| {
+                let read_u64 = |name: &str| -> rusqlite::Result<u64> {
+                    let value: i64 = row.get(name)?;
+                    Ok(value.max(0) as u64)
+                };
+                Ok(RequestLogRepriceRow {
+                    id: row.get("id")?,
+                    event_key: row.get("event_key")?,
+                    timestamp: row.get("timestamp")?,
+                    account_id: row.get("account_id")?,
+                    api_key_id: row.get("api_key_id")?,
+                    model_id: row.get("model_id")?,
+                    usage: UsageCapture {
+                        input_tokens: read_u64("input_tokens")?,
+                        output_tokens: read_u64("output_tokens")?,
+                        total_tokens: read_u64("total_tokens")?,
+                        cached_tokens: read_u64("cached_tokens")?,
+                        reasoning_tokens: read_u64("reasoning_tokens")?,
+                    },
+                    previous_cost_usd: row.get("estimated_cost_usd")?,
+                    previous_model_pricing_version: read_u64("model_pricing_version")?,
+                    previous_input_usd_per_million: row.get("input_usd_per_million")?,
+                    previous_output_usd_per_million: row.get("output_usd_per_million")?,
+                    previous_cached_input_usd_per_million: row
+                        .get("cached_input_usd_per_million")?,
+                    service_tier: row.get("service_tier")?,
+                })
+            },
+        )
         .map_err(|e| format!("读取 API 服务历史估算价值按模型数据失败: {}", e))?;
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("解析 API 服务历史估算价值按模型数据失败: {}", e))
@@ -6737,6 +6815,7 @@ fn read_request_log_reprice_batch(
     conn: &Connection,
     model_cursors: &mut HashMap<String, i64>,
     limit: i64,
+    target_pricing_version: Option<u64>,
 ) -> Result<Vec<RequestLogRepriceRow>, String> {
     if model_cursors.is_empty() {
         return Ok(Vec::new());
@@ -6765,6 +6844,7 @@ fn read_request_log_reprice_batch(
             after_id,
             remaining as i64,
             service_tier_select,
+            target_pricing_version,
         )?;
         if let Some(last) = model_rows.last() {
             if model_rows.len() < remaining {
@@ -7063,7 +7143,12 @@ async fn run_model_pricing_reprice_job(app: AppHandle, job: ModelPricingRepriceJ
             return;
         }
     };
-    let total = match count_request_logs_for_model_ids(&conn, Some(&job.model_ids)) {
+    let target_pricing_version = job.collection.model_pricing_version;
+    let total = match count_request_logs_for_model_ids(
+        &conn,
+        Some(&job.model_ids),
+        Some(target_pricing_version),
+    ) {
         Ok(total) => total,
         Err(error) => {
             logger::log_codex_api_warn(&format!(
@@ -7138,6 +7223,7 @@ async fn run_model_pricing_reprice_job(app: AppHandle, job: ModelPricingRepriceJ
             &conn,
             &mut model_cursors,
             MODEL_PRICING_REPRICE_BATCH_SIZE,
+            Some(target_pricing_version),
         ) {
             Ok(rows) => rows,
             Err(error) => {
@@ -7212,6 +7298,7 @@ async fn run_model_pricing_reprice_job(app: AppHandle, job: ModelPricingRepriceJ
         if model_cursors.is_empty() {
             break;
         }
+        tokio::task::yield_now().await;
     }
 
     apply_reprice_changes_to_runtime_stats(&all_changes).await;
@@ -7244,6 +7331,7 @@ fn reprice_request_logs_with_model_ids(
             conn,
             &mut model_cursors,
             MODEL_PRICING_REPRICE_BATCH_SIZE,
+            None,
         )?;
         if rows.is_empty() {
             break;
@@ -8207,14 +8295,6 @@ fn inspect_local_access_profile_attachment(
     profile_dir: &Path,
     collection: Option<&CodexLocalAccessCollection>,
 ) -> CodexLocalAccessProfileAttachment {
-    inspect_local_access_profile_attachment_with_base_url(profile_dir, collection, None)
-}
-
-fn inspect_local_access_profile_attachment_with_base_url(
-    profile_dir: &Path,
-    collection: Option<&CodexLocalAccessCollection>,
-    expected_base_url_override: Option<&str>,
-) -> CodexLocalAccessProfileAttachment {
     let profile_dir_text = normalize_profile_dir_key(profile_dir);
     let Some(collection) = collection else {
         return CodexLocalAccessProfileAttachment {
@@ -8229,11 +8309,7 @@ fn inspect_local_access_profile_attachment_with_base_url(
         };
     };
 
-    let expected_base_url = expected_base_url_override
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string)
-        .unwrap_or_else(|| build_collection_base_url(collection));
+    let expected_base_url = build_collection_base_url(collection);
     let expected_api_key = collection.api_key.trim();
     let mut attachment = CodexLocalAccessProfileAttachment {
         profile_dir: profile_dir_text,
@@ -10577,182 +10653,6 @@ fn bind_host_for_collection(collection: &CodexLocalAccessCollection) -> &'static
     bind_host_for_access_scope(collection.access_scope)
 }
 
-async fn stop_wsl_relay() {
-    let (shutdown_sender, task) = {
-        let mut runtime = gateway_runtime().lock().await;
-        runtime.wsl_relay_bind_host = None;
-        runtime.wsl_relay_port = None;
-        runtime.wsl_access_plan = None;
-        runtime.wsl_access_plan_resolved_at = None;
-        (
-            runtime.wsl_relay_shutdown_sender.take(),
-            runtime.wsl_relay_task.take(),
-        )
-    };
-    if let Some(sender) = shutdown_sender {
-        let _ = sender.send(true);
-    }
-    if let Some(mut task) = task {
-        tokio::select! {
-            result = &mut task => {
-                let _ = result;
-            }
-            _ = tokio::time::sleep(GATEWAY_SHUTDOWN_TIMEOUT) => {
-                task.abort();
-                let _ = task.await;
-            }
-        }
-    }
-}
-
-fn spawn_tcp_relay(
-    listener: TcpListener,
-    target_host: &'static str,
-    target_port: u16,
-) -> (watch::Sender<bool>, tokio::task::JoinHandle<()>) {
-    let (shutdown_sender, mut shutdown_receiver) = watch::channel(false);
-    let task = tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                changed = shutdown_receiver.changed() => {
-                    if changed.is_err() || *shutdown_receiver.borrow() {
-                        break;
-                    }
-                }
-                accepted = listener.accept() => {
-                    let Ok((mut inbound, peer)) = accepted else {
-                        break;
-                    };
-                    tokio::spawn(async move {
-                        let target = format!("{}:{}", target_host, target_port);
-                        match TcpStream::connect(&target).await {
-                            Ok(mut outbound) => {
-                                if let Err(error) = tokio::io::copy_bidirectional(&mut inbound, &mut outbound).await {
-                                    logger::log_codex_api_warn(&format!(
-                                        "[CodexLocalAccess][WSL] 转发连接中断: peer={} target={} error={}",
-                                        peer, target, error
-                                    ));
-                                }
-                            }
-                            Err(error) => logger::log_codex_api_warn(&format!(
-                                "[CodexLocalAccess][WSL] 连接 Windows 本地 API 服务失败: peer={} target={} error={}",
-                                peer, target, error
-                            )),
-                        }
-                    });
-                }
-            }
-        }
-    });
-    (shutdown_sender, task)
-}
-
-async fn ensure_wsl_relay_for_collection(collection: &CodexLocalAccessCollection) {
-    let Some(config_dir) = codex_wsl::configured_wsl_config_dir() else {
-        stop_wsl_relay().await;
-        return;
-    };
-    let use_loopback_relay = collection.access_scope == CodexLocalAccessScope::Localhost;
-    let configured_distro = codex_wsl::parse_wsl_distro_from_path_text(
-        config_dir.to_string_lossy().as_ref(),
-    );
-    let cached_plan_is_current = {
-        let runtime = gateway_runtime().lock().await;
-        runtime
-            .wsl_access_plan
-            .as_ref()
-            .zip(runtime.wsl_access_plan_resolved_at)
-            .is_some_and(|(plan, resolved_at)| {
-                let relay_expected =
-                    use_loopback_relay && plan.mode == codex_wsl::WslNetworkingMode::Nat;
-                let relay_ready = if relay_expected {
-                    plan.relay_bind_host
-                        .map(|host| host.to_string())
-                        .as_deref()
-                        == runtime.wsl_relay_bind_host.as_deref()
-                        && runtime.wsl_relay_port == Some(collection.port)
-                        && runtime
-                            .wsl_relay_task
-                            .as_ref()
-                            .is_some_and(|task| !task.is_finished())
-                } else {
-                    plan.relay_bind_host.is_none()
-                };
-                configured_distro.as_deref() == Some(plan.distro.as_str())
-                    && resolved_at.elapsed() < WSL_ACCESS_PLAN_REFRESH_INTERVAL
-                    && relay_ready
-            })
-    };
-    if cached_plan_is_current {
-        return;
-    }
-    let plan = match codex_wsl::resolve_access_plan(&config_dir, use_loopback_relay).await {
-        Ok(plan) => plan,
-        Err(error) => {
-            stop_wsl_relay().await;
-            logger::log_codex_api_warn(&format!(
-                "[CodexLocalAccess][WSL] 自动适配失败，Windows API 服务保持运行: profile_dir={}, error={}",
-                config_dir.display(),
-                error
-            ));
-            return;
-        }
-    };
-
-    let Some(relay_bind_host) = plan.relay_bind_host else {
-        stop_wsl_relay().await;
-        let mut runtime = gateway_runtime().lock().await;
-        runtime.wsl_access_plan = Some(plan.clone());
-        runtime.wsl_access_plan_resolved_at = Some(Instant::now());
-        logger::log_codex_api_info(&format!(
-            "[CodexLocalAccess][WSL] 已使用原生网络访问: distro={} mode={:?} client_host={}",
-            plan.distro, plan.mode, plan.client_host
-        ));
-        return;
-    };
-
-    let bind_host = relay_bind_host.to_string();
-    let port = collection.port;
-    let already_running = {
-        let runtime = gateway_runtime().lock().await;
-        runtime.wsl_relay_bind_host.as_deref() == Some(bind_host.as_str())
-            && runtime.wsl_relay_port == Some(port)
-            && runtime.wsl_relay_task.is_some()
-    };
-    if already_running {
-        let mut runtime = gateway_runtime().lock().await;
-        runtime.wsl_access_plan = Some(plan);
-        runtime.wsl_access_plan_resolved_at = Some(Instant::now());
-        return;
-    }
-
-    stop_wsl_relay().await;
-    let listener = match TcpListener::bind((relay_bind_host, port)).await {
-        Ok(listener) => listener,
-        Err(error) => {
-            logger::log_codex_api_warn(&format!(
-                "[CodexLocalAccess][WSL] 无法绑定 WSL 专属转发入口，Windows API 服务保持运行: bind={}:{} error={}",
-                bind_host, port, error
-            ));
-            return;
-        }
-    };
-    let (shutdown_sender, task) =
-        spawn_tcp_relay(listener, CODEX_LOCAL_ACCESS_LOCALHOST_BIND_HOST, port);
-
-    logger::log_codex_api_info(&format!(
-        "[CodexLocalAccess][WSL] NAT 专属转发已启动: distro={} bind={}:{} target={}:{}",
-        plan.distro, bind_host, port, CODEX_LOCAL_ACCESS_LOCALHOST_BIND_HOST, port
-    ));
-    let mut runtime = gateway_runtime().lock().await;
-    runtime.wsl_access_plan = Some(plan);
-    runtime.wsl_access_plan_resolved_at = Some(Instant::now());
-    runtime.wsl_relay_bind_host = Some(bind_host);
-    runtime.wsl_relay_port = Some(port);
-    runtime.wsl_relay_shutdown_sender = Some(shutdown_sender);
-    runtime.wsl_relay_task = Some(task);
-}
-
 #[derive(Debug)]
 struct LanIpv4Candidate {
     interface_name: String,
@@ -10991,15 +10891,6 @@ async fn write_local_access_profile_takeover(
     collection: &CodexLocalAccessCollection,
     api_key: Option<&str>,
 ) -> Result<(), String> {
-    write_local_access_profile_takeover_with_base_url(profile_dir, collection, api_key, None).await
-}
-
-async fn write_local_access_profile_takeover_with_base_url(
-    profile_dir: &Path,
-    collection: &CodexLocalAccessCollection,
-    api_key: Option<&str>,
-    base_url_override: Option<&str>,
-) -> Result<(), String> {
     let bound_oauth_account_id =
         normalize_optional_account_ref(collection.bound_oauth_account_id.as_deref());
     if let Some(bound_id) = bound_oauth_account_id.as_deref() {
@@ -11007,11 +10898,7 @@ async fn write_local_access_profile_takeover_with_base_url(
         let _ = codex_account::ensure_managed_account_fresh(bound_id).await?;
     }
     let runtime_account = build_runtime_account(
-        base_url_override
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_string)
-            .unwrap_or_else(|| build_collection_base_url(collection)),
+        build_collection_base_url(collection),
         api_key
             .map(str::trim)
             .filter(|value| !value.is_empty())
@@ -11095,48 +10982,20 @@ async fn ensure_profile_takeover(
     profile_dir: &Path,
     collection: &CodexLocalAccessCollection,
 ) -> Result<(), String> {
-    ensure_profile_takeover_with_base_url(profile_dir, collection, None).await
-}
-
-async fn ensure_profile_takeover_with_base_url(
-    profile_dir: &Path,
-    collection: &CodexLocalAccessCollection,
-    expected_base_url_override: Option<&str>,
-) -> Result<(), String> {
     if !collection.enabled {
         return Ok(());
     }
 
-    let current = inspect_local_access_profile_attachment_with_base_url(
-        profile_dir,
-        Some(collection),
-        expected_base_url_override,
-    );
+    let current = inspect_local_access_profile_attachment(profile_dir, Some(collection));
     if current.attached && current.error.is_none() {
-        write_local_access_profile_takeover_with_base_url(
-            profile_dir,
-            collection,
-            None,
-            expected_base_url_override,
-        )
-        .await?;
+        write_local_access_profile_takeover(profile_dir, collection, None).await?;
         return Ok(());
     }
 
     save_profile_takeover_backup(profile_dir, &collection.api_key)?;
-    write_local_access_profile_takeover_with_base_url(
-        profile_dir,
-        collection,
-        None,
-        expected_base_url_override,
-    )
-    .await?;
+    write_local_access_profile_takeover(profile_dir, collection, None).await?;
 
-    let next = inspect_local_access_profile_attachment_with_base_url(
-        profile_dir,
-        Some(collection),
-        expected_base_url_override,
-    );
+    let next = inspect_local_access_profile_attachment(profile_dir, Some(collection));
     if !next.attached {
         return Err(format!(
             "Codex API 服务已启动，但 Codex 配置未接管本地 API: profile_dir={}, expected_base_url={}",
@@ -11161,38 +11020,9 @@ async fn ensure_local_access_profile_takeovers(
     collection: &CodexLocalAccessCollection,
 ) -> Result<(), String> {
     let mut failures = Vec::new();
-    let profile_dirs = collect_local_access_profile_takeover_dirs();
-    let default_profile_key = normalize_profile_dir_key(&codex_account::get_codex_home());
-    let default_profile_is_bound = profile_dirs
-        .iter()
-        .any(|profile_dir| normalize_profile_dir_key(profile_dir) == default_profile_key);
-    for profile_dir in profile_dirs {
+    for profile_dir in collect_local_access_profile_takeover_dirs() {
         if let Err(err) = ensure_profile_takeover(&profile_dir, collection).await {
             failures.push(err);
-        }
-    }
-
-    if default_profile_is_bound {
-        let wsl_target = {
-            let runtime = gateway_runtime().lock().await;
-            codex_wsl::configured_wsl_config_dir().zip(runtime.wsl_access_plan.clone())
-        };
-        if let Some((wsl_config_dir, plan)) = wsl_target {
-            let wsl_base_url = format!("http://{}:{}/v1", plan.client_host, collection.port);
-            if let Err(err) = ensure_profile_takeover_with_base_url(
-                &wsl_config_dir,
-                collection,
-                Some(&wsl_base_url),
-            )
-            .await
-            {
-                failures.push(format!(
-                    "WSL Codex 配置接管失败: distro={}, profile_dir={}, error={}",
-                    plan.distro,
-                    wsl_config_dir.display(),
-                    err
-                ));
-            }
         }
     }
     if failures.is_empty() {
@@ -11215,31 +11045,6 @@ async fn ensure_local_access_profile_takeovers_from_runtime() -> Result<(), Stri
         ensure_local_access_profile_takeovers(collection).await?;
     }
     Ok(())
-}
-
-/// Re-apply the WSL projection after account switching overwrites the shared
-/// WSL `auth.json`/`config.toml` bundle. This is intentionally a no-op unless
-/// the local API service is already running, so switching an account does not
-/// implicitly start a gateway.
-pub async fn reapply_wsl_profile_takeover_after_account_switch() {
-    let collection = {
-        let runtime = gateway_runtime().lock().await;
-        runtime
-            .collection
-            .clone()
-            .filter(|collection| collection.enabled && runtime.running)
-    };
-    let Some(collection) = collection else {
-        return;
-    };
-
-    ensure_wsl_relay_for_collection(&collection).await;
-    if let Err(error) = ensure_local_access_profile_takeovers(&collection).await {
-        logger::log_codex_api_warn(&format!(
-            "[CodexLocalAccess][WSL] 账号切换后重新接管 WSL 配置失败: {}",
-            error
-        ));
-    }
 }
 
 fn generate_local_api_key() -> String {
@@ -11617,20 +11422,22 @@ fn recover_invalid_stats_file(
     empty
 }
 
-fn load_stats_from_disk(
-    collection: Option<&CodexLocalAccessCollection>,
-) -> Result<CodexLocalAccessStats, String> {
+fn load_stats_snapshot_from_disk() -> Result<CodexLocalAccessStats, String> {
     let path = local_access_stats_file_path()?;
-    let mut parsed = if path.exists() {
+    if path.exists() {
         let content =
             std::fs::read_to_string(&path).map_err(|e| format!("读取 API 服务统计失败: {}", e))?;
         match serde_json::from_str::<CodexLocalAccessStats>(&content) {
-            Ok(parsed) => parsed,
-            Err(error) => recover_invalid_stats_file(&path, &error),
+            Ok(parsed) => Ok(parsed),
+            Err(error) => Ok(recover_invalid_stats_file(&path, &error)),
         }
     } else {
-        empty_stats_snapshot()
-    };
+        Ok(empty_stats_snapshot())
+    }
+}
+
+fn load_stats_from_disk() -> Result<CodexLocalAccessStats, String> {
+    let mut parsed = load_stats_snapshot_from_disk()?;
     let json_events = std::mem::take(&mut parsed.events);
     let request_logs_schema_state = match inspect_request_logs_schema_state() {
         Ok(state) => state,
@@ -11646,58 +11453,13 @@ fn load_stats_from_disk(
         request_logs_schema_state,
         RequestLogsSchemaState::MissingTable
     ) && !json_events.is_empty();
-    let json_events_migrated =
-        match migrate_local_access_json_events(&json_events, !bootstrap_without_service_tier) {
-            Ok(()) => true,
-            Err(error) => {
-                logger::log_codex_api_warn(&format!(
-                    "API 服务请求日志迁移失败，继续使用统计快照中的最近事件: {}",
-                    error
-                ));
-                false
-            }
-        };
-    let should_reprice_history = !matches!(
-        request_logs_schema_state,
-        RequestLogsSchemaState::MissingTable
-    ) || (bootstrap_without_service_tier && json_events_migrated);
-    if should_reprice_history {
-        let mut repricing_conn = match if bootstrap_without_service_tier {
-            open_local_access_logs_db_with_schema(false)
-        } else {
-            open_local_access_logs_db()
-        } {
-            Ok(conn) => conn,
-            Err(error) => {
-                logger::log_codex_api_warn(&format!(
-                    "打开 API 服务日志数据库以执行历史估算价值重算失败，继续使用统计快照中的最近事件: {}",
-                    error
-                ));
-                let month_since = now_ms().saturating_sub(MONTH_WINDOW_MS);
-                parsed.events = json_events
-                    .into_iter()
-                    .filter(|event| event.timestamp >= month_since)
-                    .collect();
-                normalize_stats(&mut parsed);
-                return Ok(parsed);
-            }
-        };
-        let model_ids = effective_price_book_model_ids(collection);
-        match reprice_request_logs_with_model_ids(
-            &mut repricing_conn,
-            collection,
-            Some(model_ids.as_slice()),
-        ) {
-            Ok(changes) => {
-                apply_reprice_changes_to_stats(&mut parsed, &changes);
-            }
-            Err(error) => {
-                logger::log_codex_api_warn(&format!(
-                    "API 服务历史估算价值重算失败，继续使用统计快照中的最近事件: {}",
-                    error
-                ));
-            }
-        }
+    if let Err(error) =
+        migrate_local_access_json_events(&json_events, !bootstrap_without_service_tier)
+    {
+        logger::log_codex_api_warn(&format!(
+            "API 服务请求日志迁移失败，继续使用统计快照中的最近事件: {}",
+            error
+        ));
     }
     let month_since = now_ms().saturating_sub(MONTH_WINDOW_MS);
     parsed.events = match load_local_access_usage_events_since(month_since) {
@@ -11715,6 +11477,222 @@ fn load_stats_from_disk(
     };
     normalize_stats(&mut parsed);
     Ok(parsed)
+}
+
+fn collection_content_fingerprint(
+    collection: &CodexLocalAccessCollection,
+) -> Result<Vec<u8>, String> {
+    // Stable byte identity for CAS: any concurrent user edit must change the fingerprint.
+    serde_json::to_vec(collection)
+        .map_err(|error| format!("序列化 API 服务配置指纹失败: {}", error))
+}
+
+fn collection_disk_snapshot_for_cas(
+    runtime_fingerprint: &[u8],
+) -> Result<Option<(PathBuf, [u8; 32])>, String> {
+    let path = local_access_file_path()?;
+    let content = match std::fs::read(&path) {
+        Ok(content) => content,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(format!(
+                "读取 API 服务配置 CAS 快照失败: path={}, error={}",
+                path.display(),
+                error
+            ));
+        }
+    };
+    let disk_collection = serde_json::from_slice::<CodexLocalAccessCollection>(&content)
+        .map_err(|error| {
+            format!(
+                "解析 API 服务配置 CAS 快照失败: path={}, error={}",
+                path.display(),
+                error
+            )
+        })?;
+    if collection_content_fingerprint(&disk_collection)? != runtime_fingerprint {
+        return Ok(None);
+    }
+    Ok(Some((path, Sha256::digest(&content).into())))
+}
+
+/// Background membership prune. Never writes a stale clone over a newer collection:
+/// sanitize against a snapshot, then commit only if runtime still matches that snapshot.
+fn run_collection_account_sanitize_once() -> Result<bool, String> {
+    const MAX_CAS_RETRIES: u32 = 8;
+
+    for attempt in 0..MAX_CAS_RETRIES {
+        let base = {
+            let runtime = gateway_runtime().blocking_lock();
+            if !runtime.loaded {
+                return Ok(false);
+            }
+            match runtime.collection.clone() {
+                Some(collection) => collection,
+                None => return Ok(false),
+            }
+        };
+        let base_fingerprint = collection_content_fingerprint(&base)?;
+        let Some((collection_path, expected_disk_hash)) =
+            collection_disk_snapshot_for_cas(&base_fingerprint)?
+        else {
+            logger::log_codex_api_info(&format!(
+                "API 服务账号成员后台清理检测到磁盘配置正在更新，重新读取快照: attempt={}",
+                attempt + 1
+            ));
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            continue;
+        };
+
+        // Refresh the account snapshot on every retry. If a concurrent account import/delete
+        // also changes collection membership, the next CAS round must not reuse stale accounts.
+        let accounts = codex_account::list_accounts_checked()?;
+
+        let mut next = base;
+        let (changed, _) = sanitize_collection_with_accounts(&mut next, &accounts)?;
+        if !changed {
+            return Ok(true);
+        }
+        next.updated_at = now_ms();
+        let next_content = serde_json::to_string_pretty(&next)
+            .map_err(|error| format!("序列化 API 服务后台清理配置失败: {}", error))?;
+
+        // Double CAS: runtime fingerprint catches already-published mutations; the disk hash
+        // catches a mutation that has persisted but has not published its runtime state yet.
+        let committed = {
+            let mut runtime = gateway_runtime().blocking_lock();
+            if !runtime.loaded {
+                return Ok(false);
+            }
+            let Some(current) = runtime.collection.as_ref() else {
+                return Ok(false);
+            };
+            if collection_content_fingerprint(current)? != base_fingerprint {
+                logger::log_codex_api_info(&format!(
+                    "API 服务账号成员后台清理检测到配置已更新，丢弃旧快照并重试: attempt={}",
+                    attempt + 1
+                ));
+                false
+            } else {
+                let written = write_string_atomic_if_hash_matches(
+                    &collection_path,
+                    expected_disk_hash,
+                    || Ok(next_content),
+                )?;
+                if written {
+                    sync_runtime_collection(&mut runtime, next);
+                }
+                written
+            }
+        };
+        if committed {
+            return Ok(true);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+
+    Err(format!(
+        "API 服务账号成员后台清理在 {} 次 CAS 重试后仍与用户配置冲突",
+        MAX_CAS_RETRIES
+    ))
+}
+
+fn ensure_collection_account_sanitize_started() {
+    if GATEWAY_COLLECTION_ACCOUNT_SANITIZE_COMPLETED.load(Ordering::SeqCst) {
+        return;
+    }
+    if GATEWAY_COLLECTION_ACCOUNT_SANITIZE_RUNNING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    tauri::async_runtime::spawn(async move {
+        let result =
+            tauri::async_runtime::spawn_blocking(run_collection_account_sanitize_once).await;
+        match result {
+            Ok(Ok(true)) => {
+                GATEWAY_COLLECTION_ACCOUNT_SANITIZE_COMPLETED.store(true, Ordering::SeqCst);
+            }
+            Ok(Ok(false)) => {
+                // Runtime not ready yet — leave COMPLETED clear so the next state read retries.
+            }
+            Ok(Err(error)) => logger::log_codex_api_warn(&format!(
+                "API 服务账号成员后台清理失败，将在下次状态读取时重试: {}",
+                error
+            )),
+            Err(error) => logger::log_codex_api_warn(&format!(
+                "API 服务账号成员后台清理任务失败，将在下次状态读取时重试: {}",
+                error
+            )),
+        }
+        GATEWAY_COLLECTION_ACCOUNT_SANITIZE_RUNNING.store(false, Ordering::SeqCst);
+    });
+}
+
+fn ensure_stats_maintenance_started() {
+    if GATEWAY_STATS_MAINTENANCE_COMPLETED.load(Ordering::SeqCst) {
+        return;
+    }
+    if GATEWAY_STATS_MAINTENANCE_RUNNING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    tauri::async_runtime::spawn(async move {
+        let result = tauri::async_runtime::spawn_blocking(load_stats_from_disk).await;
+        match result {
+            Ok(Ok(mut maintained)) => {
+                let mut runtime = gateway_runtime().lock().await;
+                if runtime.loaded {
+                    // Merge SQLite/month events with any live runtime events so maintenance
+                    // never drops requests accepted after the compact snapshot load.
+                    let mut events_by_key = maintained
+                        .events
+                        .drain(..)
+                        .map(|event| (local_access_log_event_key(&event), event))
+                        .collect::<HashMap<_, _>>();
+                    for event in runtime.stats.events.iter().cloned() {
+                        events_by_key.insert(local_access_log_event_key(&event), event);
+                    }
+                    maintained.events = events_by_key.into_values().collect();
+                    maintained.events.sort_by_key(|event| event.timestamp);
+                    recompute_time_windows(&mut maintained, now_ms());
+
+                    // Keep runtime top-level lifetime aggregates (they include live traffic).
+                    // Only backfill account/model/api_key rows that runtime never saw.
+                    merge_missing_usage_accounts(
+                        &mut runtime.stats.accounts,
+                        &maintained.accounts,
+                    );
+                    merge_missing_usage_models(&mut runtime.stats.models, &maintained.models);
+                    merge_missing_usage_api_keys(
+                        &mut runtime.stats.api_keys,
+                        &maintained.api_keys,
+                    );
+                    sort_usage_accounts(&mut runtime.stats.accounts);
+                    sort_usage_models(&mut runtime.stats.models);
+                    sort_usage_api_keys(&mut runtime.stats.api_keys);
+
+                    runtime.stats.events = maintained.events;
+                    runtime.stats.daily = maintained.daily;
+                    runtime.stats.weekly = maintained.weekly;
+                    runtime.stats.monthly = maintained.monthly;
+                    runtime.stats.updated_at = runtime.stats.updated_at.max(maintained.updated_at);
+                    if runtime.stats.since <= 0 {
+                        runtime.stats.since = maintained.since;
+                    } else if maintained.since > 0 {
+                        runtime.stats.since = runtime.stats.since.min(maintained.since);
+                    }
+                }
+                GATEWAY_STATS_MAINTENANCE_COMPLETED.store(true, Ordering::SeqCst);
+            }
+            Ok(Err(error)) => logger::log_codex_api_warn(&format!(
+                "API 服务统计后台维护失败，将在下次状态读取时重试: {}",
+                error
+            )),
+            Err(error) => logger::log_codex_api_warn(&format!(
+                "API 服务统计后台维护任务失败，将在下次状态读取时重试: {}",
+                error
+            )),
+        }
+        GATEWAY_STATS_MAINTENANCE_RUNNING.store(false, Ordering::SeqCst);
+    });
 }
 
 fn save_stats_to_disk(stats: &CodexLocalAccessStats) -> Result<(), String> {
@@ -12615,10 +12593,11 @@ fn sanitize_collection(
     sanitize_collection_with_accounts(collection, &accounts)
 }
 
-fn sanitize_collection_with_accounts(
+/// Structure-only sanitize for cold start: ports, keys, pricing, timeouts.
+/// Does **not** load account details or prune membership lists.
+fn sanitize_collection_structure(
     collection: &mut CodexLocalAccessCollection,
-    accounts: &[CodexAccount],
-) -> Result<(bool, HashSet<String>), String> {
+) -> Result<bool, String> {
     let mut changed = false;
 
     if collection.port == 0 {
@@ -12645,77 +12624,17 @@ fn sanitize_collection_with_accounts(
         collection.upstream_proxy_url = normalized_upstream_proxy_url;
         changed = true;
     }
-
-    let valid_bound_oauth_account_ids: HashSet<String> = accounts
-        .iter()
-        .filter(|account| {
-            !account.is_api_key_auth() && codex_account::account_has_refresh_token(account)
-        })
-        .map(|account| account.id.clone())
-        .collect();
-    let valid_account_ids: HashSet<String> = accounts
-        .iter()
-        .filter(|account| {
-            is_local_access_eligible_account(account, collection.restrict_free_accounts)
-        })
-        .map(|account| account.id.clone())
-        .collect();
-    let valid_provider_gateway_account_ids: HashSet<String> = accounts
-        .iter()
-        .filter(|account| is_provider_gateway_eligible_account(account))
-        .map(|account| account.id.clone())
-        .collect();
-
     let normalized_bound_oauth_account_id =
         normalize_optional_account_ref(collection.bound_oauth_account_id.as_deref());
     if normalized_bound_oauth_account_id != collection.bound_oauth_account_id {
         collection.bound_oauth_account_id = normalized_bound_oauth_account_id;
         changed = true;
     }
-    if let Some(bound_id) = collection.bound_oauth_account_id.as_deref() {
-        if !valid_bound_oauth_account_ids.contains(bound_id) {
-            collection.bound_oauth_account_id = None;
-            changed = true;
-        }
-    }
     let has_bound_oauth_account = collection.bound_oauth_account_id.is_some();
     changed |= normalize_bound_oauth_quota_reserve(
         &mut collection.bound_oauth_quota_reserve,
         has_bound_oauth_account,
     );
-
-    let mut deduped = Vec::new();
-    let mut seen = HashSet::new();
-    for account_id in &collection.account_ids {
-        if !valid_account_ids.contains(account_id) {
-            changed = true;
-            continue;
-        }
-        if !seen.insert(account_id.clone()) {
-            changed = true;
-            continue;
-        }
-        deduped.push(account_id.clone());
-    }
-    if deduped != collection.account_ids {
-        collection.account_ids = deduped;
-        changed = true;
-    }
-
-    for api_key in &mut collection.api_keys {
-        let before = api_key.account_ids.clone();
-        let valid_scope_account_ids = if api_key.provider_gateway.is_some() {
-            &valid_provider_gateway_account_ids
-        } else {
-            &valid_account_ids
-        };
-        api_key
-            .account_ids
-            .retain(|account_id| valid_scope_account_ids.contains(account_id));
-        if api_key.account_ids != before {
-            changed = true;
-        }
-    }
 
     let original_custom_routing_rules = std::mem::take(&mut collection.custom_routing_rules);
     let normalized_custom_routing_rules = normalize_custom_routing_rules(
@@ -12750,7 +12669,6 @@ fn sanitize_collection_with_accounts(
         changed = true;
     }
     collection.model_pricings = normalized_model_pricings;
-    // Re-seed defaults when the price book version advances (clear saved overrides).
     if collection.model_pricing_version < DEFAULT_MODEL_PRICING_VERSION {
         collection.model_pricings = Vec::new();
         collection.model_pricing_version = DEFAULT_MODEL_PRICING_VERSION;
@@ -12789,125 +12707,262 @@ fn sanitize_collection_with_accounts(
     changed |= normalize_timeout_presets(&mut collection.timeout_presets);
     changed |= normalize_active_timeout_preset_id(collection);
 
+    Ok(changed)
+}
+
+fn sanitize_collection_with_accounts(
+    collection: &mut CodexLocalAccessCollection,
+    accounts: &[CodexAccount],
+) -> Result<(bool, HashSet<String>), String> {
+    let mut changed = sanitize_collection_structure(collection)?;
+
+    let valid_bound_oauth_account_ids: HashSet<String> = accounts
+        .iter()
+        .filter(|account| {
+            !account.is_api_key_auth() && codex_account::account_has_refresh_token(account)
+        })
+        .map(|account| account.id.clone())
+        .collect();
+    let valid_account_ids: HashSet<String> = accounts
+        .iter()
+        .filter(|account| {
+            is_local_access_eligible_account(account, collection.restrict_free_accounts)
+        })
+        .map(|account| account.id.clone())
+        .collect();
+    let valid_provider_gateway_account_ids: HashSet<String> = accounts
+        .iter()
+        .filter(|account| is_provider_gateway_eligible_account(account))
+        .map(|account| account.id.clone())
+        .collect();
+
+    if let Some(bound_id) = collection.bound_oauth_account_id.as_deref() {
+        if !valid_bound_oauth_account_ids.contains(bound_id) {
+            collection.bound_oauth_account_id = None;
+            changed = true;
+            changed |= normalize_bound_oauth_quota_reserve(
+                &mut collection.bound_oauth_quota_reserve,
+                false,
+            );
+        }
+    }
+
+    let mut deduped = Vec::new();
+    let mut seen = HashSet::new();
+    for account_id in &collection.account_ids {
+        if !valid_account_ids.contains(account_id) {
+            changed = true;
+            continue;
+        }
+        if !seen.insert(account_id.clone()) {
+            changed = true;
+            continue;
+        }
+        deduped.push(account_id.clone());
+    }
+    if deduped != collection.account_ids {
+        collection.account_ids = deduped;
+        changed = true;
+    }
+
+    for api_key in &mut collection.api_keys {
+        let before = api_key.account_ids.clone();
+        let valid_scope_account_ids = if api_key.provider_gateway.is_some() {
+            &valid_provider_gateway_account_ids
+        } else {
+            &valid_account_ids
+        };
+        api_key
+            .account_ids
+            .retain(|account_id| valid_scope_account_ids.contains(account_id));
+        if api_key.account_ids != before {
+            changed = true;
+        }
+    }
+
+    // Re-normalize rules against pruned membership.
+    let original_custom_routing_rules = std::mem::take(&mut collection.custom_routing_rules);
+    let normalized_custom_routing_rules = normalize_custom_routing_rules(
+        original_custom_routing_rules.clone(),
+        &collection.account_ids,
+    );
+    if normalized_custom_routing_rules != original_custom_routing_rules {
+        changed = true;
+    }
+    collection.custom_routing_rules = normalized_custom_routing_rules;
+
+    let original_account_model_rules = std::mem::take(&mut collection.account_model_rules);
+    let normalized_account_model_rules = normalize_account_model_rules(
+        original_account_model_rules.clone(),
+        &collection.account_ids,
+    );
+    if normalized_account_model_rules != original_account_model_rules {
+        changed = true;
+    }
+    collection.account_model_rules = normalized_account_model_rules;
+
     Ok((changed, valid_account_ids))
 }
+
 
 async fn ensure_runtime_loaded_without_start_with_profile_restore(
     restore_disabled_profiles: bool,
 ) -> Result<(), String> {
-    {
-        let runtime = gateway_runtime().lock().await;
-        if runtime.loaded {
-            return Ok(());
-        }
-    }
-
-    let loaded_collection = load_collection_from_disk()?;
-    let mut next_collection = loaded_collection;
-    let mut persist_after_load = false;
-
-    if next_collection.is_none() {
-        next_collection = Some(CodexLocalAccessCollection {
-            enabled: false,
-            port: allocate_initial_local_port(CODEX_LOCAL_ACCESS_LOCALHOST_BIND_HOST)?,
-            api_key: generate_local_api_key(),
-            api_keys: Vec::new(),
-            access_scope: CodexLocalAccessScope::Localhost,
-            client_base_url_host: CodexLocalAccessClientBaseUrlHost::default(),
-            image_generation_mode: CodexLocalAccessImageGenerationMode::default(),
-            gateway_mode: CodexLocalAccessGatewayMode::default(),
-            upstream_proxy_url: None,
-            routing_strategy: CodexLocalAccessRoutingStrategy::default(),
-            custom_routing_rules: Vec::new(),
-            account_model_rules: Vec::new(),
-            model_aliases: Vec::new(),
-            model_pricing_version: DEFAULT_MODEL_PRICING_VERSION,
-            model_pricings: Vec::new(),
-            excluded_models: Vec::new(),
-            session_affinity: true,
-            session_affinity_ttl_ms: DEFAULT_SESSION_AFFINITY_TTL_MS,
-            session_affinity_default_enabled_migrated: true,
-            max_retry_credentials: 0,
-            max_retry_interval_ms: DEFAULT_MAX_RETRY_INTERVAL_MS,
-            timeouts: CodexLocalAccessTimeouts::default(),
-            active_timeout_preset_id: "long_wait".to_string(),
-            timeout_presets: Vec::new(),
-            disable_cooling: false,
-            restrict_free_accounts: true,
-            debug_logs: true,
-            bound_oauth_account_id: None,
-            bound_oauth_quota_reserve: None,
-            account_ids: Vec::new(),
-            created_at: now_ms(),
-            updated_at: now_ms(),
-        });
-        persist_after_load = true;
-    }
-
-    let mut pricing_book_resealed = false;
-    if let Some(collection) = next_collection.as_mut() {
-        let previous_pricing_version = collection.model_pricing_version;
-        let (changed, _) = sanitize_collection(collection)?;
-        pricing_book_resealed = previous_pricing_version < DEFAULT_MODEL_PRICING_VERSION;
-        persist_after_load = persist_after_load || changed;
-    }
-
-    if persist_after_load {
-        if let Some(collection) = next_collection.as_ref() {
-            save_collection_to_disk(collection)?;
-        }
-    }
-
-    // After price-book reseeds, rewrite historical estimate costs with the new defaults.
-    if pricing_book_resealed {
-        if let Some(collection) = next_collection.as_ref() {
-            match open_local_access_logs_db_for_write().and_then(|(_write_guard, mut conn)| {
-                reprice_request_logs_for_collection(&mut conn, collection)
-            }) {
-                Ok(updated) => {
-                    logger::log_codex_api_info(&format!(
-                        "Codex API 服务默认价格表已升级，历史估算已重算: updated_rows={}",
-                        updated
-                    ));
-                }
-                Err(err) => {
-                    logger::log_codex_api_warn(&format!(
-                        "Codex API 服务默认价格表已升级，但历史估算重算失败: {}",
-                        err
-                    ));
-                }
+    loop {
+        {
+            let runtime = gateway_runtime().lock().await;
+            if runtime.loaded {
+                drop(runtime);
+                ensure_stats_maintenance_started();
+                ensure_collection_account_sanitize_started();
+                return Ok(());
             }
         }
+        if GATEWAY_RUNTIME_LOAD_IN_FLIGHT
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            break;
+        }
+        let notified = gateway_runtime_load_notify().notified();
+        if GATEWAY_RUNTIME_LOAD_IN_FLIGHT.load(Ordering::SeqCst) {
+            notified.await;
+        }
     }
 
-    let mut loaded_stats = load_stats_from_disk(next_collection.as_ref())?;
+    // Load only the compact collection/stat snapshot before publishing runtime. SQLite migration
+    // and month-event rebuilding start independently after the base state becomes available.
+    let load_guard = GatewayRuntimeLoadGuard;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _load_guard = load_guard;
+        let loaded_collection = load_collection_from_disk()?;
+        let mut next_collection = loaded_collection;
+        let mut persist_after_load = false;
 
-    if let Some(collection) = next_collection.as_ref() {
-        if restore_disabled_profiles && !collection.enabled {
-            if let Err(err) = restore_takeover_profiles_after_disable(collection) {
-                logger::log_codex_api_warn(&format!(
-                    "Codex API 服务处于停用状态，但恢复 Live 配置失败: {}",
-                    err
-                ));
+        if next_collection.is_none() {
+            next_collection = Some(CodexLocalAccessCollection {
+                enabled: false,
+                port: allocate_initial_local_port(CODEX_LOCAL_ACCESS_LOCALHOST_BIND_HOST)?,
+                api_key: generate_local_api_key(),
+                api_keys: Vec::new(),
+                access_scope: CodexLocalAccessScope::Localhost,
+                client_base_url_host: CodexLocalAccessClientBaseUrlHost::default(),
+                image_generation_mode: CodexLocalAccessImageGenerationMode::default(),
+                gateway_mode: CodexLocalAccessGatewayMode::default(),
+                upstream_proxy_url: None,
+                routing_strategy: CodexLocalAccessRoutingStrategy::default(),
+                custom_routing_rules: Vec::new(),
+                account_model_rules: Vec::new(),
+                model_aliases: Vec::new(),
+                model_pricing_version: DEFAULT_MODEL_PRICING_VERSION,
+                model_pricings: Vec::new(),
+                excluded_models: Vec::new(),
+                session_affinity: true,
+                session_affinity_ttl_ms: DEFAULT_SESSION_AFFINITY_TTL_MS,
+                session_affinity_default_enabled_migrated: true,
+                max_retry_credentials: 0,
+                max_retry_interval_ms: DEFAULT_MAX_RETRY_INTERVAL_MS,
+                timeouts: CodexLocalAccessTimeouts::default(),
+                active_timeout_preset_id: "long_wait".to_string(),
+                timeout_presets: Vec::new(),
+                disable_cooling: false,
+                restrict_free_accounts: true,
+                debug_logs: true,
+                bound_oauth_account_id: None,
+                bound_oauth_quota_reserve: None,
+                account_ids: Vec::new(),
+                created_at: now_ms(),
+                updated_at: now_ms(),
+            });
+            persist_after_load = true;
+        }
+
+        let mut pricing_book_resealed = false;
+        if let Some(collection) = next_collection.as_mut() {
+            let previous_pricing_version = collection.model_pricing_version;
+            // Cold start must not list/decrypt every Codex account before publishing
+            // runtime. Membership pruning runs in ensure_collection_account_sanitize_started.
+            let changed = sanitize_collection_structure(collection)?;
+            pricing_book_resealed = previous_pricing_version < DEFAULT_MODEL_PRICING_VERSION;
+            persist_after_load = persist_after_load || changed;
+        }
+
+        if persist_after_load {
+            if let Some(collection) = next_collection.as_ref() {
+                save_collection_to_disk(collection)?;
             }
         }
-    }
 
-    {
-        let mut runtime = gateway_runtime().lock().await;
-        normalize_stats(&mut loaded_stats);
-        runtime.stats_dirty = false;
-        runtime.stats_flush_inflight = false;
-        runtime.stats = loaded_stats;
-        if let Some(collection) = next_collection.clone() {
-            sync_runtime_collection(&mut runtime, collection);
-        } else {
-            runtime.loaded = true;
-            runtime.collection = None;
-            runtime.last_error = None;
-            prune_prepared_account_cache(&mut runtime, now_ms());
+        let mut loaded_stats = load_stats_snapshot_from_disk()?;
+        sort_usage_accounts(&mut loaded_stats.accounts);
+        sort_usage_models(&mut loaded_stats.models);
+        sort_usage_api_keys(&mut loaded_stats.api_keys);
+        loaded_stats.events.sort_by_key(|event| event.timestamp);
+        if loaded_stats.events.len() > STATE_RECENT_USAGE_EVENT_LIMIT {
+            let remove_count = loaded_stats.events.len() - STATE_RECENT_USAGE_EVENT_LIMIT;
+            loaded_stats.events.drain(..remove_count);
         }
-    }
+
+        {
+            let mut runtime = gateway_runtime().blocking_lock();
+            runtime.stats_dirty = false;
+            runtime.stats_flush_inflight = false;
+            runtime.stats = loaded_stats;
+            if let Some(collection) = next_collection.clone() {
+                sync_runtime_collection(&mut runtime, collection);
+            } else {
+                runtime.loaded = true;
+                runtime.collection = None;
+                runtime.last_error = None;
+                prune_prepared_account_cache(&mut runtime, now_ms());
+            }
+        }
+
+        // After the base runtime is visible, prune stale account membership in background.
+        ensure_collection_account_sanitize_started();
+
+        if restore_disabled_profiles
+            && next_collection
+                .as_ref()
+                .is_some_and(|collection| !collection.enabled)
+        {
+            if let Some(collection) = next_collection.clone() {
+                let _ = std::thread::Builder::new()
+                    .name("codex-api-profile-restore".to_string())
+                    .spawn(move || {
+                        if let Err(error) = restore_takeover_profiles_after_disable(&collection) {
+                            logger::log_codex_api_warn(&format!(
+                                "Codex API 服务处于停用状态，但后台恢复 Live 配置失败: {}",
+                                error
+                            ));
+                        }
+                    });
+            }
+        }
+
+        ensure_stats_maintenance_started();
+        if let (Some(collection), Some(app)) =
+            (next_collection, crate::get_app_handle().cloned())
+        {
+            tauri::async_runtime::spawn(async move {
+                let model_ids = effective_price_book_model_ids(Some(&collection));
+                if pricing_book_resealed {
+                    logger::log_codex_api_info(
+                        "Codex API 服务默认价格表已升级，历史估算已转入后台重算",
+                    );
+                }
+                queue_model_pricing_reprice(app, collection, model_ids).await;
+            });
+        } else if pricing_book_resealed {
+            logger::log_codex_api_warn(
+                "Codex API 服务默认价格表已升级，但应用句柄尚未就绪，历史估算将在下次启动后台重算",
+            );
+        }
+
+        Ok::<_, String>(())
+    })
+    .await
+    .map_err(|e| format!("加载 Codex API 服务配置/统计任务失败: {}", e))??;
 
     Ok(())
 }
@@ -13191,7 +13246,6 @@ async fn ensure_gateway_matches_runtime_locked() -> Result<(), String> {
             && actual_bind_host.as_deref() == Some(bind_host)
             && actual_fingerprint.is_none()
         {
-            ensure_wsl_relay_for_collection(&collection).await;
             return Ok(());
         }
         if running {
@@ -13212,9 +13266,7 @@ async fn ensure_gateway_matches_runtime_locked() -> Result<(), String> {
         if let Some(endpoint) = stopped_endpoint {
             wait_for_gateway_port_release(&endpoint.bind_host, endpoint.port).await?;
         }
-        start_legacy_gateway_locked(&collection).await?;
-        ensure_wsl_relay_for_collection(&collection).await;
-        return Ok(());
+        return start_legacy_gateway_locked(&collection).await;
     }
 
     let launch_config = match prepare_sidecar_launch_config(&collection).await {
@@ -13233,7 +13285,6 @@ async fn ensure_gateway_matches_runtime_locked() -> Result<(), String> {
         && actual_bind_host.as_deref() == Some(bind_host)
         && actual_fingerprint.as_deref() == Some(launch_config.fingerprint.as_str())
     {
-        ensure_wsl_relay_for_collection(&collection).await;
         return Ok(());
     }
     if running {
@@ -13445,8 +13496,6 @@ async fn ensure_gateway_matches_runtime_locked() -> Result<(), String> {
     runtime.shutdown_sender = None;
     runtime.task = Some(task);
     runtime.sidecar_child = Some(child);
-    drop(runtime);
-    ensure_wsl_relay_for_collection(&collection).await;
     Ok(())
 }
 
@@ -13456,7 +13505,6 @@ async fn stop_gateway() -> Option<GatewayBindEndpoint> {
 }
 
 async fn stop_gateway_locked() -> Option<GatewayBindEndpoint> {
-    stop_wsl_relay().await;
     let (shutdown_sender, task, child, endpoint) = {
         let mut runtime = gateway_runtime().lock().await;
         let endpoint = runtime
@@ -22713,45 +22761,6 @@ async fn handle_connection(
 #[cfg(test)]
 mod tests {
 
-    #[tokio::test]
-    async fn tcp_relay_forwards_both_directions_and_releases_listener() {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-        let upstream = tokio::net::TcpListener::bind("127.0.0.1:0")
-            .await
-            .unwrap();
-        let upstream_addr = upstream.local_addr().unwrap();
-        let upstream_task = tokio::spawn(async move {
-            let (mut stream, _) = upstream.accept().await.unwrap();
-            let mut buffer = [0_u8; 4];
-            stream.read_exact(&mut buffer).await.unwrap();
-            stream.write_all(&buffer).await.unwrap();
-        });
-
-        let relay_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-            .await
-            .unwrap();
-        let relay_addr = relay_listener.local_addr().unwrap();
-        let (shutdown_sender, relay_task) =
-            super::spawn_tcp_relay(relay_listener, "127.0.0.1", upstream_addr.port());
-
-        let mut client = tokio::net::TcpStream::connect(relay_addr).await.unwrap();
-        client.write_all(b"ping").await.unwrap();
-        let mut response = [0_u8; 4];
-        client.read_exact(&mut response).await.unwrap();
-        assert_eq!(&response, b"ping");
-        drop(client);
-        upstream_task.await.unwrap();
-
-        shutdown_sender.send(true).unwrap();
-        tokio::time::timeout(std::time::Duration::from_secs(1), relay_task)
-            .await
-            .unwrap()
-            .unwrap();
-        let rebound = tokio::net::TcpListener::bind(relay_addr).await.unwrap();
-        drop(rebound);
-    }
-
     #[test]
     fn port_in_reserved_ranges_detects_membership() {
         assert!(super::port_in_reserved_ranges(1450, &[(1400, 1500)]));
@@ -22794,6 +22803,7 @@ mod tests {
         cleanup_profile_takeover_without_backup, cleanup_provider_gateway_profile_model_overrides,
         codex_price, collect_local_access_profile_takeover_dirs_from_store,
         compare_routing_candidates, default_codex_model_ids, extract_usage_capture,
+        count_request_logs_for_model_ids,
         filter_bound_oauth_quota_reserve_account, filter_websocket_client_message,
         insert_local_access_usage_event, inspect_local_access_profile_config,
         is_codex_local_access_auth_text, is_codex_local_access_config_for_api_key,
@@ -22814,7 +22824,8 @@ mod tests {
         provider_gateway_bound_oauth_account_id_for_account,
         provider_gateway_default_model_for_account,
         provider_gateway_image_generation_mode_for_account, provider_gateway_model_slots,
-        provider_gateway_models_for_account, read_http_request, recover_invalid_stats_file,
+        provider_gateway_models_for_account, read_http_request, read_request_log_reprice_batch,
+        recover_invalid_stats_file,
         remove_account_refs_from_collection, remove_codex_local_access_config,
         reprice_request_logs_for_collection, request_image_generation_mode,
         resolve_effective_model_pricing, resolve_plan_rank, resolve_sidecar_upstream_base_url,
@@ -24725,6 +24736,70 @@ wire_api = "responses"
         assert_eq!(loaded.2, 3.0);
         assert_eq!(loaded.3, 9.0);
         assert_eq!(loaded.4, Some(0.25));
+
+        drop(conn);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn background_reprice_reads_only_stale_pricing_versions() {
+        let dir = make_temp_dir("codex-local-access-background-reprice");
+        let db_path = dir.join("request_logs.sqlite");
+        let conn = open_local_access_logs_db_once(&db_path, true).expect("open logs db");
+        let mut events = Vec::new();
+        let usage = UsageCapture {
+            input_tokens: 1_000,
+            output_tokens: 500,
+            total_tokens: 1_500,
+            cached_tokens: 200,
+            reasoning_tokens: 0,
+        };
+        for (request_id, timestamp, pricing_version) in
+            [("req-stale", 1_700_000_000_000, 7), ("req-current", 1_700_000_000_001, 8)]
+        {
+            let event = append_usage_event(
+                &mut events,
+                timestamp,
+                Some(request_id),
+                Some("acc-1"),
+                Some("user@example.com"),
+                Some("key-1"),
+                Some("Production Key"),
+                Some("gpt-5.4"),
+                Some(CodexLocalAccessGatewayMode::Sidecar),
+                CodexLocalAccessRequestKind::Text,
+                None,
+                true,
+                Some(200),
+                None,
+                None,
+                42,
+                Some(&usage),
+                Some(&model_pricing(
+                    "gpt-5.4",
+                    None,
+                    codex_price(1.0, 0.5, 2.0),
+                    None,
+                    None,
+                    None,
+                )),
+                pricing_version,
+                1.0,
+            );
+            insert_local_access_usage_event(&conn, &event).expect("insert request log");
+        }
+
+        let model_ids = vec!["gpt-5.4".to_string()];
+        assert_eq!(
+            count_request_logs_for_model_ids(&conn, Some(&model_ids), Some(8))
+                .expect("count stale rows"),
+            1
+        );
+        let mut cursors = HashMap::from([("gpt-5.4".to_string(), 0_i64)]);
+        let rows = read_request_log_reprice_batch(&conn, &mut cursors, 10, Some(8))
+            .expect("read stale rows");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].previous_model_pricing_version, 7);
 
         drop(conn);
         let _ = fs::remove_dir_all(dir);
