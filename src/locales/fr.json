@@ -4859,7 +4859,19 @@
       "queryFailed": "Échec de la requête",
       "retry": "Réessayer",
       "inactive": "Indisponible",
-      "inactiveHint": "Le check-in n'est pas actif pour ce compte"
+      "inactiveHint": "Le check-in n'est pas actif pour ce compte",
+      "autoCheckinSettings": "Paramètres de pointage automatique",
+      "autoCheckinLabel": "Pointage automatique",
+      "autoCheckinOff": "Pointage automatique désactivé",
+      "autoCheckinEnabledHint": "Pointage automatique activé : pointage aléatoire entre {{start}} et {{end}}",
+      "autoCheckinDisabledHint": "Pointage automatique désactivé",
+      "enableAutoCheckin": "Activer le pointage automatique",
+      "enableAutoCheckinDesc": "Effectue un pointage quotidien aléatoire dans la plage horaire spécifiée",
+      "randomTimeRange": "Plage horaire de pointage aléatoire",
+      "startTime": "Heure de début",
+      "endTime": "Heure de fin",
+      "timeRangeHint": "Sélectionne quotidiennement une heure aléatoire dans cette plage pour effectuer le pointage.",
+      "timeRangeError": "L'heure de début ne peut pas être postérieure à l'heure de fin"
     }
   },
   "zcode": {

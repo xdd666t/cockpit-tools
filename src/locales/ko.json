@@ -4859,7 +4859,19 @@
       "queryFailed": "조회 실패",
       "retry": "재시도",
       "inactive": "사용 불가",
-      "inactiveHint": "이 계정에서는 출석체크를 사용할 수 없습니다"
+      "inactiveHint": "이 계정에서는 출석체크를 사용할 수 없습니다",
+      "autoCheckinSettings": "자동 출석 체크 설정",
+      "autoCheckinLabel": "자동 출석 체크",
+      "autoCheckinOff": "자동 출석 체크 꺼짐",
+      "autoCheckinEnabledHint": "자동 출석 체크 활성화: {{start}} ~ {{end}} 사이 무작위 체크인",
+      "autoCheckinDisabledHint": "자동 출석 체크 비활성화",
+      "enableAutoCheckin": "자동 출석 체크 활성화",
+      "enableAutoCheckinDesc": "지정된 시간 내에서 매일 무작위로 자동 출석 체크를 진행합니다",
+      "randomTimeRange": "무작위 출석 체크 시간대",
+      "startTime": "시작 시간",
+      "endTime": "종료 시간",
+      "timeRangeHint": "매일 이 시간대 내에서 무작위 시간을 선택하여 백그라운드 출석 체크를 완료합니다.",
+      "timeRangeError": "시작 시간은 종료 시간보다 늦을 수 없습니다"
     }
   },
   "zcode": {

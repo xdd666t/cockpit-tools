@@ -4859,7 +4859,19 @@
       "queryFailed": "Abfrage fehlgeschlagen",
       "retry": "Erneut",
       "inactive": "Inaktiv",
-      "inactiveHint": "Check-in für dieses Konto nicht aktiv"
+      "inactiveHint": "Check-in für dieses Konto nicht aktiv",
+      "autoCheckinSettings": "Einstellungen für automatischen Check-in",
+      "autoCheckinLabel": "Auto-Check-in",
+      "autoCheckinOff": "Auto-Check-in Aus",
+      "autoCheckinEnabledHint": "Auto-Check-in aktiviert: Zufälliger Check-in zwischen {{start}} und {{end}}",
+      "autoCheckinDisabledHint": "Auto-Check-in deaktiviert",
+      "enableAutoCheckin": "Auto-Check-in aktivieren",
+      "enableAutoCheckinDesc": "Führt täglich zufällig innerhalb des angegebenen Zeitfensters einen Check-in durch",
+      "randomTimeRange": "Zufälliger Check-in-Zeitbereich",
+      "startTime": "Startzeit",
+      "endTime": "Endzeit",
+      "timeRangeHint": "Wählt täglich eine zufällige Zeit in diesem Bereich, um den Hintergrund-Check-in abzuschließen.",
+      "timeRangeError": "Die Startzeit darf nicht nach der Endzeit liegen"
     }
   },
   "zcode": {

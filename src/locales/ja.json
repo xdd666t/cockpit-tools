@@ -4859,7 +4859,19 @@
       "queryFailed": "照会失敗",
       "retry": "再試行",
       "inactive": "利用不可",
-      "inactiveHint": "このアカウントではチェックインが無効です"
+      "inactiveHint": "このアカウントではチェックインが無効です",
+      "autoCheckinSettings": "自動チェックイン設定",
+      "autoCheckinLabel": "自動チェックイン",
+      "autoCheckinOff": "自動チェックインオフ",
+      "autoCheckinEnabledHint": "自動チェックイン有効：{{start}} から {{end}} の間にランダムチェックイン",
+      "autoCheckinDisabledHint": "自動チェックイン無効",
+      "enableAutoCheckin": "自動チェックインを有効化",
+      "enableAutoCheckinDesc": "指定された時間帯内で毎日ランダムにチェックインします",
+      "randomTimeRange": "ランダムチェックイン時間帯",
+      "startTime": "開始時間",
+      "endTime": "終了時間",
+      "timeRangeHint": "バックグラウンドチェックインを完了するため、この時間帯から毎日ランダムな時間を自動選択します。",
+      "timeRangeError": "開始時間は終了時間より後にできません"
     }
   },
   "zcode": {

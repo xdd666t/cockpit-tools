@@ -5087,7 +5087,19 @@
       "streakDays": "{{days}} 天",
       "streakRewardCountdown": "再签 {{days}} 天获大礼包",
       "streakRewardToday": "今日可获得大礼包!",
-      "recentDates": "近期签到："
+      "recentDates": "近期签到：",
+      "autoCheckinSettings": "自动签到设置",
+      "autoCheckinLabel": "自动签到",
+      "autoCheckinOff": "自动签到未开启",
+      "autoCheckinEnabledHint": "自动签到已开启：将在 {{start}} 至 {{end}} 随机签到",
+      "autoCheckinDisabledHint": "自动签到未开启",
+      "enableAutoCheckin": "开启自动签到",
+      "enableAutoCheckinDesc": "每天在指定时间段内随机选取一个时间完成自动签到",
+      "randomTimeRange": "随机签到时间段",
+      "startTime": "开始时间",
+      "endTime": "结束时间",
+      "timeRangeHint": "应用保持运行时，会在这个时间段内随机选取一个时间点完成后台自动签到。",
+      "timeRangeError": "开始时间不能晚于结束时间"
     },
     "flowNotice": {
       "title": "WorkBuddy 账号管理说明（点击展开/收起）",

@@ -4859,7 +4859,19 @@
       "queryFailed": "Dotaz selhal",
       "retry": "Znovu",
       "inactive": "Nedostupné",
-      "inactiveHint": "Check-in není pro tento účet aktivní"
+      "inactiveHint": "Check-in není pro tento účet aktivní",
+      "autoCheckinSettings": "Nastavení automatického přihlášení",
+      "autoCheckinLabel": "Automatické přihlášení",
+      "autoCheckinOff": "Automatické přihlášení vypnuto",
+      "autoCheckinEnabledHint": "Automatické přihlášení povoleno: Náhodné přihlášení mezi {{start}} a {{end}}",
+      "autoCheckinDisabledHint": "Automatické přihlášení zakázáno",
+      "enableAutoCheckin": "Povolit automatické přihlášení",
+      "enableAutoCheckinDesc": "Provádí denně náhodné přihlášení v určeném časovém rozmezí",
+      "randomTimeRange": "Náhodný časový rozsah přihlášení",
+      "startTime": "Počáteční čas",
+      "endTime": "Koncový čas",
+      "timeRangeHint": "Vybere denně náhodný čas v tomto rozsahu k dokončení přihlášení na pozadí.",
+      "timeRangeError": "Počáteční čas nesmí být pozdější než koncový čas"
     }
   },
   "zcode": {

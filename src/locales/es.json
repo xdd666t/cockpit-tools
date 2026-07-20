@@ -4859,7 +4859,19 @@
       "queryFailed": "Consulta fallida",
       "retry": "Reintentar",
       "inactive": "No disponible",
-      "inactiveHint": "El check-in no está activo en esta cuenta"
+      "inactiveHint": "El check-in no está activo en esta cuenta",
+      "autoCheckinSettings": "Configuración de registro automático",
+      "autoCheckinLabel": "Registro automático",
+      "autoCheckinOff": "Registro automático desactivado",
+      "autoCheckinEnabledHint": "Registro automático activado: registro aleatorio entre {{start}} y {{end}}",
+      "autoCheckinDisabledHint": "Registro automático desactivado",
+      "enableAutoCheckin": "Habilitar registro automático",
+      "enableAutoCheckinDesc": "Realiza un registro diario aleatorio dentro del rango de tiempo especificado",
+      "randomTimeRange": "Rango de tiempo de registro aleatorio",
+      "startTime": "Hora de inicio",
+      "endTime": "Hora de finalización",
+      "timeRangeHint": "Selecciona diariamente una hora aleatoria dentro de este rango para completar el registro.",
+      "timeRangeError": "La hora de inicio no puede ser posterior a la hora de finalización"
     }
   },
   "zcode": {

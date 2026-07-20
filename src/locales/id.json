@@ -5034,7 +5034,19 @@
       "queryFailed": "Kueri gagal",
       "retry": "Coba lagi",
       "inactive": "Tidak tersedia",
-      "inactiveHint": "Check-in tidak aktif untuk akun ini"
+      "inactiveHint": "Check-in tidak aktif untuk akun ini",
+      "autoCheckinSettings": "Pengaturan Check-in Otomatis",
+      "autoCheckinLabel": "Check-in Otomatis",
+      "autoCheckinOff": "Check-in Otomatis Mati",
+      "autoCheckinEnabledHint": "Check-in otomatis aktif: Check-in acak antara {{start}} dan {{end}}",
+      "autoCheckinDisabledHint": "Check-in otomatis nonaktif",
+      "enableAutoCheckin": "Aktifkan Check-in Otomatis",
+      "enableAutoCheckinDesc": "Melakukan check-in harian secara acak dalam rentang waktu yang ditentukan",
+      "randomTimeRange": "Rentang Waktu Check-in Acak",
+      "startTime": "Waktu Mulai",
+      "endTime": "Waktu Selesai",
+      "timeRangeHint": "Memilih waktu acak dalam rentang ini setiap hari untuk menyelesaikan check-in latar belakang.",
+      "timeRangeError": "Waktu mulai tidak boleh lebih lambat dari waktu selesai"
     }
   },
   "mfaVault": {

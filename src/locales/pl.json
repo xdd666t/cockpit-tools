@@ -4859,7 +4859,19 @@
       "queryFailed": "Zapytanie nieudane",
       "retry": "Ponów",
       "inactive": "Niedostępne",
-      "inactiveHint": "Check-in nieaktywny dla tego konta"
+      "inactiveHint": "Check-in nieaktywny dla tego konta",
+      "autoCheckinSettings": "Ustawienia automatycznego meldowania",
+      "autoCheckinLabel": "Automatyczne meldowanie",
+      "autoCheckinOff": "Automatyczne meldowanie wyłączone",
+      "autoCheckinEnabledHint": "Automatyczne meldowanie włączone: losowe meldowanie między {{start}} a {{end}}",
+      "autoCheckinDisabledHint": "Automatyczne meldowanie wyłączone",
+      "enableAutoCheckin": "Włącz automatyczne meldowanie",
+      "enableAutoCheckinDesc": "Wykonuje codzienne losowe meldowanie w określonym przedziale czasowym",
+      "randomTimeRange": "Losowy przedział czasowy meldowania",
+      "startTime": "Czas rozpoczęcia",
+      "endTime": "Czas zakończenia",
+      "timeRangeHint": "Wybiera codziennie losową godzinę w tym przedziale, aby dokończyć meldowanie w tle.",
+      "timeRangeError": "Czas rozpoczęcia nie może być późniejszy niż czas zakończenia"
     }
   },
   "zcode": {

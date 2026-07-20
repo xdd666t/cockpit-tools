@@ -4859,7 +4859,19 @@
       "queryFailed": "Truy vấn thất bại",
       "retry": "Thử lại",
       "inactive": "Không khả dụng",
-      "inactiveHint": "Check-in không hoạt động với tài khoản này"
+      "inactiveHint": "Check-in không hoạt động với tài khoản này",
+      "autoCheckinSettings": "Cài đặt điểm danh tự động",
+      "autoCheckinLabel": "Điểm danh tự động",
+      "autoCheckinOff": "Điểm danh tự động tắt",
+      "autoCheckinEnabledHint": "Điểm danh tự động bật: Điểm danh ngẫu nhiên từ {{start}} đến {{end}}",
+      "autoCheckinDisabledHint": "Điểm danh tự động tắt",
+      "enableAutoCheckin": "Bật điểm danh tự động",
+      "enableAutoCheckinDesc": "Tự động điểm danh ngẫu nhiên mỗi ngày trong khoảng thời gian quy định",
+      "randomTimeRange": "Khoảng thời gian điểm danh ngẫu nhiên",
+      "startTime": "Thời gian bắt đầu",
+      "endTime": "Thời gian kết thúc",
+      "timeRangeHint": "Tự động chọn một thời điểm ngẫu nhiên mỗi ngày trong khoảng này để điểm danh chạy ngầm.",
+      "timeRangeError": "Thời gian bắt đầu không thể sau thời gian kết thúc"
     }
   },
   "zcode": {

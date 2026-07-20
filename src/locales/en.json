@@ -5087,7 +5087,19 @@
       "streakDays": "{{days}} days",
       "streakRewardCountdown": "{{days}} more days for bonus reward",
       "streakRewardToday": "Bonus reward available today!",
-      "recentDates": "Recent: "
+      "recentDates": "Recent: ",
+      "autoCheckinSettings": "Auto Check-in Settings",
+      "autoCheckinLabel": "Auto Check-in",
+      "autoCheckinOff": "Auto Check-in Off",
+      "autoCheckinEnabledHint": "Auto Check-in Enabled: Random check-in between {{start}} and {{end}}",
+      "autoCheckinDisabledHint": "Auto Check-in Disabled",
+      "enableAutoCheckin": "Enable Auto Check-in",
+      "enableAutoCheckinDesc": "Randomly check in daily within the specified time window",
+      "randomTimeRange": "Random Check-in Time Range",
+      "startTime": "Start Time",
+      "endTime": "End Time",
+      "timeRangeHint": "While the app is running, it selects a random time within this range daily to complete background check-in.",
+      "timeRangeError": "Start time cannot be later than end time"
     },
     "flowNotice": {
       "title": "WorkBuddy Account Info (click to expand/collapse)",

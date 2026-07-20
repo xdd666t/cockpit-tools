@@ -4859,7 +4859,19 @@
       "queryFailed": "Sorgu başarısız",
       "retry": "Yeniden dene",
       "inactive": "Kullanılamaz",
-      "inactiveHint": "Bu hesap için check-in etkin değil"
+      "inactiveHint": "Bu hesap için check-in etkin değil",
+      "autoCheckinSettings": "Otomatik Giriş Ayarları",
+      "autoCheckinLabel": "Otomatik Giriş",
+      "autoCheckinOff": "Otomatik Giriş Kapalı",
+      "autoCheckinEnabledHint": "Otomatik giriş etkin: {{start}} ile {{end}} arasında rastgele giriş",
+      "autoCheckinDisabledHint": "Otomatik giriş devre dışı",
+      "enableAutoCheckin": "Otomatik Girişi Etkinleştir",
+      "enableAutoCheckinDesc": "Belirtilen zaman aralığında günlük olarak rastgele giriş yapar",
+      "randomTimeRange": "Rastgele Giriş Zaman Aralığı",
+      "startTime": "Başlangıç Zamanı",
+      "endTime": "Bitiş Zamanı",
+      "timeRangeHint": "Arka planda girişi tamamlamak için her gün bu aralıkta rastgele bir zaman seçer.",
+      "timeRangeError": "Başlangıç zamanı bitiş zamanından sonra olamaz"
     }
   },
   "zcode": {
