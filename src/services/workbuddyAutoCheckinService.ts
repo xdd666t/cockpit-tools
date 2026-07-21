@@ -148,14 +148,105 @@ export function getWorkbuddyAutoCheckinNextDelayMs(
   return Math.max(1_000, scheduledAt.getTime() - now.getTime());
 }
 
-export async function runWorkbuddyAutoCheckinCycleIfNeeded(): Promise<WorkbuddyAutoCheckinCycleResult> {
+export interface WorkbuddyAutoCheckinAccountDetail {
+  accountId: string;
+  email: string;
+  status: 'success' | 'already_checked' | 'failed' | 'inactive';
+  message?: string;
+  credit?: number;
+}
+
+export interface WorkbuddyAutoCheckinLogRecord {
+  id: string;
+  timestamp: string; // formatted e.g. "YYYY-MM-DD HH:mm:ss"
+  date: string;      // "YYYY-MM-DD"
+  durationMs: number;
+  totalAccounts: number;
+  successCount: number;
+  alreadyCheckedCount: number;
+  failedCount: number;
+  status: 'success' | 'partial' | 'failed' | 'no_accounts';
+  details: WorkbuddyAutoCheckinAccountDetail[];
+}
+
+const LOGS_KEY = 'agtools.workbuddy.auto_checkin_logs';
+export const WORKBUDDY_AUTO_CHECKIN_LOGS_CHANGED_EVENT = 'workbuddy-auto-checkin-logs-changed';
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function getWorkbuddyAutoCheckinLogs(): WorkbuddyAutoCheckinLogRecord[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+  try {
+    const raw = localStorage.getItem(LOGS_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as WorkbuddyAutoCheckinLogRecord[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const now = Date.now();
+    // 自动过滤并清理超过 30 天的历史记录
+    const validLogs = parsed.filter((log) => {
+      const logTime = new Date(log.timestamp.replace(' ', 'T')).getTime();
+      return !isNaN(logTime) && now - logTime <= THIRTY_DAYS_MS;
+    });
+
+    if (validLogs.length !== parsed.length) {
+      localStorage.setItem(LOGS_KEY, JSON.stringify(validLogs));
+    }
+    return validLogs;
+  } catch {
+    return [];
+  }
+}
+
+export function saveWorkbuddyAutoCheckinLogs(logs: WorkbuddyAutoCheckinLogRecord[]): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    const now = Date.now();
+    // 仅保留近 30 天记录
+    const validLogs = logs.filter((log) => {
+      const logTime = new Date(log.timestamp.replace(' ', 'T')).getTime();
+      return !isNaN(logTime) && now - logTime <= THIRTY_DAYS_MS;
+    });
+    localStorage.setItem(LOGS_KEY, JSON.stringify(validLogs));
+    window.dispatchEvent(new Event(WORKBUDDY_AUTO_CHECKIN_LOGS_CHANGED_EVENT));
+  } catch (err) {
+    console.warn('[WorkbuddyAutoCheckin] 保存自动签到日志失败:', err);
+  }
+}
+
+export function addWorkbuddyAutoCheckinLog(record: WorkbuddyAutoCheckinLogRecord): void {
+  const currentLogs = getWorkbuddyAutoCheckinLogs();
+  saveWorkbuddyAutoCheckinLogs([record, ...currentLogs]);
+}
+
+export function clearWorkbuddyAutoCheckinLogs(): void {
+  saveWorkbuddyAutoCheckinLogs([]);
+}
+
+export function formatFormattedTimestamp(date: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+export async function runWorkbuddyAutoCheckinCycleIfNeeded(
+  force = false,
+): Promise<WorkbuddyAutoCheckinCycleResult> {
   const config = getWorkbuddyAutoCheckinConfig();
-  if (!config.enabled) {
+  if (!config.enabled && !force) {
     return 'disabled';
   }
 
   const todayStr = getTodayDateString();
-  if (config.lastCheckedDate === todayStr) {
+  if (!force && config.lastCheckedDate === todayStr) {
     return 'completed';
   }
 
@@ -163,7 +254,7 @@ export async function runWorkbuddyAutoCheckinCycleIfNeeded(): Promise<WorkbuddyA
   const now = new Date();
   const currentMinute = now.getHours() * 60 + now.getMinutes();
 
-  if (currentMinute < scheduledMinute) {
+  if (!force && currentMinute < scheduledMinute) {
     return 'waiting';
   }
 
@@ -172,40 +263,137 @@ export async function runWorkbuddyAutoCheckinCycleIfNeeded(): Promise<WorkbuddyA
   }
 
   isAutoCheckinCycleRunning = true;
+  const startTime = Date.now();
+  const startTimestampStr = formatFormattedTimestamp(new Date(startTime));
+
   try {
     console.log('[WorkbuddyAutoCheckin] 开始触发自动签到流程...');
     const accounts = await listWorkbuddyAccounts();
     if (accounts.length === 0) {
-      saveWorkbuddyAutoCheckinConfig({ ...getWorkbuddyAutoCheckinConfig(), lastCheckedDate: todayStr });
+      if (!force) {
+        saveWorkbuddyAutoCheckinConfig({
+          ...getWorkbuddyAutoCheckinConfig(),
+          lastCheckedDate: todayStr,
+        });
+      }
+      addWorkbuddyAutoCheckinLog({
+        id: `log_${startTime}_${Math.random().toString(36).substring(2, 7)}`,
+        timestamp: startTimestampStr,
+        date: todayStr,
+        durationMs: Date.now() - startTime,
+        totalAccounts: 0,
+        successCount: 0,
+        alreadyCheckedCount: 0,
+        failedCount: 0,
+        status: 'no_accounts',
+        details: [],
+      });
       return 'completed';
     }
 
     let didCheckinAny = false;
     let retryNeeded = false;
+    let successCount = 0;
+    let alreadyCheckedCount = 0;
+    let failedCount = 0;
+    const details: WorkbuddyAutoCheckinAccountDetail[] = [];
+
     for (const account of accounts) {
+      const emailDisplay = account.email || account.id;
       try {
         const status = await getCheckinStatusWorkbuddy(account.id);
-        if (!status.today_checked_in && status.active !== false) {
-          console.log(`[WorkbuddyAutoCheckin] 为账号 ${account.email || account.id} 执行自动签到...`);
+        if (status.today_checked_in) {
+          alreadyCheckedCount++;
+          details.push({
+            accountId: account.id,
+            email: emailDisplay,
+            status: 'already_checked',
+            message: '今日已完成签到',
+            credit: status.daily_credit ?? undefined,
+          });
+        } else if (status.active === false) {
+          details.push({
+            accountId: account.id,
+            email: emailDisplay,
+            status: 'inactive',
+            message: '签到活动未开启或不适用',
+          });
+        } else {
+          console.log(`[WorkbuddyAutoCheckin] 为账号 ${emailDisplay} 执行自动签到...`);
           const res = await checkinWorkbuddy(account.id);
           if (res.success) {
             didCheckinAny = true;
+            successCount++;
+            details.push({
+              accountId: account.id,
+              email: emailDisplay,
+              status: 'success',
+              message: res.message || '签到成功',
+              credit: res.credit ?? undefined,
+            });
           } else {
-            // 可能是另一处流程已签到；复查后再决定是否需要重试。
+            // 可能是另一处流程已签到；复查后再决定是否需要重试
             const latestStatus = await getCheckinStatusWorkbuddy(account.id);
-            if (!latestStatus.today_checked_in && latestStatus.active !== false) {
+            if (latestStatus.today_checked_in) {
+              alreadyCheckedCount++;
+              details.push({
+                accountId: account.id,
+                email: emailDisplay,
+                status: 'already_checked',
+                message: '今日已完成签到',
+              });
+            } else {
               retryNeeded = true;
+              failedCount++;
+              details.push({
+                accountId: account.id,
+                email: emailDisplay,
+                status: 'failed',
+                message: res.message || '签到失败',
+              });
             }
           }
         }
       } catch (accountErr) {
+        const errMsg = accountErr instanceof Error ? accountErr.message : String(accountErr);
         console.warn(`[WorkbuddyAutoCheckin] 账号 ${account.id} 签到检测异常:`, accountErr);
         retryNeeded = true;
+        failedCount++;
+        details.push({
+          accountId: account.id,
+          email: emailDisplay,
+          status: 'failed',
+          message: errMsg,
+        });
       }
     }
 
-    if (!retryNeeded) {
-      saveWorkbuddyAutoCheckinConfig({ ...getWorkbuddyAutoCheckinConfig(), lastCheckedDate: todayStr });
+    const durationMs = Date.now() - startTime;
+    const overallStatus: WorkbuddyAutoCheckinLogRecord['status'] =
+      failedCount === 0
+        ? 'success'
+        : successCount > 0 || alreadyCheckedCount > 0
+          ? 'partial'
+          : 'failed';
+
+    addWorkbuddyAutoCheckinLog({
+      id: `log_${startTime}_${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: startTimestampStr,
+      date: todayStr,
+      durationMs,
+      totalAccounts: accounts.length,
+      successCount,
+      alreadyCheckedCount,
+      failedCount,
+      status: overallStatus,
+      details,
+    });
+
+    if (!retryNeeded && !force) {
+      saveWorkbuddyAutoCheckinConfig({
+        ...getWorkbuddyAutoCheckinConfig(),
+        lastCheckedDate: todayStr,
+      });
     }
     if (didCheckinAny) {
       void useWorkbuddyAccountStore.getState().fetchAccounts().catch((err) => {
