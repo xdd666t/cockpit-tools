@@ -1,13 +1,18 @@
 import { listWorkbuddyAccounts, getCheckinStatusWorkbuddy, checkinWorkbuddy } from './workbuddyService';
 import { useWorkbuddyAccountStore } from '../stores/useWorkbuddyAccountStore';
 
+export interface WorkbuddyAccountScheduleState {
+  scheduledDate: string;        // "YYYY-MM-DD"
+  scheduledMinute: number;      // Minutes from midnight (0..1439)
+  lastCheckedDate?: string;     // "YYYY-MM-DD" when checked in
+}
+
 export interface WorkbuddyAutoCheckinConfig {
   enabled: boolean;
   startTime: string; // HH:mm, e.g. "06:00"
   endTime: string;   // HH:mm, e.g. "12:00"
   lastCheckedDate?: string; // "YYYY-MM-DD"
-  scheduledDateToday?: string; // "YYYY-MM-DD"
-  scheduledMinuteToday?: number; // Minutes from midnight (0..1439)
+  accountSchedules?: Record<string, WorkbuddyAccountScheduleState>;
 }
 
 export const DEFAULT_WORKBUDDY_AUTO_CHECKIN_CONFIG: WorkbuddyAutoCheckinConfig = {
@@ -43,8 +48,7 @@ export function getWorkbuddyAutoCheckinConfig(): WorkbuddyAutoCheckinConfig {
       startTime: isValidTime(parsed.startTime) ? parsed.startTime : '06:00',
       endTime: isValidTime(parsed.endTime) ? parsed.endTime : '12:00',
       lastCheckedDate: typeof parsed.lastCheckedDate === 'string' ? parsed.lastCheckedDate : undefined,
-      scheduledDateToday: typeof parsed.scheduledDateToday === 'string' ? parsed.scheduledDateToday : undefined,
-      scheduledMinuteToday: typeof parsed.scheduledMinuteToday === 'number' ? parsed.scheduledMinuteToday : undefined,
+      accountSchedules: typeof parsed.accountSchedules === 'object' && parsed.accountSchedules !== null ? parsed.accountSchedules : undefined,
     };
   } catch {
     return DEFAULT_WORKBUDDY_AUTO_CHECKIN_CONFIG;
@@ -82,38 +86,60 @@ export function getTodayDateString(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-export function ensureTodayScheduledMinute(config: WorkbuddyAutoCheckinConfig): {
-  updatedConfig: WorkbuddyAutoCheckinConfig;
-  scheduledMinute: number;
-} {
+export function formatTimeOnly(date: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+export function ensureAccountSchedules(
+  config: WorkbuddyAutoCheckinConfig,
+  accounts: Array<{ id: string; email?: string }>,
+): WorkbuddyAutoCheckinConfig {
   const todayStr = getTodayDateString();
   const startMin = parseTimeToMinutes(config.startTime);
   let endMin = parseTimeToMinutes(config.endTime);
   if (endMin < startMin) {
     endMin = startMin;
   }
+  const minRange = Math.max(0, endMin - startMin);
 
-  if (
-    config.scheduledDateToday === todayStr &&
-    typeof config.scheduledMinuteToday === 'number' &&
-    config.scheduledMinuteToday >= startMin &&
-    config.scheduledMinuteToday <= endMin
-  ) {
-    return { updatedConfig: config, scheduledMinute: config.scheduledMinuteToday };
+  const existingSchedules = config.accountSchedules || {};
+  let changed = false;
+  const updatedSchedules: Record<string, WorkbuddyAccountScheduleState> = { ...existingSchedules };
+
+  for (const account of accounts) {
+    const existing = existingSchedules[account.id];
+    if (
+      existing &&
+      existing.scheduledDate === todayStr &&
+      existing.scheduledMinute >= startMin &&
+      existing.scheduledMinute <= endMin
+    ) {
+      continue;
+    }
+
+    // 每个不同账号，在时间段内随机分配各自的签到时间
+    const randomOffset = minRange > 0 ? Math.floor(Math.random() * (minRange + 1)) : 0;
+    const scheduledMinute = startMin + randomOffset;
+
+    updatedSchedules[account.id] = {
+      scheduledDate: todayStr,
+      scheduledMinute,
+      lastCheckedDate: existing?.lastCheckedDate === todayStr ? todayStr : undefined,
+    };
+    changed = true;
   }
 
-  const minRange = Math.max(0, endMin - startMin);
-  const randomOffset = minRange > 0 ? Math.floor(Math.random() * (minRange + 1)) : 0;
-  const scheduledMinute = startMin + randomOffset;
+  if (changed) {
+    const updatedConfig: WorkbuddyAutoCheckinConfig = {
+      ...config,
+      accountSchedules: updatedSchedules,
+    };
+    saveWorkbuddyAutoCheckinConfig(updatedConfig);
+    return updatedConfig;
+  }
 
-  const updatedConfig: WorkbuddyAutoCheckinConfig = {
-    ...config,
-    scheduledDateToday: todayStr,
-    scheduledMinuteToday: scheduledMinute,
-  };
-
-  saveWorkbuddyAutoCheckinConfig(updatedConfig);
-  return { updatedConfig, scheduledMinute };
+  return config;
 }
 
 let isAutoCheckinCycleRunning = false;
@@ -126,25 +152,45 @@ function getMillisecondsUntilNextLocalDay(now: Date): number {
 
 export function getWorkbuddyAutoCheckinNextDelayMs(
   result?: WorkbuddyAutoCheckinCycleResult,
+  accounts: Array<{ id: string }> = [],
 ): number {
   const config = getWorkbuddyAutoCheckinConfig();
   if (!config.enabled) {
     return AUTO_CHECKIN_IDLE_RECHECK_DELAY_MS;
   }
 
-  const now = new Date();
-  const todayStr = getTodayDateString();
-  if (config.lastCheckedDate === todayStr) {
-    return getMillisecondsUntilNextLocalDay(now);
-  }
-
   if (result === 'retry') {
     return AUTO_CHECKIN_RETRY_DELAY_MS;
   }
 
-  const { scheduledMinute } = ensureTodayScheduledMinute(config);
+  const now = new Date();
+  const todayStr = getTodayDateString();
+  const updatedConfig = ensureAccountSchedules(config, accounts);
+  const schedules = updatedConfig.accountSchedules || {};
+
+  const currentMinute = now.getHours() * 60 + now.getMinutes();
+  let nextScheduledMinute: number | null = null;
+
+  for (const accId of Object.keys(schedules)) {
+    const sch = schedules[accId];
+    if (!sch) continue;
+    if (sch.lastCheckedDate !== todayStr) {
+      if (nextScheduledMinute === null || sch.scheduledMinute < nextScheduledMinute) {
+        nextScheduledMinute = sch.scheduledMinute;
+      }
+    }
+  }
+
+  if (nextScheduledMinute === null) {
+    return getMillisecondsUntilNextLocalDay(now);
+  }
+
+  if (currentMinute >= nextScheduledMinute) {
+    return 1000;
+  }
+
   const scheduledAt = new Date(now);
-  scheduledAt.setHours(Math.floor(scheduledMinute / 60), scheduledMinute % 60, 0, 0);
+  scheduledAt.setHours(Math.floor(nextScheduledMinute / 60), nextScheduledMinute % 60, 0, 0);
   return Math.max(1_000, scheduledAt.getTime() - now.getTime());
 }
 
@@ -152,6 +198,7 @@ export interface WorkbuddyAutoCheckinAccountDetail {
   accountId: string;
   email: string;
   status: 'success' | 'already_checked' | 'failed' | 'inactive';
+  time?: string; // e.g. "16:17:02"
   message?: string;
   credit?: number;
 }
@@ -223,7 +270,65 @@ export function saveWorkbuddyAutoCheckinLogs(logs: WorkbuddyAutoCheckinLogRecord
 
 export function addWorkbuddyAutoCheckinLog(record: WorkbuddyAutoCheckinLogRecord): void {
   const currentLogs = getWorkbuddyAutoCheckinLogs();
-  saveWorkbuddyAutoCheckinLogs([record, ...currentLogs]);
+  const existingIndex = currentLogs.findIndex((l) => l.date === record.date);
+
+  if (existingIndex < 0) {
+    saveWorkbuddyAutoCheckinLogs([record, ...currentLogs]);
+    return;
+  }
+
+  // 一天的所有自动签到记录（独立随机签到/手动测试），合并保存在当天的唯一一条记录中
+  const existing = currentLogs[existingIndex];
+  if (!existing) {
+    saveWorkbuddyAutoCheckinLogs([record, ...currentLogs]);
+    return;
+  }
+
+  const mergedDetailsMap = new Map<string, WorkbuddyAutoCheckinAccountDetail>();
+  for (const d of existing.details) {
+    mergedDetailsMap.set(d.accountId, d);
+  }
+  for (const d of record.details) {
+    mergedDetailsMap.set(d.accountId, d);
+  }
+
+  const mergedDetails = Array.from(mergedDetailsMap.values());
+  let successCount = 0;
+  let alreadyCheckedCount = 0;
+  let failedCount = 0;
+
+  for (const d of mergedDetails) {
+    if (d.status === 'success') successCount++;
+    else if (d.status === 'already_checked') alreadyCheckedCount++;
+    else if (d.status === 'failed') failedCount++;
+  }
+
+  const totalAccounts = mergedDetails.length;
+  const overallStatus: WorkbuddyAutoCheckinLogRecord['status'] =
+    totalAccounts === 0
+      ? 'no_accounts'
+      : failedCount === 0
+        ? 'success'
+        : successCount > 0 || alreadyCheckedCount > 0
+          ? 'partial'
+          : 'failed';
+
+  const mergedRecord: WorkbuddyAutoCheckinLogRecord = {
+    id: existing.id,
+    timestamp: record.timestamp, // 记为当天最新签到触发的时间戳
+    date: record.date,
+    durationMs: existing.durationMs + record.durationMs,
+    totalAccounts,
+    successCount,
+    alreadyCheckedCount,
+    failedCount,
+    status: overallStatus,
+    details: mergedDetails,
+  };
+
+  const updatedLogs = [...currentLogs];
+  updatedLogs[existingIndex] = mergedRecord;
+  saveWorkbuddyAutoCheckinLogs(updatedLogs);
 }
 
 export function clearWorkbuddyAutoCheckinLogs(): void {
@@ -245,19 +350,6 @@ export async function runWorkbuddyAutoCheckinCycleIfNeeded(
     return 'disabled';
   }
 
-  const todayStr = getTodayDateString();
-  if (!force && config.lastCheckedDate === todayStr) {
-    return 'completed';
-  }
-
-  const { scheduledMinute } = ensureTodayScheduledMinute(config);
-  const now = new Date();
-  const currentMinute = now.getHours() * 60 + now.getMinutes();
-
-  if (!force && currentMinute < scheduledMinute) {
-    return 'waiting';
-  }
-
   if (isAutoCheckinCycleRunning) {
     return 'waiting';
   }
@@ -265,30 +357,45 @@ export async function runWorkbuddyAutoCheckinCycleIfNeeded(
   isAutoCheckinCycleRunning = true;
   const startTime = Date.now();
   const startTimestampStr = formatFormattedTimestamp(new Date(startTime));
+  const todayStr = getTodayDateString();
 
   try {
-    console.log('[WorkbuddyAutoCheckin] 开始触发自动签到流程...');
+    console.log('[WorkbuddyAutoCheckin] 检查账号独立随机签到任务...');
     const accounts = await listWorkbuddyAccounts();
     if (accounts.length === 0) {
-      if (!force) {
-        saveWorkbuddyAutoCheckinConfig({
-          ...getWorkbuddyAutoCheckinConfig(),
-          lastCheckedDate: todayStr,
+      if (force) {
+        addWorkbuddyAutoCheckinLog({
+          id: `log_${startTime}_${Math.random().toString(36).substring(2, 7)}`,
+          timestamp: startTimestampStr,
+          date: todayStr,
+          durationMs: Date.now() - startTime,
+          totalAccounts: 0,
+          successCount: 0,
+          alreadyCheckedCount: 0,
+          failedCount: 0,
+          status: 'no_accounts',
+          details: [],
         });
       }
-      addWorkbuddyAutoCheckinLog({
-        id: `log_${startTime}_${Math.random().toString(36).substring(2, 7)}`,
-        timestamp: startTimestampStr,
-        date: todayStr,
-        durationMs: Date.now() - startTime,
-        totalAccounts: 0,
-        successCount: 0,
-        alreadyCheckedCount: 0,
-        failedCount: 0,
-        status: 'no_accounts',
-        details: [],
-      });
       return 'completed';
+    }
+
+    const updatedConfig = ensureAccountSchedules(config, accounts);
+    const schedules = updatedConfig.accountSchedules || {};
+    const now = new Date();
+    const currentMinute = now.getHours() * 60 + now.getMinutes();
+
+    // 筛选今日需进行签到的账号（按各自设定的随机分钟到期且今日未签到）
+    const targetAccounts = force
+      ? accounts
+      : accounts.filter((acc) => {
+          const sch = schedules[acc.id];
+          if (!sch) return false;
+          return sch.scheduledMinute <= currentMinute && sch.lastCheckedDate !== todayStr;
+        });
+
+    if (targetAccounts.length === 0) {
+      return 'waiting';
     }
 
     let didCheckinAny = false;
@@ -297,9 +404,11 @@ export async function runWorkbuddyAutoCheckinCycleIfNeeded(
     let alreadyCheckedCount = 0;
     let failedCount = 0;
     const details: WorkbuddyAutoCheckinAccountDetail[] = [];
+    const newSchedules = { ...schedules };
 
-    for (const account of accounts) {
+    for (const account of targetAccounts) {
       const emailDisplay = account.email || account.id;
+      const accountCheckinTime = formatTimeOnly(new Date());
       try {
         const status = await getCheckinStatusWorkbuddy(account.id);
         if (status.today_checked_in) {
@@ -308,14 +417,22 @@ export async function runWorkbuddyAutoCheckinCycleIfNeeded(
             accountId: account.id,
             email: emailDisplay,
             status: 'already_checked',
+            time: accountCheckinTime,
             message: '今日已完成签到',
             credit: status.daily_credit ?? undefined,
           });
+          newSchedules[account.id] = {
+            ...newSchedules[account.id],
+            scheduledDate: todayStr,
+            scheduledMinute: newSchedules[account.id]?.scheduledMinute ?? currentMinute,
+            lastCheckedDate: todayStr,
+          };
         } else if (status.active === false) {
           details.push({
             accountId: account.id,
             email: emailDisplay,
             status: 'inactive',
+            time: accountCheckinTime,
             message: '签到活动未开启或不适用',
           });
         } else {
@@ -328,11 +445,17 @@ export async function runWorkbuddyAutoCheckinCycleIfNeeded(
               accountId: account.id,
               email: emailDisplay,
               status: 'success',
+              time: accountCheckinTime,
               message: res.message || '签到成功',
               credit: res.credit ?? undefined,
             });
+            newSchedules[account.id] = {
+              ...newSchedules[account.id],
+              scheduledDate: todayStr,
+              scheduledMinute: newSchedules[account.id]?.scheduledMinute ?? currentMinute,
+              lastCheckedDate: todayStr,
+            };
           } else {
-            // 可能是另一处流程已签到；复查后再决定是否需要重试
             const latestStatus = await getCheckinStatusWorkbuddy(account.id);
             if (latestStatus.today_checked_in) {
               alreadyCheckedCount++;
@@ -340,8 +463,15 @@ export async function runWorkbuddyAutoCheckinCycleIfNeeded(
                 accountId: account.id,
                 email: emailDisplay,
                 status: 'already_checked',
+                time: accountCheckinTime,
                 message: '今日已完成签到',
               });
+              newSchedules[account.id] = {
+                ...newSchedules[account.id],
+                scheduledDate: todayStr,
+                scheduledMinute: newSchedules[account.id]?.scheduledMinute ?? currentMinute,
+                lastCheckedDate: todayStr,
+              };
             } else {
               retryNeeded = true;
               failedCount++;
@@ -349,6 +479,7 @@ export async function runWorkbuddyAutoCheckinCycleIfNeeded(
                 accountId: account.id,
                 email: emailDisplay,
                 status: 'failed',
+                time: accountCheckinTime,
                 message: res.message || '签到失败',
               });
             }
@@ -363,10 +494,17 @@ export async function runWorkbuddyAutoCheckinCycleIfNeeded(
           accountId: account.id,
           email: emailDisplay,
           status: 'failed',
+          time: accountCheckinTime,
           message: errMsg,
         });
       }
     }
+
+    // 保存更新后的账号状态
+    saveWorkbuddyAutoCheckinConfig({
+      ...updatedConfig,
+      accountSchedules: newSchedules,
+    });
 
     const durationMs = Date.now() - startTime;
     const overallStatus: WorkbuddyAutoCheckinLogRecord['status'] =
@@ -381,7 +519,7 @@ export async function runWorkbuddyAutoCheckinCycleIfNeeded(
       timestamp: startTimestampStr,
       date: todayStr,
       durationMs,
-      totalAccounts: accounts.length,
+      totalAccounts: targetAccounts.length,
       successCount,
       alreadyCheckedCount,
       failedCount,
@@ -389,12 +527,6 @@ export async function runWorkbuddyAutoCheckinCycleIfNeeded(
       details,
     });
 
-    if (!retryNeeded && !force) {
-      saveWorkbuddyAutoCheckinConfig({
-        ...getWorkbuddyAutoCheckinConfig(),
-        lastCheckedDate: todayStr,
-      });
-    }
     if (didCheckinAny) {
       void useWorkbuddyAccountStore.getState().fetchAccounts().catch((err) => {
         console.warn('[WorkbuddyAutoCheckin] 刷新账号列表失败:', err);

@@ -941,26 +941,20 @@
 
 /* ===== 自动签到弹窗 Tab 导航与历史记录 ===== */
 .auto-checkin-modal-header {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-bottom: 12px;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 12px 20px !important;
   border-bottom: 1px solid var(--border);
+  min-height: 52px;
 }
 
-.header-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-
-.header-title-row h2 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-size: 16px;
+.auto-checkin-modal-header .modal-close {
+  position: absolute !important;
+  right: 16px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
 }
 
 .auto-checkin-tabs-nav {
@@ -971,6 +965,7 @@
   padding: 3px;
   border-radius: var(--radius-md, 8px);
   width: fit-content;
+  margin: 0 auto;
 }
 
 .auto-checkin-tab-item {
@@ -1110,6 +1105,19 @@
   font-family: var(--font-mono);
 }
 
+.log-account-name-badge {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  padding: 2px 8px;
+  border-radius: 6px;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .history-log-meta {
   display: flex;
   align-items: center;
@@ -1174,11 +1182,27 @@
   gap: 8px;
 }
 
+.detail-account-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
 .detail-account {
   color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.detail-time {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.04));
+  padding: 1px 6px;
+  border-radius: 4px;
 }
 
 .detail-status {

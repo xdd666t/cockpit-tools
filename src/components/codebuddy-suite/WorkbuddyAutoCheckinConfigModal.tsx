@@ -75,8 +75,7 @@ export function WorkbuddyAutoCheckinConfigModal({
       enabled,
       startTime,
       endTime,
-      scheduledMinuteToday: undefined,
-      scheduledDateToday: undefined,
+      accountSchedules: undefined,
     });
     onClose();
   };
@@ -114,23 +113,13 @@ export function WorkbuddyAutoCheckinConfigModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header auto-checkin-modal-header">
-          <div className="header-title-row">
-            <h2>
-              <Clock size={18} />
-              {t('workbuddy.checkin.autoCheckinSettings', '自动签到')}
-            </h2>
-            <button className="modal-close" onClick={onClose}>
-              <X size={18} />
-            </button>
-          </div>
-
           <div className="auto-checkin-tabs-nav">
             <button
               className={`auto-checkin-tab-item ${activeTab === 'settings' ? 'active' : ''}`}
               onClick={() => setActiveTab('settings')}
             >
               <Settings size={14} />
-              {t('workbuddy.checkin.tabSettings', '设置')}
+              {t('workbuddy.checkin.tabSettings', '自动签到设置')}
             </button>
             <button
               className={`auto-checkin-tab-item ${activeTab === 'history' ? 'active' : ''}`}
@@ -141,6 +130,10 @@ export function WorkbuddyAutoCheckinConfigModal({
               {logs.length > 0 && <span className="tab-count-badge">{logs.length}</span>}
             </button>
           </div>
+
+          <button className="modal-close" onClick={onClose}>
+            <X size={18} />
+          </button>
         </div>
 
         <div className="modal-body auto-checkin-config-body">
@@ -271,7 +264,7 @@ export function WorkbuddyAutoCheckinConfigModal({
                         <div className="history-log-header" onClick={() => toggleExpand(log.id)}>
                           <div className="history-log-main-info">
                             <span className="log-timestamp">{log.timestamp}</span>
-                            <span className="log-duration-badge" title="自动签到总耗时">
+                            <span className="log-duration-badge" title="累计签到耗时">
                               <Clock size={11} />
                               {formatDuration(log.durationMs)}
                             </span>
@@ -306,9 +299,12 @@ export function WorkbuddyAutoCheckinConfigModal({
                           <div className="history-log-details">
                             {log.details.map((item, idx) => (
                               <div key={idx} className="log-detail-row">
-                                <span className="detail-account" title={item.email}>
-                                  {item.email}
-                                </span>
+                                <div className="detail-account-info">
+                                  <span className="detail-account" title={item.email}>
+                                    {item.email}
+                                  </span>
+                                  {item.time && <span className="detail-time">{item.time}</span>}
+                                </div>
                                 <span
                                   className={`detail-status ${
                                     item.status === 'success' || item.status === 'already_checked'
