@@ -101,6 +101,7 @@ import {
   formatCodexResetTimeAbsolute,
   isCodexApiKeyAccount,
   isCodexAgentIdentityAccount,
+  isCodexWebSessionAccount,
   isCodexChatCompletionsApiKeyAccount,
   isCodexNewApiAccount,
   isCodexPendingOAuthAccount,
@@ -5111,13 +5112,40 @@ export function CodexAccountsPage() {
     ],
   );
 
-  const handleSwitch = async (accountId: string) => {
-    const account = codexAccountsRef.current.find((item) => item.id === accountId);
-    if (isCodexAgentIdentityAccount(account)) {
-      setMessage({
-        text: t(
+  const getCodexSwitchOrLaunchBlockedReason = useCallback(
+    (account?: CodexAccount | null): string | null => {
+      if (isCodexAgentIdentityAccount(account)) {
+        return t(
           "codex.agentIdentityRegistration.apiOnlyActionError",
           "Agent Identity 账号仅支持 API 服务，无法作为普通账号切换或启动。",
+        );
+      }
+      if (isCodexWebSessionAccount(account)) {
+        return t(
+          "codex.webSessionImport.actionBlocked",
+          "Web Session 账号仅支持查看额度，无法切换或启动。",
+        );
+      }
+      return null;
+    },
+    [t],
+  );
+
+  const handleSwitch = async (accountId: string) => {
+    const account = codexAccountsRef.current.find((item) => item.id === accountId);
+    const blockedReason = getCodexSwitchOrLaunchBlockedReason(account);
+    if (blockedReason) {
+      setMessage({
+        text: blockedReason,
+        tone: "error",
+      });
+      return;
+    }
+    if (isCodexWebSessionAccount(account)) {
+      setMessage({
+        text: t(
+          "codex.webSessionImport.actionBlocked",
+          "Web Session 账号仅支持查看额度，无法切换或启动。",
         ),
         tone: "error",
       });
@@ -5153,6 +5181,15 @@ export function CodexAccountsPage() {
         t(
           "codex.agentIdentityRegistration.oauthBindingUnsupported",
           "Agent Identity 账号仅用于 API 服务，不能作为 OAuth 绑定账号。",
+        ),
+      );
+      return;
+    }
+    if (isCodexWebSessionAccount(selectedOAuthBindingAccount)) {
+      setOauthBindingError(
+        t(
+          "codex.webSessionImport.oauthBindingUnsupported",
+          "Web Session 账号仅支持查看额度，不能作为 OAuth 绑定账号。",
         ),
       );
       return;
@@ -5493,11 +5530,19 @@ export function CodexAccountsPage() {
   };
 
   const handleLaunchCodexCli = (account: CodexAccount) => {
-    if (isCodexAgentIdentityAccount(account)) {
+    const blockedReason = getCodexSwitchOrLaunchBlockedReason(account);
+    if (blockedReason) {
+      setMessage({
+        text: blockedReason,
+        tone: "error",
+      });
+      return;
+    }
+    if (isCodexWebSessionAccount(account)) {
       setMessage({
         text: t(
-          "codex.agentIdentityRegistration.apiOnlyActionError",
-          "Agent Identity 账号仅支持 API 服务，无法作为普通账号切换或启动。",
+          "codex.webSessionImport.actionBlocked",
+          "Web Session 账号仅支持查看额度，无法切换或启动。",
         ),
         tone: "error",
       });
@@ -6892,10 +6937,7 @@ export function CodexAccountsPage() {
     }
   };
 
-  const performTokenImport = async (
-    rawContent: string,
-    forceAgentIdentityApiService = false,
-  ) => {
+  const performTokenImport = async (rawContent: string) => {
     const trimmed = rawContent.trim();
     if (!trimmed) {
       page.setAddStatus("error");
@@ -6962,11 +7004,11 @@ export function CodexAccountsPage() {
         const accountIdsToSync = resolveImportedCodexAccountIdsForLocalAccess(
           imported,
           syncImportedToApiService,
-          forceAgentIdentityApiService,
+          false,
         );
         const syncResult = await syncImportedAccountsToApiService(
           accountIdsToSync,
-          forceAgentIdentityApiService,
+          false,
         );
         if (failures.length > 0) {
           page.setAddStatus("error");
@@ -8922,6 +8964,7 @@ export function CodexAccountsPage() {
       options?: {
         restrictFreeAccounts?: boolean;
         backupAccountIds?: string[];
+        preferredAccountIds?: string[];
         sessionAffinity?: boolean;
         sessionAffinityTtlMs?: number;
       },
@@ -8949,11 +8992,15 @@ export function CodexAccountsPage() {
         const backupAccountIds = (options?.backupAccountIds ?? []).filter((id) =>
           filteredAccountIdSet.has(id),
         );
+        const preferredAccountIds = (
+          options?.preferredAccountIds ?? []
+        ).filter((id) => filteredAccountIdSet.has(id));
         const nextState =
           await codexLocalAccessService.saveCodexLocalAccessAccounts(
             filteredAccountIds,
             restrictFreeAccounts,
             backupAccountIds,
+            preferredAccountIds,
             options?.sessionAffinity,
             options?.sessionAffinityTtlMs,
           );
@@ -10465,6 +10512,8 @@ export function CodexAccountsPage() {
       const isSelected = selected.has(account.id);
       const isApiKeyAccount = isCodexApiKeyAccount(account);
       const isAgentIdentityAccount = isCodexAgentIdentityAccount(account);
+      const switchOrLaunchBlockedReason =
+        getCodexSwitchOrLaunchBlockedReason(account);
       const isChatCompletionsApiKey =
         isCodexChatCompletionsApiKeyAccount(account);
       const compactQuotaItems = resolveCompactQuotaItems(presentation);
@@ -10560,15 +10609,8 @@ export function CodexAccountsPage() {
           <button
             className={`codex-compact-switch-btn ${!isCurrent ? "success" : ""}`}
             onClick={() => handleSwitch(account.id)}
-            disabled={!!switching || isAgentIdentityAccount}
-            title={
-              isAgentIdentityAccount
-                ? t(
-                    "codex.agentIdentityRegistration.apiOnlyActionError",
-                    "Agent Identity 账号仅支持 API 服务，无法作为普通账号切换或启动。",
-                  )
-                : t("codex.switch", "切换")
-            }
+            disabled={!!switching || Boolean(switchOrLaunchBlockedReason)}
+            title={switchOrLaunchBlockedReason || t("codex.switch", "切换")}
           >
             {switching === account.id ? (
               <RefreshCw size={14} className="loading-spinner" />
@@ -10586,7 +10628,8 @@ export function CodexAccountsPage() {
       const meta = resolveAccountMeta(account);
       const isCurrent = overviewCurrentAccountId === account.id;
       const isApiKeyAccount = isCodexApiKeyAccount(account);
-      const isAgentIdentityAccount = isCodexAgentIdentityAccount(account);
+      const switchOrLaunchBlockedReason =
+        getCodexSwitchOrLaunchBlockedReason(account);
       const isPendingOAuthAccount = isPendingOAuthCodexAccount(account);
       const isNewApiAccount = isCodexNewApiAccount(account);
       const isChatCompletionsApiKey =
@@ -10995,15 +11038,11 @@ export function CodexAccountsPage() {
                   onClick={() => void handleLaunchCodexCli(account)}
                   disabled={
                     cliLaunchingAccountId === account.id ||
-                    isAgentIdentityAccount
+                    Boolean(switchOrLaunchBlockedReason)
                   }
                   title={
-                    isAgentIdentityAccount
-                      ? t(
-                          "codex.agentIdentityRegistration.apiOnlyActionError",
-                          "Agent Identity 账号仅支持 API 服务，无法作为普通账号切换或启动。",
-                        )
-                      : t("codex.cli.quickLaunch", "CLI 快速启动")
+                    switchOrLaunchBlockedReason ||
+                    t("codex.cli.quickLaunch", "CLI 快速启动")
                   }
                 >
                   {cliLaunchingAccountId === account.id ? (
@@ -11053,14 +11092,9 @@ export function CodexAccountsPage() {
                 <button
                   className={`card-action-btn ${!isCurrent ? "success" : ""}`}
                   onClick={() => handleSwitch(account.id)}
-                  disabled={!!switching || isAgentIdentityAccount}
+                  disabled={!!switching || Boolean(switchOrLaunchBlockedReason)}
                   title={
-                    isAgentIdentityAccount
-                      ? t(
-                          "codex.agentIdentityRegistration.apiOnlyActionError",
-                          "Agent Identity 账号仅支持 API 服务，无法作为普通账号切换或启动。",
-                        )
-                      : t("codex.switch", "切换")
+                    switchOrLaunchBlockedReason || t("codex.switch", "切换")
                   }
                 >
                   {switching === account.id ? (
@@ -11996,7 +12030,8 @@ export function CodexAccountsPage() {
       const meta = resolveAccountMeta(account);
       const isCurrent = overviewCurrentAccountId === account.id;
       const isApiKeyAccount = isCodexApiKeyAccount(account);
-      const isAgentIdentityAccount = isCodexAgentIdentityAccount(account);
+      const switchOrLaunchBlockedReason =
+        getCodexSwitchOrLaunchBlockedReason(account);
       const isPendingOAuthAccount = isPendingOAuthCodexAccount(account);
       const isNewApiAccount = isCodexNewApiAccount(account);
       const isChatCompletionsApiKey =
@@ -12376,15 +12411,11 @@ export function CodexAccountsPage() {
                 onClick={() => void handleLaunchCodexCli(account)}
                 disabled={
                   cliLaunchingAccountId === account.id ||
-                  isAgentIdentityAccount
+                  Boolean(switchOrLaunchBlockedReason)
                 }
                 title={
-                  isAgentIdentityAccount
-                    ? t(
-                        "codex.agentIdentityRegistration.apiOnlyActionError",
-                        "Agent Identity 账号仅支持 API 服务，无法作为普通账号切换或启动。",
-                      )
-                    : t("codex.cli.quickLaunch", "CLI 快速启动")
+                  switchOrLaunchBlockedReason ||
+                  t("codex.cli.quickLaunch", "CLI 快速启动")
                 }
               >
                 {cliLaunchingAccountId === account.id ? (
@@ -12435,14 +12466,9 @@ export function CodexAccountsPage() {
               <button
                 className={`action-btn ${!isCurrent ? "success" : ""}`}
                 onClick={() => handleSwitch(account.id)}
-                disabled={!!switching || isAgentIdentityAccount}
+                disabled={!!switching || Boolean(switchOrLaunchBlockedReason)}
                 title={
-                  isAgentIdentityAccount
-                    ? t(
-                        "codex.agentIdentityRegistration.apiOnlyActionError",
-                        "Agent Identity 账号仅支持 API 服务，无法作为普通账号切换或启动。",
-                      )
-                    : t("codex.switch", "切换")
+                  switchOrLaunchBlockedReason || t("codex.switch", "切换")
                 }
               >
                 {switching === account.id ? (
@@ -16233,10 +16259,15 @@ export function CodexAccountsPage() {
                                                 "codex.agentIdentityRegistration.oauthBindingUnsupported",
                                                 "Agent Identity 账号仅用于 API 服务，不能作为 OAuth 绑定账号。",
                                               )
-                                            : t(
-                                                "codex.api.oauthBinding.validationSubscriptionRequired",
-                                                "只能绑定带 refresh_token 的 OAuth 账号",
-                                              )
+                                            : isCodexWebSessionAccount(account)
+                                              ? t(
+                                                  "codex.webSessionImport.oauthBindingUnsupported",
+                                                  "Web Session 账号仅支持查看额度，不能作为 OAuth 绑定账号。",
+                                                )
+                                              : t(
+                                                  "codex.api.oauthBinding.validationSubscriptionRequired",
+                                                  "只能绑定带 refresh_token 的 OAuth 账号",
+                                                )
                                       }
                                       onClick={(event) => {
                                         if (rowDisabled) {
@@ -17428,7 +17459,7 @@ export function CodexAccountsPage() {
                   <h2>
                     <CircleAlert size={18} />
                     {t(
-                      "codex.agentIdentityRegistration.noticeTitle",
+                      "codex.webSessionImport.noticeTitle",
                       "Web Session 导入须知",
                     )}
                   </h2>
@@ -17443,8 +17474,8 @@ export function CodexAccountsPage() {
                 <div className="modal-body">
                   <p className="codex-local-access-hide-confirm-desc">
                     {t(
-                      "codex.agentIdentityRegistration.noticeMessage",
-                      "检测到 {{count}} 个 Web Session 账号。继续后将自动注册为 Agent Identity。",
+                      "codex.webSessionImport.noticeMessage",
+                      "检测到 {{count}} 个 Web Session 账号。此格式不支持实际使用，仅支持查看额度。",
                       { count: pendingWebSessionImport.accountLabels.length },
                     )}
                   </p>
@@ -17466,8 +17497,8 @@ export function CodexAccountsPage() {
                       <span className="codex-local-access-hide-confirm-dot" />
                       <span>
                         {t(
-                          "codex.agentIdentityRegistration.noticeApiOnly",
-                          "这类账号仅用于 API 服务，确认后会自动加入 API 服务账号池。",
+                          "codex.webSessionImport.noticeQuotaOnly",
+                          "仅支持查看额度，不能启动官方客户端或 CLI，也不能切号。",
                         )}
                       </span>
                     </div>
@@ -17475,17 +17506,8 @@ export function CodexAccountsPage() {
                       <span className="codex-local-access-hide-confirm-dot" />
                       <span>
                         {t(
-                          "codex.agentIdentityRegistration.noticeNoSwitch",
-                          "无法作为普通 Codex 账号切号，不能直接启动官方客户端或 CLI，也不能作为 OAuth 绑定账号。",
-                        )}
-                      </span>
-                    </div>
-                    <div className="codex-local-access-hide-confirm-point">
-                      <span className="codex-local-access-hide-confirm-dot" />
-                      <span>
-                        {t(
-                          "codex.agentIdentityRegistration.noticeCredential",
-                          "应用会在本机生成并保存 Agent Identity 私钥；导出备份时请像密码一样保护。",
+                          "codex.webSessionImport.noticeNoApi",
+                          "不能加入 Codex API 服务账号池，也不能作为 OAuth 绑定账号。",
                         )}
                       </span>
                     </div>
@@ -17503,11 +17525,11 @@ export function CodexAccountsPage() {
                     onClick={() => {
                       const pending = pendingWebSessionImport;
                       setPendingWebSessionImport(null);
-                      void performTokenImport(pending.content, true);
+                      void performTokenImport(pending.content);
                     }}
                   >
                     {t(
-                      "codex.agentIdentityRegistration.noticeConfirm",
+                      "codex.webSessionImport.noticeConfirm",
                       "已知晓，继续导入",
                     )}
                   </button>
@@ -18548,12 +18570,14 @@ export function CodexAccountsPage() {
               accountIds,
               restrictFreeAccounts,
               backupAccountIds,
+              preferredAccountIds,
               sessionAffinity,
               sessionAffinityTtlMs,
             }) =>
               handleSaveLocalAccessAccounts(accountIds, {
                 restrictFreeAccounts,
                 backupAccountIds,
+                preferredAccountIds,
                 sessionAffinity,
                 sessionAffinityTtlMs,
               })
